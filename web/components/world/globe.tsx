@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GlobeMethods } from "react-globe.gl";
 import * as THREE from "three";
 import { BANDS, BAND_COLOR, type AgentPoint, type Arc, type Band, type Ring } from "./use-world";
@@ -36,6 +36,7 @@ interface Props {
 interface ParticleList { key: string; points: AgentPoint[]; color: string; size: number }
 
 const scoreColor = (s: number) => (s < 450 ? BAND_COLOR.red : s < 600 ? BAND_COLOR.amber : s < 750 ? BAND_COLOR.neutral : BAND_COLOR.green);
+const hexSide = () => "rgba(34,211,238,0.12)";
 
 export function WorldGlobe(p: Props) {
   const box = useRef<HTMLDivElement>(null);
@@ -70,6 +71,20 @@ export function WorldGlobe(p: Props) {
   }, [ready, p.pov]);
 
   const material = useMemo(() => new THREE.MeshPhongMaterial({ color: "#0a1224", emissive: "#060b16", shininess: 6 }), []);
+
+  // Stable accessors and one merged mesh: a new accessor function on every render made
+  // react-globe.gl rebuild every hex mesh each time the feed re-rendered the globe (QA-008).
+  // Merged hexes cannot be clicked, so the Observatory picks a region from the globe click.
+  const { hexColorBy, hexMax } = p;
+  const hexAltitude = useCallback((d: { sumWeight: number }) => (hexColorBy === "score" ? 0.02 : Math.min(0.35, (d.sumWeight / Math.max(1, hexMax ?? 1)) * 0.35 + 0.005)), [hexColorBy, hexMax]);
+  const hexTopColor = useCallback((d: { sumWeight: number; points: object[] }) => {
+    if (hexColorBy === "score") {
+      const pts = d.points as HexPoint[];
+      return scoreColor(pts.reduce((s, x) => s + (x.score ?? 600), 0) / Math.max(1, pts.length));
+    }
+    const t = Math.min(1, d.sumWeight / Math.max(1, hexMax ?? 1));
+    return `rgba(${Math.round(34 + t * 214)},${Math.round(211 - t * 98)},${Math.round(238 - t * 125)},${0.35 + t * 0.6})`;
+  }, [hexColorBy, hexMax]);
 
   const particles: ParticleList[] = useMemo(() => {
     if (p.dimmed && p.highlight) {
@@ -166,21 +181,11 @@ export function WorldGlobe(p: Props) {
         hexBinPointWeight="weight"
         hexBinResolution={3}
         hexMargin={0.18}
-        hexAltitude={(d: { sumWeight: number }) => (p.hexColorBy === "score" ? 0.02 : Math.min(0.35, (d.sumWeight / Math.max(1, p.hexMax ?? 1)) * 0.35 + 0.005))}
-        hexTopColor={(d: { sumWeight: number; points: object[] }) => {
-          if (p.hexColorBy === "score") {
-            const pts = d.points as HexPoint[];
-            return scoreColor(pts.reduce((s, x) => s + (x.score ?? 600), 0) / Math.max(1, pts.length));
-          }
-          const t = Math.min(1, d.sumWeight / Math.max(1, p.hexMax ?? 1));
-          return `rgba(${Math.round(34 + t * 214)},${Math.round(211 - t * 98)},${Math.round(238 - t * 125)},${0.35 + t * 0.6})`;
-        }}
-        hexSideColor={() => "rgba(34,211,238,0.12)"}
-        hexTransitionDuration={600}
-        onHexClick={(h: { points: object[] }) => {
-          const pts = h.points as HexPoint[];
-          if (pts[0]) p.onHex?.(pts[0].lat, pts[0].lng);
-        }}
+        hexAltitude={hexAltitude}
+        hexTopColor={hexTopColor}
+        hexSideColor={hexSide}
+        hexBinMerge
+        hexTransitionDuration={0}
         onGlobeClick={({ lat, lng }: { lat: number; lng: number }) => p.onGlobe(lat, lng)}
       />
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTable } from "spacetimedb/react";
 import { tables } from "@/module_bindings";
@@ -103,13 +103,23 @@ function WorldInner() {
     return r;
   }, [events, agents.byId, layer, patterns]);
 
+  // The Observatory re-bins on a metric switch and every 10 s, not on every agent update:
+  // binning 10,000 agents and rebuilding the hex mesh is the expensive part (QA-008).
+  const [hexTick, setHexTick] = useState(0);
+  useEffect(() => {
+    if (mode !== "observatory") return;
+    const id = setInterval(() => setHexTick((t) => t + 1), 10_000);
+    return () => clearInterval(id);
+  }, [mode]);
+  const agentsNow = useRef(agents.byId);
+  agentsNow.current = agents.byId;
   const hex = useMemo((): { points: HexPoint[] | null; colorBy: "weight" | "score"; max: number } => {
     if (mode !== "observatory" || metric === "business") return { points: null, colorBy: "weight", max: 1 };
     const regionRow = new Map(regions.map((r) => [r.regionId, r]));
     const inPattern = new Set<number>();
     for (const p of patterns) if (p.status !== "dismissed") for (const a of p.agentIds) inPattern.add(a);
     const pts: HexPoint[] = [];
-    for (const a of agents.all) {
+    for (const a of agentsNow.current.values()) {
       const r = regionRow.get(a.region);
       const share = r && r.agents ? 1 / r.agents : 0;
       let w = 0;
@@ -124,10 +134,12 @@ function WorldInner() {
     // Normalise height against a typical busy hex, not the single largest one.
     const total = pts.reduce((s, x) => s + x.weight, 0);
     return { points: pts, colorBy: metric === "credit" ? "score" : "weight", max: Math.max(1, (total / 180) * 4) };
-  }, [mode, metric, agents.all, regions, patterns]);
+    // hexTick re-reads agentsNow; agents.ready triggers the first bin once data has arrived
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, metric, hexTick, agents.ready, regions.length, patterns.length]);
 
   const onGlobe = (lat: number, lng: number) => {
-    if (mode === "observatory") return;
+    if (mode === "observatory") return onHex(lat, lng);
     const a = agents.nearest(lat, lng);
     if (a) selectAgent(a.id);
   };
