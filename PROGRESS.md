@@ -1,5 +1,5 @@
 # Vouch World progress
-Loop: 3 Fix (Loop 2 report in QA_REPORT.md) | Gate: G6 | Sim day: live on /system | Last green e2e: 2026-10-24 12:46 UTC (`npx playwright test e2e/`, 4/4)
+Loop: 3 done (QA_REPORT.md) | Gate: G6, live checks left | Sim day: live on /system | Last green e2e: 2026-10-24 12:46 UTC (`npx playwright test e2e/`, 4/4)
 
 Environment for this session: local SpacetimeDB 2.13.0 standalone on `ws://localhost:3011` (installed in the cloud session, `spacetime start`), not Maincloud. "Live" below means against that running server. CREAO runs in fixture mode. Every live-only step is listed in `docs/LIVE_CHECKLIST.md`.
 
@@ -71,7 +71,8 @@ Environment for this session: local SpacetimeDB 2.13.0 standalone on `ws://local
 - [x] T5.5 The Investigator receives the verification result and cites it. (orchestrator sends `credential` in the case; worker test "T5.5 the Investigator cites a verified credential")
 
 ## Gate G6 Ship
-- [ ] T6.1 The demo script runs twice in a row from `demo-reset` with no manual fixes.
+- [x] T6.1 The demo script runs twice in a row from `demo-reset` with no manual fixes. (`npx tsx scripts/demo-reset.ts && npx playwright test e2e/demo.spec.ts --repeat-each 2`: 2 passed in 6.7 min. It covers every step of the 4-minute script in fixture mode: home, Live world, agent panel → cause, phone claim, business with the kill switch off/on and accept, Replay, Observatory → region, lab. Log: `qa/results-demo-T6.1.log`.)
+  - UNVERIFIED-LIVE: the same script with live CREAO runs and a real phone video, rehearsed twice by the team on the laptop (`npm run build && npm run start`).
 - [x] T6.2 README has CREAO agent IDs and run links; where and how Droid is used; how SpacetimeDB is used; real versus simulated; setup; limits. (IDs and links are `<fill in>` until the agents exist)
 - [ ] T6.3 Devpost draft submitted with CREAO, SpacetimeDB and Factory tracks, teammates, video. (humans)
 - [x] T6.4 Secret scan clean; `NEXT_PUBLIC_DATA=fixture` build fails as designed. (`grep` for `capi_`/`cr_sk_` values over the repo and `web/.next/static`: none; fixture build: "refusing to build fixture data into a deployable app"; a normal `next build` succeeds)
