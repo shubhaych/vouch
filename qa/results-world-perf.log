@@ -1,0 +1,4 @@
+
+Running 1 test using 1 worker
+
+[1/1] qa/world-perf.spec.ts:6:1 › world modes: long-task load over 10 s

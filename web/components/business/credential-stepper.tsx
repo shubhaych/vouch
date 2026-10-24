@@ -17,7 +17,10 @@ export function CredentialStepper({ refundId }: { refundId: bigint }) {
   const [credentials] = useTable(tables.credential);
   const call = useCall();
   const latest = useMemo(() => [...verifications].sort((a, b) => Number(b.id - a.id))[0], [verifications]);
-  const cred = latest ? credentials.find((c) => c.id === latest.credentialId) : undefined;
+  const used = latest ? credentials.find((c) => c.id === latest.credentialId) : undefined;
+  // Re-verify with the holder's newest credential from that issuer: issuers renew every few
+  // minutes of sim time, and the one this claim first used may have expired since (QA-013).
+  const cred = used ? [...credentials].filter((c) => c.holder === used.holder && c.issuer === used.issuer).sort((a, b) => b.issuedDay - a.issuedDay)[0] : undefined;
   const steps = parse<Step[]>(latest?.stepsJson, []);
   const revealed = parse<Record<string, unknown>>(latest?.revealedJson, {});
   const [shown, setShown] = useState(0);
