@@ -128,6 +128,8 @@ test('P6 controller: credential verify, tamper and revoke in the five-step check
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   await seat(page, CONTROLLER_CODE);
+  // The five-step check belongs to a claim whose shopper holds a credential: A-00421's showcase claim.
+  await page.locator('[data-testid^="queue-"]').filter({ hasText: 'A-00421' }).first().click({ timeout: 30_000 });
   await expect(page.getByTestId('credential-stepper')).toBeVisible({ timeout: 30_000 });
   await page.getByTestId('cred-verify').click();
   await expect(page.getByTestId('cred-result')).toContainText(/pass|verified/i, { timeout: 30_000 });
@@ -152,8 +154,10 @@ test('P7 judge on the globe: layers, agent, graph click-through, replay, observa
   }
   await shot(page, 'P7-layer-credit');
   await expect(page.getByTestId('monitor-line').first()).toBeVisible({ timeout: 30_000 });
+  await page.getByTestId('monitor-tab-refunds').click();
+  await expect(page.getByTestId('monitor-line').first()).toBeVisible({ timeout: 60_000 });
   await page.getByTestId('event-monitor').locator('ol').hover();
-  await page.getByTestId('monitor-line').filter({ hasText: /\[Refund/ }).first().click();
+  await page.getByTestId('monitor-line').first().click();
   await expect(page.getByTestId('agent-panel')).toBeVisible();
   const dots = page.getByTestId('credit-dot');
   await expect(dots.first()).toBeVisible({ timeout: 15_000 });

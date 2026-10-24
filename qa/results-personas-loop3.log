@@ -35,3 +35,38 @@ Running 7 tests using 1 worker
 
 
 [5/7] qa/personas.spec.ts:144:1 › P7 judge on the globe: layers, agent, graph click-through, replay, observatory, region
+  2) qa/personas.spec.ts:144:1 › P7 judge on the globe: layers, agent, graph click-through, replay, observatory, region 
+
+    Test timeout of 300000ms exceeded.
+
+    Error: locator.click: Test timeout of 300000ms exceeded.
+    Call log:
+      - waiting for getByTestId('monitor-line').filter({ hasText: /\[Refund/ }).first()
+
+
+      154 |   await expect(page.getByTestId('monitor-line').first()).toBeVisible({ timeout: 30_000 });
+      155 |   await page.getByTestId('event-monitor').locator('ol').hover();
+    > 156 |   await page.getByTestId('monitor-line').filter({ hasText: /\[Refund/ }).first().click();
+          |                                                                                  ^
+      157 |   await expect(page.getByTestId('agent-panel')).toBeVisible();
+      158 |   const dots = page.getByTestId('credit-dot');
+      159 |   await expect(dots.first()).toBeVisible({ timeout: 15_000 });
+        at /home/user/vouch/qa/personas.spec.ts:156:82
+
+    Error Context: test-results/qa-personas-P7-judge-on-th-bb31e-h-replay-observatory-region/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/qa-personas-P7-judge-on-th-bb31e-h-replay-observatory-region/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/qa-personas-P7-judge-on-th-bb31e-h-replay-observatory-region/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[6/7] qa/personas.spec.ts:198:1 › P8 engineer: /lab user trigger and stream, /system bench
+[7/7] qa/personas.spec.ts:223:1 › Every page at 390 px has no horizontal scroll
+  2 failed
+    qa/personas.spec.ts:127:1 › P6 controller: credential verify, tamper and revoke in the five-step check 
+    qa/personas.spec.ts:144:1 › P7 judge on the globe: layers, agent, graph click-through, replay, observatory, region 
+  5 passed (9.2m)

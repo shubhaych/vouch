@@ -1,0 +1,4 @@
+
+Running 2 tests using 1 worker
+
+[1/2] qa/personas.spec.ts:127:1 › P6 controller: credential verify, tamper and revoke in the five-step check
