@@ -57,6 +57,19 @@ export function fixtureResponse(seat: Seat, c: unknown): unknown {
     else if (get(c, 'deterministic_checks.within_window') === false) { reason = 'The claim was filed outside the return window.'; cites = 'policy:window'; }
     if (reason) return fill(load(seat, 'more_evidence'), { claim_id: get(c, 'claim_id'), reason, cites });
     const accept = fill(load(seat, 'accept'), { claim_id: get(c, 'claim_id'), amount, needs_controller: amount > Number(get(c, 'controller_threshold') ?? 500) }) as Obj;
+    // The history reason states this shopper's real numbers (QA-004). A high refund ratio is context,
+    // not proof: it lowers confidence so a person looks closer, and never turns into a decline.
+    const asked = Number(get(c, 'history.refunds_requested_90d') ?? NaN);
+    const ratio = Number(get(c, 'history.refund_ratio_90d') ?? NaN);
+    if (Number.isFinite(asked) && Number.isFinite(ratio)) {
+      const bought = ratio > 0 ? Math.round(asked / ratio) : Number(get(c, 'history.purchases_completed') ?? 0);
+      const high = ratio >= 0.4 && asked >= 3;
+      const text = `Refunds were requested on ${asked} of the last ${bought} purchases (${Math.round(ratio * 100)}% in 90 days)${high
+        ? ', well above typical shoppers; weighed as context, not proof, so the video evidence decides and a person should look closely.'
+        : ', in line with typical shoppers.'}`;
+      accept.reasons = (accept.reasons as Obj[]).map((r) => (r.cites === 'history:refund_ratio_90d' ? { ...r, text } : r));
+      if (high) accept.confidence = 0.55;
+    }
     // The prompt weighs a verified credential from another store as context, and every reason cites its source.
     const issuer = get(c, 'credential.issuer');
     if (get(c, 'credential.verified') === true && issuer) {

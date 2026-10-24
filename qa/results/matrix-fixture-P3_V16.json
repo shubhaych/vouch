@@ -1,0 +1,166 @@
+{
+  "ranAt": "2026-10-24T13:30:32.692Z",
+  "mode": "fixture",
+  "rows": [
+    {
+      "id": "V16",
+      "persona": "P2→fresh shopper",
+      "video": "S04-fresh (stand-in)",
+      "expected": "Recommendation goes to the controller",
+      "actual": "amount $649.00; accept; business accept → refund awaiting_controller; controller accept → ok, refund accepted; journal #13",
+      "match": false,
+      "details": {
+        "checks": {
+          "fresh": true,
+          "uploaded_after_s": 2,
+          "duration_s": 8,
+          "width": 480,
+          "height": 360,
+          "duration_ok": true,
+          "resolution_ok": false,
+          "frame_reuse": [],
+          "frame_times": [
+            0.5,
+            0.8,
+            1.6,
+            2.4,
+            3.2,
+            4,
+            4.8,
+            5.6,
+            7.5
+          ],
+          "blank_frames": 0,
+          "frame_motion": 18,
+          "still_image": false,
+          "within_window": true,
+          "reason_allowed": true,
+          "over_video_threshold": true,
+          "policy_line": "30-day window; video required over $100"
+        },
+        "evidenceFlags": {
+          "unable_to_verify": false,
+          "capture_flags": [],
+          "challenge": {
+            "expected": 3,
+            "seen": 3,
+            "passed": true
+          },
+          "provenance": "fixture",
+          "summary": "The item matches the order and the claimed crack is visible in frames 3 and 4. The finger challenge was passed at the end of the video."
+        },
+        "recommendation": {
+          "action": "accept",
+          "amount": 64900,
+          "method": "original_payment",
+          "confidence": 0.78,
+          "status": "proposed",
+          "reasons": [
+            "frame:3: The claimed defect is visible in two frames and matches the claim.",
+            "policy:window: The claim was filed inside the return window.",
+            "history:refund_ratio_90d: Refunds were requested on 1 of the last 1 purchases (100% in 90 days), in line with typical shoppers."
+          ]
+        },
+        "offline": false,
+        "runsStarted": 2,
+        "secondsToRec": 4.2
+      }
+    },
+    {
+      "id": "P3",
+      "persona": "P3",
+      "video": "S05-fresh",
+      "expected": "More scrutiny; never an automatic decline",
+      "actual": "upload 200; accept $249.00; reasons: frame:3: The claimed defect is visible in two frames and matches the claim. | policy:window: The claim was filed inside the return window. | history:refund_ratio_90d: Refunds were requested on 6 of th",
+      "match": true,
+      "details": {
+        "upload": {
+          "ok": true,
+          "frames": 9,
+          "checks": {
+            "fresh": true,
+            "uploaded_after_s": 11,
+            "duration_s": 8,
+            "width": 480,
+            "height": 360,
+            "duration_ok": true,
+            "resolution_ok": false,
+            "frame_reuse": [],
+            "frame_times": [
+              0.5,
+              0.8,
+              1.6,
+              2.4,
+              3.2,
+              4,
+              4.8,
+              5.6,
+              7.5
+            ],
+            "blank_frames": 0,
+            "frame_motion": 14,
+            "still_image": false,
+            "within_window": true,
+            "reason_allowed": true,
+            "over_video_threshold": true,
+            "policy_line": "30-day window; video required over $100"
+          }
+        },
+        "checks": {
+          "fresh": true,
+          "uploaded_after_s": 11,
+          "duration_s": 8,
+          "width": 480,
+          "height": 360,
+          "duration_ok": true,
+          "resolution_ok": false,
+          "frame_reuse": [],
+          "frame_times": [
+            0.5,
+            0.8,
+            1.6,
+            2.4,
+            3.2,
+            4,
+            4.8,
+            5.6,
+            7.5
+          ],
+          "blank_frames": 0,
+          "frame_motion": 14,
+          "still_image": false,
+          "within_window": true,
+          "reason_allowed": true,
+          "over_video_threshold": true,
+          "policy_line": "30-day window; video required over $100"
+        },
+        "evidenceFlags": {
+          "unable_to_verify": false,
+          "capture_flags": [],
+          "challenge": {
+            "expected": 3,
+            "seen": 3,
+            "passed": true
+          },
+          "provenance": "fixture",
+          "summary": "The item matches the order and the claimed crack is visible in frames 3 and 4. The finger challenge was passed at the end of the video."
+        },
+        "recommendation": {
+          "action": "accept",
+          "amount": 24900,
+          "method": "original_payment",
+          "confidence": 0.55,
+          "status": "proposed",
+          "reasons": [
+            "frame:3: The claimed defect is visible in two frames and matches the claim.",
+            "policy:window: The claim was filed inside the return window.",
+            "history:refund_ratio_90d: Refunds were requested on 6 of the last 10 purchases (60% in 90 days), well above typical shoppers; weighed as context, not proof, so the video evidence decides and a person should look closely."
+          ]
+        },
+        "offline": false,
+        "runsStarted": 2,
+        "secondsToRec": 3.2
+      }
+    }
+  ]
+}

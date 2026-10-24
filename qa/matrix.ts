@@ -4,6 +4,7 @@
 // the recommendation, and (where the case says) decides as the business or
 // controller. Writes qa/results/matrix-<mode>.json. QA only: never fixes.
 //   npx tsx qa/matrix.ts [--only V02,V08] [--skip-stale]
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { DbConnection } from '../worker/module_bindings/index';
 import { loadEnv } from '../scripts/_env';
@@ -18,6 +19,13 @@ const argv = process.argv.slice(2);
 const only = argv.includes('--only') ? new Set(argv[argv.indexOf('--only') + 1]!.split(',')) : null;
 const skipStale = argv.includes('--skip-stale');
 const V = (f: string) => `qa/videos/${f}`;
+/** A never-uploaded moving clip, for cases where frame reuse from an earlier run would hide what is being tested. */
+function freshClip(): string {
+  mkdirSync('qa/results', { recursive: true });
+  const out = `qa/results/clip-${Date.now()}.mp4`;
+  execFileSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', `life=s=480x360:mold=10:r=24:ratio=0.12:seed=${Date.now() % 1e9}`, '-t', '8', '-pix_fmt', 'yuv420p', out]);
+  return out;
+}
 
 const QUERIES = [
   'SELECT * FROM my_agent', "SELECT * FROM purchase WHERE source = 'live'", "SELECT * FROM refund WHERE source = 'live'", 'SELECT * FROM claim',
@@ -212,7 +220,7 @@ if (want('V15')) {
 if (want('V16')) {
   const s = await shopper('qa-v16');
   const { claim, refund } = await fileClaim(s, 2, 21);
-  const u = await upload(claim.id, claim.nonce, V('S04-fresh.mp4'));
+  const u = await upload(claim.id, claim.nonce, freshClip());
   const o = await outcome(s.conn, claim.id, refund.id, u.t0);
   let flow = '';
   if (o.recommendation?.action === 'accept') {
@@ -225,7 +233,7 @@ if (want('V16')) {
     const je = await wait('journal entry', () => journalFor(s.conn, refund.id), 20_000).catch(() => undefined);
     flow = `business accept → refund ${st1}; controller accept → ${ctrl}, refund ${st2}; journal ${je ? `#${je.id}` : 'missing'}`;
   }
-  const ok = refund.amount > 50_000 && flow.includes('sent_to_controller') && flow.includes('refund accepted');
+  const ok = refund.amount > 50_000 && flow.includes('awaiting_controller') && flow.includes('refund accepted');
   record({ id: 'V16', persona: 'P2→fresh shopper', video: 'S04-fresh (stand-in)', expected: 'Recommendation goes to the controller', actual: `amount $${(refund.amount / 100).toFixed(2)}; ${o.recommendation?.action ?? 'no recommendation'}; ${flow}`, match: ok, details: o });
 }
 
@@ -255,7 +263,7 @@ if (want('P3')) {
     const s = await shopper('qa-p3', a.token);
     const c = a.claims[0]!;
     const refund = [...s.conn.db.claim.iter()].find((x) => String(x.id) === c.claimId);
-    const u = await upload(BigInt(c.claimId), c.nonce, V('S05-fresh.mp4'));
+    const u = await upload(BigInt(c.claimId), c.nonce, freshClip());
     const o = refund ? await outcome(s.conn, BigInt(c.claimId), refund.refundId, u.t0) : {};
     const rec = (o as Outcome).recommendation;
     record({ id: 'P3', persona: 'P3', video: 'S05-fresh', expected: 'More scrutiny; never an automatic decline', actual: `upload ${u.status}; ${rec ? `${rec.action} $${(rec.amount / 100).toFixed(2)}; reasons: ${rec.reasons.join(' | ').slice(0, 200)}` : 'no recommendation'}`, match: !!rec && rec.action !== 'decline', details: { upload: u.body, ...o } });

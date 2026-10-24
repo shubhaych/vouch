@@ -141,7 +141,11 @@ export class Showcase {
       action: string; amount: number; method: string; confidence: number; reasons: unknown[];
     };
     const reasons = [...(inv.reasons ?? [])];
-    if (credential?.verified) reasons.push({ text: `Verified credential from ${credential.issuer}: 10 or more purchases, low refund ratio, no confirmed fraud.`, cites: `credential:${credential.issuer}` });
+    if (credential?.verified) {
+      // Say exactly what the credential disclosed (QA-010), not the verifier's minimum.
+      const cl = credential.claims as Record<string, unknown>;
+      reasons.push({ text: `Verified credential from ${credential.issuer}: ${String(cl.completed_purchases_gte)} or more completed purchases, ${String(cl.refund_ratio_band)} refund ratio, no confirmed fraud in 180 days.`, cites: `credential:${credential.issuer}` });
+    }
     await call('recordEvidence', r.recordEvidence({ claimId, seat: 'refund_investigator', runId: rec?.investigatorRun.runId ?? '', runUrl: rec?.investigatorRun.runUrl ?? '', json: JSON.stringify({ ...inv, reasons, credential }), provenance: prov }));
     await call('propose', r.propose({
       refundId, action: inv.action === 'accept' ? 'accept' : 'more_evidence', amount: inv.action === 'accept' ? amount : 0, method: inv.method || 'original_payment',

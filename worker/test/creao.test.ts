@@ -86,6 +86,19 @@ describe('fixtures follow each prompt\'s hard rules', () => {
     expect(inv({ evidence: { challenge: { passed: false } } }).action).toBe('more_evidence');
     expect(inv({ deterministic_checks: { frame_reuse: [], within_window: true, still_image: true } }).action).toBe('more_evidence'); // QA-003
   });
+  it('QA-004 the history reason states the real numbers; a high refund ratio lowers confidence but never declines', () => {
+    type R = { action: string; confidence: number; reasons: { text: string; cites: string }[] };
+    const hist = (bought: number, asked: number) => ({ history: { purchases_completed: bought, refunds_requested_90d: asked, refund_ratio_90d: Math.round((asked / bought) * 100) / 100 } });
+    const repeat = inv(hist(10, 6)) as unknown as R;
+    const h = repeat.reasons.find((r) => r.cites === 'history:refund_ratio_90d')!;
+    expect(repeat.action).toBe('accept');
+    expect(h.text).toContain('6 of the last 10');
+    expect(h.text).not.toMatch(/in line with typical/);
+    expect(repeat.confidence).toBeLessThan(0.78);
+    const normal = inv(hist(20, 1)) as unknown as R;
+    expect(normal.reasons.find((r) => r.cites === 'history:refund_ratio_90d')!.text).toContain('1 of the last 20');
+    expect(normal.confidence).toBe(0.78);
+  });
   it('T5.5 the Investigator cites a verified credential, and ignores one that failed', () => {
     const cited = (r: { reasons: { cites: string }[] }) => r.reasons.map((x) => x.cites);
     const ok = inv({ credential: { presented: true, verified: true, failed_step: null, issuer: 'B-019', claims: { refund_ratio_band: 'low' } } }) as unknown as { reasons: { cites: string }[] };
