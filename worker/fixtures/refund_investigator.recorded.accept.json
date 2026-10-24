@@ -1,0 +1,10 @@
+{
+  "_fixture": "recorded from run e02ad1a1-dee9-4915-9a94-9d2151e8fd75 on 2026-10-24T20:08:21.986Z",
+  "case": "C-TEST2",
+  "claim_id": "C-TEST2",
+  "action": "accept",
+  "amount": 249,
+  "method": "original_payment",
+  "confidence": 0.88,
+  "needs_controller": "false"
+}

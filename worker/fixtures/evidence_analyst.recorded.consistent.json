@@ -1,0 +1,10 @@
+{
+  "_fixture": "recorded from run 8dc784e9-adcc-4db5-8f0c-c6d4d3b68916 on 2026-10-24T20:07:36.035Z",
+  "case": "C-TEST1",
+  "claim_id": "C-TEST1",
+  "item_match": "uncertain",
+  "claimed_defect_visible": "uncertain",
+  "challenge_seen": "null",
+  "challenge_passed": "false",
+  "unable_to_verify": "true"
+}

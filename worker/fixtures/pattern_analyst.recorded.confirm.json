@@ -1,0 +1,16 @@
+{
+  "_fixture": "recorded from run 723e0a49-f7d9-4d1c-8505-5bd643176b18 on 2026-10-24T20:09:07.739Z",
+  "case": "FR-028",
+  "claim_id": "R-5521",
+  "pattern_id": "FR-028",
+  "verdict": "needs_review",
+  "confidence": 0.52,
+  "core_agents": "A-01877",
+  "item_match": "yes",
+  "claimed_defect_visible": "unverifiable",
+  "challenge_seen": "no",
+  "unable_to_verify": "yes",
+  "action": "needs_review",
+  "method": "skill-procedure",
+  "needs_controller": "yes"
+}
