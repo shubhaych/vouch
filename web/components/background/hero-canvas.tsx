@@ -69,13 +69,18 @@ function District() {
   );
 }
 
+// Constructa's small linear congruential generator, so the lit windows are the same on every render.
+function lcg(seed: number) {
+  let s = seed;
+  return () => ((s = (s * 9301 + 49297) % 233280) / 233280);
+}
+
 function Block({ index, position, floors, width, depth, color }: { index: number; position: [number, number, number]; floors: number; width: number; depth: number; color: string }) {
   const FLOOR_H = 0.6;
   const bodyH = floors * FLOOR_H;
   const windows = useMemo(() => {
     const out: { pos: [number, number, number]; rot: [number, number, number]; lit: string | null }[] = [];
-    let s = index * 9301 + 49297;
-    const rnd = () => ((s = (s * 9301 + 49297) % 233280) / 233280);
+    const rnd = lcg(index * 9301 + 49297);
     for (let f = 0; f < floors; f++) {
       const y = FLOOR_H * (f + 0.5);
       for (let c = 0; c < 3; c++) {

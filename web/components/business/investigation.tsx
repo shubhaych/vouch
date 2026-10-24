@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Line, LineChart, ResponsiveContainer, YAxis } from "recharts";
 import { useTable } from "spacetimedb/react";

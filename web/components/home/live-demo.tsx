@@ -101,7 +101,7 @@ export function LiveDemo() {
           <ol className="space-y-2" data-testid="demo-steps">
             {visible.map((s, i) => (
               <motion.li key={s.title + i} initial={false} animate={{ opacity: s.lit ? 1 : 0.32, x: s.lit ? 0 : -4 }} transition={{ duration: 0.3 }} className="flex items-center gap-3">
-                <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${s.lit ? "bg-honest text-black" : "border border-line-dark text-ink-soft-dark"}`}>{s.lit ? "✓" : i + 1}</span>
+                <span aria-hidden className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${s.lit ? "bg-honest text-black" : "border border-line-dark text-ink-soft-dark"}`}>{s.lit ? "✓" : i + 1}</span>
                 <span className="text-sm font-medium">
                   {i === 8 && s.lit && credit ? <>Credit {credit.before} → <span className="font-mono text-honest"><Tween value={credit.after} duration={1.2} /></span></> : s.title}
                 </span>

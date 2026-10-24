@@ -88,3 +88,12 @@ export const ping = spacetimedb.reducer({ clientSentMs: t.f64() }, (ctx, { clien
   const row = ctx.db.latencyPing.insert({ id: 0n, who: ctx.sender, clientSentMs, serverAt: ctx.timestamp });
   if (row.id > 300n) ctx.db.latencyPing.id.delete(row.id - 300n);
 });
+
+/** scripts/bench.ts records what it measured on throwaway databases. Only real runs are written. */
+export const recordBench = spacetimedb.reducer(
+  { agents: t.u32(), days: t.u32(), stepsPerSec: t.f64(), daysPerMin: t.f64(), machine: t.string(), ranAt: t.string() },
+  (ctx, a) => {
+    requireRole(ctx, 'worker', 'controller');
+    ctx.db.benchResult.insert({ id: 0, ...a });
+  },
+);

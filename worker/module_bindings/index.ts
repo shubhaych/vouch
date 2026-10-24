@@ -54,6 +54,7 @@ import OpenInvestigationReducer from "./open_investigation_reducer";
 import PingReducer from "./ping_reducer";
 import PostReducer from "./post_reducer";
 import ProposeReducer from "./propose_reducer";
+import RecordBenchReducer from "./record_bench_reducer";
 import RecordEvidenceReducer from "./record_evidence_reducer";
 import RecordRunReducer from "./record_run_reducer";
 import RecordVerificationReducer from "./record_verification_reducer";
@@ -476,6 +477,7 @@ const reducersSchema = __reducers(
   __reducerSchema("ping", PingReducer),
   __reducerSchema("post", PostReducer),
   __reducerSchema("propose", ProposeReducer),
+  __reducerSchema("record_bench", RecordBenchReducer),
   __reducerSchema("record_evidence", RecordEvidenceReducer),
   __reducerSchema("record_run", RecordRunReducer),
   __reducerSchema("record_verification", RecordVerificationReducer),

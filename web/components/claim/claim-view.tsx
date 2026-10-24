@@ -60,7 +60,7 @@ export function ClaimView() {
       <ol className="space-y-2" data-testid="claim-stepper">
         {steps.map((s, i) => (
           <motion.li key={s.title} initial={false} animate={{ opacity: s.on || s.active ? 1 : 0.4 }} className="flex items-center gap-3">
-            <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${s.on ? "bg-emerald-500 text-white" : s.active ? "animate-pulse bg-cyan-400 text-white" : "bg-slate-200 text-slate-500"}`}>{s.on ? "✓" : i + 1}</span>
+            <span aria-hidden className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${s.on ? "bg-emerald-500 text-white" : s.active ? "animate-pulse bg-cyan-400 text-white" : "bg-slate-200 text-slate-500"}`}>{s.on ? "✓" : i + 1}</span>
             <span className="text-sm font-medium">{s.title}</span>
             {s.sub ? <span className="text-xs text-ink-soft">{s.sub}</span> : null}
           </motion.li>

@@ -117,8 +117,6 @@ export function useReplay(pattern: FraudPattern | null, agents: Map<number, Agen
     return {
       events, ready, start, end, playhead, setPlayhead, playing, setPlaying, speed, setSpeed, arcs, rings, members, dimmed, businessIds, pov, detectionDay,
     };
-    // pov only depends on the pattern's members, not the playhead
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pattern, events, ready, playhead, playing, speed, agents, businesses, start, end, detectionDay]);
 }
 

@@ -86,7 +86,7 @@ function Catalog() {
         {items.map((item) => (
           <article key={item.sku} className="feature--telemetry flex flex-col justify-between" data-testid={`product-${item.sku}`}>
             <div>
-              <div className="feature__kicker">SKU {item.sku} · {item.category}</div>
+              <div className="feature__kicker">{`SKU ${item.sku} · ${item.category}`}</div>
               <h3 className="feature__title">{item.name}</h3>
               <p className="feature__body text-sm">{item.description}</p>
             </div>

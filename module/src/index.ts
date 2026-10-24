@@ -7,7 +7,7 @@ import { spacetimedb } from './schema';
 export default spacetimedb;
 export { init, seedWorld, tick } from './economy';
 export {
-  bootstrapWorker, bootstrapPoster, setSeatCodes, takeBusinessSeat, switchBusiness, setControl, setSim, ping,
+  bootstrapWorker, bootstrapPoster, setSeatCodes, takeBusinessSeat, switchBusiness, setControl, setSim, ping, recordBench,
 } from './control';
 export { joinAsShopper, buy, fastForward, requestRefund, showcaseAct } from './consumer';
 export { attachVideo, setClaimStatus, recordRun, runStep, finishRun, recordEvidence, openInvestigation } from './claims';
