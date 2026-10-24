@@ -45,8 +45,10 @@ test('T6.1 the judge demo, start to finish', async ({ page, context }) => {
   await expect(page.getByTestId('events-per-sec')).toBeVisible();
 
   // 0:50 Agent panel: credit progression, click a drop to open its cause.
-  await page.getByTestId('event-monitor').locator('ol').hover();
-  await page.getByTestId('monitor-line').filter({ hasText: /\[Refund/ }).first().click();
+  await page.getByTestId('monitor-tab-refunds').click();
+  await expect(page.getByTestId('monitor-line').first()).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId('event-monitor').locator('ol').hover(); // hovering pauses the list so the line stays put
+  await page.getByTestId('monitor-line').first().click();
   await expect(page.getByTestId('credit-chart')).toBeVisible({ timeout: 15_000 });
   await page.getByTestId('credit-dot').last().click({ force: true });
   await expect(page.getByTestId('cause-card')).toBeVisible({ timeout: 15_000 });
