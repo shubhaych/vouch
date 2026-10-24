@@ -27,7 +27,7 @@ const CELL = 2; // degrees
 export function useAgents(): AgentsState {
   const conn = useConn();
   const { version, ready } = useTableVersion("agent", "SELECT * FROM agent", 1500);
-  const prev = useRef<{ key: string; byBand: Record<Band, AgentPoint[]>; live: AgentPoint[]; grid: Map<string, AgentPoint[]>; all: AgentPoint[] } | null>(null);
+  const prev = useRef<{ key: string; byBand: Record<Band, AgentPoint[]>; live: AgentPoint[]; grid: Map<string, AgentPoint[]>; all: AgentPoint[]; at: number } | null>(null);
 
   return useMemo(() => {
     const byId = new Map<number, AgentPoint>();
@@ -41,7 +41,8 @@ export function useAgents(): AgentsState {
       byId.set(a.id, { id: a.id, lat: a.lat, lng: a.lng, band, score: a.score, region: a.region, isLive: a.isLive, purchases: a.purchases, refunds: a.refunds });
       key += band[0];
     }
-    if (!prev.current || prev.current.key !== key) {
+    // Re-bucket at most every 5 s: each re-bucket rebuilds point clouds on the globe (QA-014).
+    if (!prev.current || (prev.current.key !== key && Date.now() - prev.current.at > 5000)) {
       const byBand: Record<Band, AgentPoint[]> = { red: [], amber: [], neutral: [], green: [] };
       const live: AgentPoint[] = [];
       const grid = new Map<string, AgentPoint[]>();
@@ -53,7 +54,7 @@ export function useAgents(): AgentsState {
         const cell = grid.get(k);
         if (cell) cell.push(p); else grid.set(k, [p]);
       }
-      prev.current = { key, byBand, live, grid, all };
+      prev.current = { key, byBand, live, grid, all, at: Date.now() };
     }
     const { byBand, live, grid, all } = prev.current;
     const nearest = (lat: number, lng: number, maxDeg = 2.5) => {
@@ -110,6 +111,25 @@ export function useFeed(): { events: FeedEvent[]; people: FeedEvent[]; ready: bo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [events, peopleVersion]);
   return { events, people, ready };
+}
+
+/**
+ * Keeps one object per id across updates. react-globe.gl matches data by object identity, so
+ * fresh arc and ring objects every 400 ms made it dispose and rebuild every arc, and three.js
+ * recompiled the dash shader each time (about 60% of the main thread in a profile, QA-014).
+ */
+export function useStableById<T extends { id: string }>(items: T[]): T[] {
+  const cache = useRef(new Map<string, T>());
+  return useMemo(() => {
+    const next = new Map<string, T>();
+    const out = items.map((it) => {
+      const kept = cache.current.get(it.id) ?? it;
+      next.set(it.id, kept);
+      return kept;
+    });
+    cache.current = next;
+    return out;
+  }, [items]);
 }
 
 export interface Arc { id: string; startLat: number; startLng: number; endLat: number; endLng: number; color: string | string[]; dash: number; stroke: number; kind: string }

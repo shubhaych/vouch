@@ -9,7 +9,7 @@ import { useCall, useRowsThrottled, useStatus } from "@/lib/stdb/hooks";
 import type { Business, RegionStat } from "@/module_bindings/types";
 import { int } from "@/lib/format";
 import { WorldGlobe, type BusinessPoint, type HexPoint, type Pov } from "./globe";
-import { arcsFromFeed, ringsFromFeed, useAgents, useFeed, type AgentPoint } from "./use-world";
+import { arcsFromFeed, ringsFromFeed, useAgents, useFeed, useStableById, type AgentPoint } from "./use-world";
 import { EventMonitor } from "./event-monitor";
 import { AgentPanel } from "./agent-panel";
 import { PatternsRail } from "./patterns-rail";
@@ -25,6 +25,8 @@ const LAYERS: { id: Layer; label: string }[] = [
   { id: "patterns", label: "Fraud patterns" },
   { id: "credit", label: "Agent credit" },
 ];
+
+const NONE: never[] = [];
 
 export function WorldView() {
   return (
@@ -138,6 +140,9 @@ function WorldInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, metric, hexTick, agents.ready, regions.length, patterns.length]);
 
+  const globeArcs = useStableById(mode === "replay" && replay ? replay.arcs : mode === "observatory" ? NONE : liveArcs);
+  const globeRings = useStableById(mode === "replay" && replay ? replay.rings : mode === "observatory" ? NONE : liveRings);
+
   const onGlobe = (lat: number, lng: number) => {
     if (mode === "observatory") return onHex(lat, lng);
     const a = agents.nearest(lat, lng);
@@ -173,8 +178,8 @@ function WorldInner() {
         highlight={highlight}
         selected={mode === "replay" ? null : selected}
         businesses={bizPoints}
-        arcs={mode === "replay" && replay ? replay.arcs : mode === "observatory" ? [] : liveArcs}
-        rings={mode === "replay" && replay ? replay.rings : mode === "observatory" ? [] : liveRings}
+        arcs={globeArcs}
+        rings={globeRings}
         hexPoints={hex.points}
         hexColorBy={hex.colorBy}
         hexMax={hex.max}

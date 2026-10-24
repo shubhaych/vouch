@@ -25,6 +25,19 @@ const VALIDITY_DAYS = 180;
 // credential this many days before it expires, the way a real issuer refreshes one.
 const RENEW_MARGIN_DAYS = 30;
 
+/**
+ * Renewal replaces an expiring credential. A revoked one stays revoked until the issuer
+ * reinstates it: re-issuing behind a revocation would undo the issuer's decision.
+ */
+export function needsRenewal<C extends { id: string; issuer: number; holder: string; issuedDay: number; expiresDay: number; revoked: boolean }>(
+  creds: Iterable<C>, holderDid: string, issuer: number, today: number,
+): boolean {
+  const newest = [...creds].filter((c) => c.holder === holderDid && c.issuer === issuer).sort((a, b) => b.issuedDay - a.issuedDay)[0];
+  if (!newest) return true;
+  if (newest.revoked) return false;
+  return !freshCredential([newest], holderDid, issuer, today);
+}
+
 /** Refund-to-purchase bands. 15% sits at the low end of typical online return rates, so one or two extra claims do not flip a good record. */
 export const ratioBand = (ratio: number) => (ratio < 0.15 ? 'low' : ratio < 0.35 ? 'medium' : 'high');
 
@@ -196,10 +209,10 @@ export class Credentials {
     }
   }
 
-  /** Issues a new credential from `issuer` when the agent has no fresh one (none, revoked, expired or expiring soon). */
+  /** Issues a new credential from `issuer` when the agent has none, or its newest one is expiring. Never replaces a revoked one. */
   async ensureFresh(agentId: number, issuer: number): Promise<void> {
     const today = this.conn.db.simRun.id.find(1)?.day ?? 0;
-    if (!freshCredential(this.conn.db.credential.iter(), this.holderFor(agentId).did, issuer, today)) await this.issue(agentId, issuer);
+    if (needsRenewal(this.conn.db.credential.iter(), this.holderFor(agentId).did, issuer, today)) await this.issue(agentId, issuer);
   }
 
   /** The holder's side: reveal what the verifier asks for, sign its nonce. `tamper` flips one revealed value (the demo's Tamper button). */

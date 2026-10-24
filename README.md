@@ -119,7 +119,7 @@ cp .env.example .env              # fill in what you have; every key is optional
 npm run stdb:start                # local SpacetimeDB on :3011 (or use Maincloud, docs/SETUP.md)
 npm run stdb:publish && npm run stdb:generate
 npm run worker                    # Fastify worker on :8787: orchestrator, video, detectors, poster, lab
-npm run dev                       # web on http://localhost:3000
+npm run dev                       # web on http://localhost:3000 (for the demo: npm run build && npm run start)
 npm run demo:reset                # seed 11, 10,000 agents, start the tick
 npm run check                     # typecheck, module and worker tests, rule checks
 npx playwright test e2e/          # browser smoke tests against the running stack

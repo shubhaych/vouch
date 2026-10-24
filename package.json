@@ -16,6 +16,7 @@
     "dev": "npm run dev -w web",
     "worker": "npm run start -w worker",
     "build": "npm run build -w web",
+    "start": "npm run start -w web",
     "lint": "npm run lint -w web",
     "typecheck": "npm run typecheck --workspaces && tsc -p .",
     "test": "npm test -w module && npm test -w worker",

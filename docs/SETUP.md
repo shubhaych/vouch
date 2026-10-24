@@ -56,7 +56,10 @@ Seats:
 2. Set `STDB_URI=https://maincloud.spacetimedb.com`, `STDB_DB=vouch-world` and the matching `NEXT_PUBLIC_STDB_*` values.
 3. Start the worker once, right after publishing. The first identity to call `bootstrapWorker` becomes the worker, and the ledger poster is a second identity. If another machine claimed the role first, republish with `RESET=1` (demo data only).
 4. Start a tunnel to `:8787` and set `NEXT_PUBLIC_WORKER_URL` to its URL, so phones can upload. On the laptop, `CREAO_WEBHOOK_URL` is the tunnel URL plus `/creao/webhook`.
-5. Run [LIVE_CHECKLIST.md](LIVE_CHECKLIST.md) top to bottom.
+5. Run the demo on a production build: `npm run build && npm run start`.
+   - `next dev` adds React's development checks. With them, `/world` kept the main thread about 35–100% busier in our measurements (`qa/results/world-perf-*.json`).
+   - Check 45 fps on `/world` on the laptop itself, because headless runs render WebGL in software.
+6. Run [LIVE_CHECKLIST.md](LIVE_CHECKLIST.md) top to bottom.
 
 ## Checks
 

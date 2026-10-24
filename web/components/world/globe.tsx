@@ -36,7 +36,15 @@ interface Props {
 interface ParticleList { key: string; points: AgentPoint[]; color: string; size: number }
 
 const scoreColor = (s: number) => (s < 450 ? BAND_COLOR.red : s < 600 ? BAND_COLOR.amber : s < 750 ? BAND_COLOR.neutral : BAND_COLOR.green);
+// Accessors live at module level on purpose: react-globe.gl rebuilds a whole layer whenever an
+// accessor prop changes identity, and the globe re-renders every 400 ms with the feed. An inline
+// hexPolygonColor rebuilt every country's dots each time and kept the main thread busy (QA-014).
 const hexSide = () => "rgba(34,211,238,0.12)";
+const NO_HEX: HexPoint[] = [];
+const landColor = () => "rgba(148,163,184,0.28)";
+const arcDash = (d: object) => (d as Arc).dash;
+const arcGap = () => Math.random();
+const ringFade = (d: object) => (t: number) => `${(d as Ring).color}${Math.round((1 - t) * 255).toString(16).padStart(2, "0")}`;
 
 export function WorldGlobe(p: Props) {
   const box = useRef<HTMLDivElement>(null);
@@ -100,7 +108,24 @@ export function WorldGlobe(p: Props) {
     return lists;
   }, [p.byBand, p.live, p.selected, p.dimmed, p.highlight]);
 
-  const businessEl = (d: object) => {
+  const onBusiness = useRef(p.onBusiness);
+  onBusiness.current = p.onBusiness;
+  // Keep a list object while its points array is unchanged, so one band changing does not
+  // rebuild (and recompile) every point cloud on the globe (QA-014).
+  const lastParticles = useRef(new Map<string, ParticleList>());
+  const stableParticles = useMemo(() => {
+    const next = new Map<string, ParticleList>();
+    const out = particles.map((l) => {
+      const prev = lastParticles.current.get(l.key);
+      const kept = prev && prev.points === l.points && prev.color === l.color && prev.size === l.size ? prev : l;
+      next.set(l.key, kept);
+      return kept;
+    });
+    lastParticles.current = next;
+    return out;
+  }, [particles]);
+
+  const businessEl = useCallback((d: object) => {
     const b = d as BusinessPoint;
     let el = elements.current.get(b.id);
     if (!el) {
@@ -108,7 +133,7 @@ export function WorldGlobe(p: Props) {
       el.className = "globe-biz";
       el.title = `${b.name} · B-${String(b.id).padStart(3, "0")} · ${b.category}`;
       el.setAttribute("data-testid", `globe-business-${b.id}`);
-      el.onclick = (ev) => { ev.stopPropagation(); p.onBusiness?.(b.id); };
+      el.onclick = (ev) => { ev.stopPropagation(); onBusiness.current?.(b.id); };
       elements.current.set(b.id, el);
     }
     const px = Math.max(5, Math.min(26, b.size));
@@ -116,7 +141,7 @@ export function WorldGlobe(p: Props) {
     el.style.height = `${px}px`;
     el.style.opacity = b.dim ? "0.15" : "1";
     return el;
-  };
+  }, []);
 
   return (
     <div ref={box} className="absolute inset-0 isolate z-0" data-testid="globe">
@@ -138,9 +163,9 @@ export function WorldGlobe(p: Props) {
         hexPolygonResolution={3}
         hexPolygonMargin={0.62}
         hexPolygonUseDots
-        hexPolygonColor={() => "rgba(148,163,184,0.28)"}
+        hexPolygonColor={landColor}
         hexPolygonsTransitionDuration={0}
-        particlesData={particles}
+        particlesData={stableParticles}
         particlesList="points"
         particleLat="lat"
         particleLng="lng"
@@ -162,20 +187,20 @@ export function WorldGlobe(p: Props) {
         arcEndLng="endLng"
         arcColor="color"
         arcStroke="stroke"
-        arcDashLength={(d: object) => (d as Arc).dash}
+        arcDashLength={arcDash}
         arcDashGap={0.25}
-        arcDashInitialGap={() => Math.random()}
+        arcDashInitialGap={arcGap}
         arcDashAnimateTime={1500}
         arcAltitudeAutoScale={0.35}
         arcsTransitionDuration={0}
         ringsData={p.rings}
         ringLat="lat"
         ringLng="lng"
-        ringColor={(d: object) => (t: number) => `${(d as Ring).color}${Math.round((1 - t) * 255).toString(16).padStart(2, "0")}`}
+        ringColor={ringFade}
         ringMaxRadius="max"
         ringPropagationSpeed="speed"
         ringRepeatPeriod={900}
-        hexBinPointsData={p.hexPoints ?? []}
+        hexBinPointsData={p.hexPoints ?? NO_HEX}
         hexBinPointLat="lat"
         hexBinPointLng="lng"
         hexBinPointWeight="weight"

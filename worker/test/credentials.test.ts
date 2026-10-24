@@ -1,6 +1,6 @@
 import { generateKeyPairSync, randomBytes, sign } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { canonical, digestOf, freshCredential, ratioBand, sha256, signedPart, verifyPresentation, type Presentation } from '../src/credentials';
+import { canonical, digestOf, freshCredential, needsRenewal, ratioBand, sha256, signedPart, verifyPresentation, type Presentation } from '../src/credentials';
 
 // T5.4: five steps pass; Tamper fails step 4; Revoke fails step 3; expired fails step 3; a forged signature fails step 2.
 const der = (k: { export(o: object): Buffer }, type: string) => k.export({ type, format: 'der' }).toString('base64');
@@ -57,5 +57,13 @@ describe('Vouch Credential verification', () => {
     expect(ratioBand(4 / 40)).toBe('low');
     expect(ratioBand(6 / 40)).toBe('medium');
     expect(ratioBand(0.5)).toBe('high');
+  });
+  it('QA-013 renewal replaces an expiring credential but never one the issuer revoked', () => {
+    const c = (o: Partial<typeof base>) => ({ ...base, ...o });
+    expect(needsRenewal([], did, 19, 150)).toBe(true);
+    expect(needsRenewal([c({})], did, 19, 150)).toBe(false);
+    expect(needsRenewal([c({})], did, 19, 290)).toBe(true); // expiring
+    expect(needsRenewal([c({ revoked: true })], did, 19, 150)).toBe(false); // revoked stays revoked
+    expect(needsRenewal([c({ revoked: true, expiresDay: 200 })], did, 19, 290)).toBe(false);
   });
 });

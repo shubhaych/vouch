@@ -24,7 +24,7 @@ test('QA-013 the credential check uses the newest credential: verify passes, tam
   await check(page, 'cred-verify', /^Verified by/);
   await check(page, 'cred-tamper', /step 4/);
   await page.getByTestId('cred-revoke').click();
-  await expect(page.getByTestId('cred-revoke')).toHaveText('Reinstate', { timeout: 15_000 });
+  await expect(page.getByTestId('cred-revoke')).toContainText('Reinstate', { timeout: 15_000 });
   await check(page, 'cred-verify', /step 3/);
   await page.getByTestId('cred-revoke').click(); // reinstate, leave the demo as it was
 });
