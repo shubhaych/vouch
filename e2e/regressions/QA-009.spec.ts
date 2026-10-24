@@ -7,7 +7,7 @@ test('QA-009 /system has no horizontal scroll at 390 px', async ({ page }) => {
   await page.goto('/system');
   await expect(page.getByTestId('bench-table')).toBeVisible({ timeout: 60_000 });
   await page.waitForTimeout(3000);
-  const wide = await page.evaluate(() => [...document.querySelectorAll('main *')]
+  const wide = await page.evaluate(() => Array.from(document.querySelectorAll('main *'))
     .filter((e) => e.getBoundingClientRect().right > window.innerWidth + 1 && !e.closest('.overflow-x-auto'))
     .slice(0, 5).map((e) => `${e.tagName.toLowerCase()}.${(e.getAttribute('class') ?? '').split(' ').slice(0, 3).join('.')} → ${Math.round(e.getBoundingClientRect().right)}`));
   const sw = await page.evaluate(() => document.documentElement.scrollWidth);
