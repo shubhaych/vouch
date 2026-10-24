@@ -23,6 +23,7 @@ export const DEFAULT_AGENTS_PER_TICK = 1_000;
 export const DEFAULT_TICK_MICROS = 200_000n;
 export const DEFAULT_MAX_DAY = 720;
 const RING_BURST_PERIOD = 60;
+export const AGENT_JITTER_DEG = 3;
 const ELECTRONICS_BUSINESSES = BUSINESSES.filter((b) => b.category === 'electronics').map((b) => b.id);
 
 export type Kind = 'honest' | 'opportunist' | 'serial' | 'ring' | 'live' | 'showcase';
@@ -207,8 +208,9 @@ export function seedWorld(db: SimDb, opts: SeedOpts): SimRunRow {
     const showcase = id === SHOWCASE_AGENT_ID;
     const region = showcase ? REGIONS[2]! : REGIONS[rng.weighted(regionWeights)]!;
     const kind: Kind = showcase ? 'showcase' : KINDS[rng.weighted(KIND_SHARE)]!;
-    // Uniform in a disc of radius 1.5 degrees around the metro centroid.
-    const rad = 1.5 * Math.sqrt(rng.next());
+    // Uniform in a disc of radius 3 degrees around the metro centroid. (The spec says 1.5; at globe
+    // scale that renders 10,000 agents as 40 dots hidden under the store markers.)
+    const rad = AGENT_JITTER_DEG * Math.sqrt(rng.next());
     const theta = rng.next() * Math.PI * 2;
     const score = START_SCORE;
     db.agent.insert({
@@ -461,12 +463,19 @@ export function settleRefund(w: World, r: RefundRow, outcome: 'accepted' | 'decl
     s.accepted += 1;
     if (w.db.refundIntent.purchaseId.find(r.purchaseId)?.falseClaim) s.lossCents += BigInt(amount);
     const c = basis === 'fast' ? CREDIT.acceptedFast : CREDIT.acceptedEvidence;
-    applyCredit(w, r.agentId, c.kind, c.delta, 'refund', r.id);
+    const before = a.score;
+    applyCredit(w, r.agentId, c.kind, c.delta, 'refund', r.id, false);
+    // One line per outcome, carrying the business so the globe can draw the return arc.
+    w.feed('refund_accepted', r.agentId, r.businessId, amount, r.id,
+      `[Refund] ${businessLabel(r.businessId)} accepted ${agentLabel(r.agentId)} ${dollars(amount)}${basis === 'fast' ? ' (fast path)' : ''} · credit ${before} → ${w.agent(r.agentId).score}`);
   } else if (outcome === 'declined') {
     if (p) w.db.purchase.id.update({ ...p, status: 'kept' });
     s.declined += 1;
     if (!w.db.refundIntent.purchaseId.find(r.purchaseId)?.falseClaim && w.kind(r.agentId) !== 'live') s.honestDeclines += 1;
-    applyCredit(w, r.agentId, CREDIT.declined.kind, CREDIT.declined.delta, 'refund', r.id);
+    const before = a.score;
+    applyCredit(w, r.agentId, CREDIT.declined.kind, CREDIT.declined.delta, 'refund', r.id, false);
+    w.feed('refund_declined', r.agentId, r.businessId, r.amount, r.id,
+      `[Refund] ${businessLabel(r.businessId)} declined ${agentLabel(r.agentId)} ${dollars(r.amount)} · credit ${before} → ${w.agent(r.agentId).score}`);
   } else if (p) {
     w.db.purchase.id.update({ ...p, status: 'kept' });
   }

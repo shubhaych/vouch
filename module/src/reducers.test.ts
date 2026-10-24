@@ -134,7 +134,7 @@ describe('patterns and the Droid Lab triggers (T3.7, T4.1)', () => {
   const flag = (ctx: Ctx, agents: number[], version = 1) =>
     flagPatternImpl(ctx, {
       kind: 'coordinated', detectorId: 'coordinated', detectorVersion: version, firstDay: 120, lastDay: 125, agentIds: agents, businessIds: [2, 7],
-      featuresJson: JSON.stringify({ agents: agents.length }), events: [{ table: 'refund', id: 1n, day: 124, why: 'similar text' }],
+      featuresJson: JSON.stringify({ agents: agents.length }), events: [{ table: 'refund', id: 1n, kind: 'refund', agentId: agents[0]!, businessId: 2, amount: 8_900, day: 124, text: 'cracked', why: 'similar text' }],
     });
 
   it('confirm applies -120 to core agents only; the same pattern is never flagged twice', () => {

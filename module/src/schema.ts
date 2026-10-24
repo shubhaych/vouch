@@ -195,12 +195,18 @@ const fraudPattern = table({ name: 'fraud_pattern', public: true }, {
   reviewedDay: t.u32(),
 });
 
+/** Everything Replay needs, denormalised so the browser subscribes to one small table per pattern. */
 const patternEvent = table({ name: 'pattern_event', public: true }, {
   id: t.u64().primaryKey().autoInc(),
   patternId: t.u32().index(),
   eventTable: t.string(), // purchase | refund
   eventId: t.u64(),
+  kind: t.string(), // purchase | delivery | refund
+  agentId: t.u32(),
+  businessId: t.u16(),
+  amount: t.u32(),
   day: t.u32(),
+  text: t.string(), // claim text for refunds, item name for purchases
   why: t.string(),
 });
 

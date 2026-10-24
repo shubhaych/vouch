@@ -25,3 +25,4 @@ playwright-report/
 
 # spacetime publish build output
 module/dist/
+.stdb/

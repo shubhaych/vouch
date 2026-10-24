@@ -8,13 +8,16 @@ import { CREDIT } from './score';
 // Detector output and the Pattern Analyst's verdict. Only a confirmed
 // pattern changes anyone's credit, and only for agents the analyst calls core.
 
-const PatternEventIn = t.object('PatternEventIn', { table: t.string(), id: t.u64(), day: t.u32(), why: t.string() });
+const PatternEventIn = t.object('PatternEventIn', {
+  table: t.string(), id: t.u64(), kind: t.string(), agentId: t.u32(), businessId: t.u16(), amount: t.u32(), day: t.u32(), text: t.string(), why: t.string(),
+});
 
 export function flagPatternImpl(
   ctx: Ctx,
   a: {
     kind: string; detectorId: string; detectorVersion: number; firstDay: number; lastDay: number; agentIds: number[]; businessIds: number[];
-    featuresJson: string; events: { table: string; id: bigint; day: number; why: string }[];
+    featuresJson: string;
+    events: { table: string; id: bigint; kind: string; agentId: number; businessId: number; amount: number; day: number; text: string; why: string }[];
   },
 ) {
   requireRole(ctx, 'worker');
@@ -29,7 +32,12 @@ export function flagPatternImpl(
     agentIds: agents, businessIds: [...new Set(a.businessIds)].sort((x, y) => x - y), features: a.featuresJson, runId: '', runUrl: '', narrative: '',
     rolesJson: '', signature, flaggedDay: run?.day ?? 0, reviewedDay: 0,
   });
-  for (const e of a.events) ctx.db.patternEvent.insert({ id: 0n, patternId: id, eventTable: e.table, eventId: e.id, day: e.day, why: e.why.slice(0, 300) });
+  for (const e of a.events) {
+    ctx.db.patternEvent.insert({
+      id: 0n, patternId: id, eventTable: e.table, eventId: e.id, kind: e.kind, agentId: e.agentId, businessId: e.businessId, amount: e.amount,
+      day: e.day, text: e.text.slice(0, 300), why: e.why.slice(0, 300),
+    });
+  }
   const w = worldOf(ctx);
   for (const agentId of agents) {
     const ag = ctx.db.agent.id.find(agentId);

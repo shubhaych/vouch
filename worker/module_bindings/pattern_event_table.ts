@@ -15,6 +15,11 @@ export default __t.row({
   patternId: __t.u32().name("pattern_id"),
   eventTable: __t.string().name("event_table"),
   eventId: __t.u64().name("event_id"),
+  kind: __t.string(),
+  agentId: __t.u32().name("agent_id"),
+  businessId: __t.u16().name("business_id"),
+  amount: __t.u32(),
   day: __t.u32(),
+  text: __t.string(),
   why: __t.string(),
 });

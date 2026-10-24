@@ -284,7 +284,12 @@ export const PatternEvent = __t.object("PatternEvent", {
   patternId: __t.u32(),
   eventTable: __t.string(),
   eventId: __t.u64(),
+  kind: __t.string(),
+  agentId: __t.u32(),
+  businessId: __t.u16(),
+  amount: __t.u32(),
   day: __t.u32(),
+  text: __t.string(),
   why: __t.string(),
 });
 export type PatternEvent = __Infer<typeof PatternEvent>;
@@ -292,7 +297,12 @@ export type PatternEvent = __Infer<typeof PatternEvent>;
 export const PatternEventIn = __t.object("PatternEventIn", {
   table: __t.string(),
   id: __t.u64(),
+  kind: __t.string(),
+  agentId: __t.u32(),
+  businessId: __t.u16(),
+  amount: __t.u32(),
   day: __t.u32(),
+  text: __t.string(),
   why: __t.string(),
 });
 export type PatternEventIn = __Infer<typeof PatternEventIn>;

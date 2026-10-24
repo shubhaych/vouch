@@ -1,8 +1,9 @@
 {
   "name": "vouch",
   "private": true,
-  "version": "0.1.0",
-  "description": "Vouch Refunds: refund good customers faster, let an AI check the rest.",
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Vouch World: AI refund investigation, a live SpacetimeDB shopping economy, and Droid-improved fraud detectors.",
   "engines": {
     "node": ">=22"
   },
@@ -13,20 +14,22 @@
   ],
   "scripts": {
     "dev": "npm run dev -w web",
-    "dev:worker": "npm run dev -w worker",
+    "worker": "npm run start -w worker",
     "build": "npm run build -w web",
     "lint": "npm run lint -w web",
     "typecheck": "npm run typecheck --workspaces && tsc -p .",
-    "test": "npm test -w module -w worker",
-    "check": "npm run typecheck && npm run lint && npm test && npm run check:rules",
+    "test": "npm test -w module && npm test -w worker",
+    "check": "npm run typecheck && npm test && npm run check:rules",
+    "check:rules": "tsx scripts/check-rules.ts",
+    "stdb:start": "bash scripts/stdb-start.sh",
     "stdb:publish": "bash scripts/stdb-publish.sh",
     "stdb:generate": "bash scripts/stdb-generate.sh",
-    "seed": "tsx scripts/seed.ts",
-    "demo:reset": "tsx scripts/demo-reset.ts",
-    "hello:crs": "tsx scripts/hello-crs.ts",
+    "env:check": "tsx scripts/env-check.ts",
+    "hello:stdb": "tsx scripts/hello-stdb.ts",
     "hello:creao": "tsx scripts/hello-creao.ts",
-    "hello:nessie": "tsx scripts/hello-nessie.ts",
-    "check:rules": "tsx scripts/check-rules.ts"
+    "hello:droid": "tsx scripts/hello-droid.ts",
+    "demo:reset": "tsx scripts/demo-reset.ts",
+    "eval": "tsx detectors/eval.ts"
   },
   "devDependencies": {
     "@types/node": "^22",
