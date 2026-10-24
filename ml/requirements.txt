@@ -1,5 +1,0 @@
-scikit-learn
-lightgbm
-imagehash
-pandas
-scipy

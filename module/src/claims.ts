@@ -1,56 +1,91 @@
 import { t } from 'spacetimedb/server';
 import { spacetimedb } from './schema';
-import { requireRole } from './desk';
-import { decide as decideLane } from './policy';
-import { DEFAULT_POLICY, type MerchantPolicy, type Tier } from './types';
+import { requireRole, worldOf, type Ctx } from './ctx';
+import { agentLabel } from './sim';
 
-const MERCHANT_ID = 'threadline';
+// The worker's bookkeeping for video evidence and CREAO runs. Agents never
+// write here: the worker validates their JSON and calls these reducers.
 
-const loadPolicy = (ctx: { db: any }): MerchantPolicy => {
-  const row = ctx.db.merchantPolicy.merchantId.find(MERCHANT_ID);
-  return row ? (JSON.parse(row.policyJson) as MerchantPolicy) : DEFAULT_POLICY;
-};
+export const attachVideo = spacetimedb.reducer(
+  { claimId: t.u64(), videoUrl: t.string(), frameUrls: t.array(t.string()), frameHashes: t.array(t.string()), checksJson: t.string() },
+  (ctx, a) => {
+    requireRole(ctx, 'worker');
+    const c = ctx.db.claim.id.find(a.claimId);
+    if (!c) throw new Error('no such claim');
+    if (c.status !== 'awaiting_video' && c.status !== 'more_evidence') throw new Error(`claim is ${c.status}`);
+    ctx.db.claim.id.update({ ...c, videoUrl: a.videoUrl, frameUrls: a.frameUrls, frameHashes: a.frameHashes, checksJson: a.checksJson, status: 'frames_ready' });
+  },
+);
 
-/** Fail closed: a missing row counts as off. */
-export const creaoEnabled = (ctx: { db: any }): boolean =>
-  ctx.db.config.key.find('creao_enabled')?.value === 'true';
+export const setClaimStatus = spacetimedb.reducer({ claimId: t.u64(), status: t.string() }, (ctx, a) => {
+  requireRole(ctx, 'worker');
+  const c = ctx.db.claim.id.find(a.claimId);
+  if (!c) throw new Error('no such claim');
+  ctx.db.claim.id.update({ ...c, status: a.status });
+});
 
-/**
- * A shopper files a claim. "Spending trust is a lookup": the lane comes from
- * the stored Vouch Record, never from an agent run. A subject with no record
- * (or an expired one) is tier 0, lands in lane C, and the worker starts the
- * Credit Analyst. The worker may escalate later (duplicate photo, Refund Desk).
- */
-export const submitClaim = spacetimedb.reducer(
-  { subjectId: t.string(), orderId: t.u64(), amountCents: t.u32(), kind: t.string() },
-  (ctx, { subjectId, orderId, amountCents, kind }) => {
-    const rec = ctx.db.vouchRecord.subjectId.find(subjectId);
-    const expired = !rec || rec.expiresAt.microsSinceUnixEpoch <= ctx.timestamp.microsSinceUnixEpoch;
-    const tier = (rec && !expired ? rec.tier : 0) as Tier;
-    let incident = false;
-    for (const i of ctx.db.incident.iter()) if (i.subjectId === subjectId) { incident = true; break; }
+export const recordRun = spacetimedb.reducer(
+  { runId: t.string(), seat: t.string(), caseRef: t.string(), runUrl: t.string(), conversationId: t.string(), mode: t.string() },
+  (ctx, a) => {
+    requireRole(ctx, 'worker');
+    const row = {
+      runId: a.runId, seat: a.seat, caseRef: a.caseRef, status: 'running', runUrl: a.runUrl, conversationId: a.conversationId,
+      mode: a.mode, stepsJson: JSON.stringify([{ step: 'run started', at: Number(ctx.timestamp.microsSinceUnixEpoch / 1000n) }]),
+      startedAt: ctx.timestamp, finishedAt: undefined,
+    };
+    if (ctx.db.agentRun.runId.find(a.runId)) ctx.db.agentRun.runId.update(row);
+    else ctx.db.agentRun.insert(row);
+  },
+);
 
-    const d = decideLane(
-      tier,
-      { verdict: 'not_contested' },
-      { incident, underwriterOffline: !creaoEnabled(ctx), recordExpired: !!rec && expired },
-      { amountCents },
-      loadPolicy(ctx),
-    );
-    ctx.db.claim.insert({
-      id: 0n, orderId, subjectId, amountCents, kind,
-      status: d.lane === 'A' || d.lane === 'B' ? 'decided' : 'held',
-      lane: d.lane, reasonCodes: d.reasons, provenance: 'live', createdAt: ctx.timestamp,
-    });
+/** Appends a progress step ("frames sent", "waiting", "result") so the org chart shows movement while a run takes minutes. */
+export const runStep = spacetimedb.reducer({ runId: t.string(), step: t.string() }, (ctx, a) => {
+  requireRole(ctx, 'worker');
+  const r = ctx.db.agentRun.runId.find(a.runId);
+  if (!r) throw new Error('no such run');
+  const steps = JSON.parse(r.stepsJson || '[]') as unknown[];
+  steps.push({ step: a.step.slice(0, 200), at: Number(ctx.timestamp.microsSinceUnixEpoch / 1000n) });
+  ctx.db.agentRun.runId.update({ ...r, stepsJson: JSON.stringify(steps.slice(-20)) });
+});
+
+export const finishRun = spacetimedb.reducer({ runId: t.string(), status: t.string(), runUrl: t.string() }, (ctx, a) => {
+  requireRole(ctx, 'worker');
+  const r = ctx.db.agentRun.runId.find(a.runId);
+  if (!r) throw new Error('no such run');
+  ctx.db.agentRun.runId.update({ ...r, status: a.status, runUrl: a.runUrl || r.runUrl, finishedAt: ctx.timestamp });
+});
+
+export const recordEvidence = spacetimedb.reducer(
+  { claimId: t.u64(), seat: t.string(), runId: t.string(), runUrl: t.string(), json: t.string(), provenance: t.string() },
+  (ctx, a) => {
+    requireRole(ctx, 'worker');
+    if (!ctx.db.claim.id.find(a.claimId)) throw new Error('no such claim');
+    JSON.parse(a.json); // refuse malformed evidence
+    ctx.db.evidence.insert({ id: 0n, claimId: a.claimId, seat: a.seat, runId: a.runId, runUrl: a.runUrl, json: a.json, provenance: a.provenance, at: ctx.timestamp });
+  },
+);
+
+export function openInvestigationImpl(ctx: Ctx, refundId: bigint) {
+  requireRole(ctx, 'business', 'controller');
+  const r = ctx.db.refund.id.find(refundId);
+  if (!r) throw new Error('no such refund');
+  for (const c of ctx.db.claim.refundId.filter(refundId)) return c; // already open
+  const open = r.status === 'requested' || r.status === 'more_evidence';
+  if (open) {
+    // Take it off the fast path: from now on the investigators and a person decide.
+    ctx.db.refund.id.update({ ...r, status: 'investigating', path: 'investigation', decideDay: 0, resolveDay: 0 });
+  }
+  const c = ctx.db.claim.insert({
+    id: 0n, refundId, agentId: r.agentId, nonce: '', fingerCount: 0, videoUrl: '', frameUrls: [], frameHashes: [], checksJson: '{}',
+    status: open ? 'frames_ready' : 'review_only', kind: 'simulated', createdAt: ctx.timestamp,
   });
+  const w = worldOf(ctx);
+  w.feed('claim', r.agentId, r.businessId, r.amount, c.id, `[Claim] C-${c.id}: a person opened ${agentLabel(r.agentId)}'s simulated refund R-${r.id} for investigation`);
+  w.commit();
+  return c;
+}
 
-/** The Desk Lead (worker) moves a claim after the Refund Desk or a photo-hash hit. */
-export const setClaimLane = spacetimedb.reducer(
-  { claimId: t.u64(), lane: t.string(), reasonCodes: t.array(t.string()) },
-  (ctx, { claimId, lane, reasonCodes }) => {
-    requireRole(ctx, 'router');
-    if (!['A', 'B', 'C', 'D'].includes(lane)) throw new Error('lane must be A, B, C or D');
-    const row = ctx.db.claim.id.find(claimId);
-    if (!row) throw new Error('no such claim');
-    ctx.db.claim.id.update({ ...row, lane, reasonCodes, status: lane === 'A' || lane === 'B' ? 'decided' : 'held' });
-  });
+/** A judge opens a simulated refund from the globe for a CREAO investigation (no video: simulated refunds have claim text and timing). */
+export const openInvestigation = spacetimedb.reducer({ refundId: t.u64() }, (ctx, { refundId }) => {
+  openInvestigationImpl(ctx, refundId);
+});

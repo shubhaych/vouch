@@ -1,19 +1,27 @@
 {
   "name": "@vouch/module",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
-  "description": "SpacetimeDB module plus the pure policy code (handshake, decide) shared with web and worker.",
+  "description": "SpacetimeDB module for Vouch World: schema, reducers and the simulation engine. sim.ts and friends are pure and shared with web, worker and the detector evaluator.",
   "exports": {
-    "./handshake": "./src/handshake.ts",
-    "./policy": "./src/policy.ts",
-    "./types": "./src/types.ts"
+    "./sim": "./src/sim.ts",
+    "./simdb": "./src/simdb.ts",
+    "./memdb": "./src/memdb.ts",
+    "./world": "./src/world.ts",
+    "./score": "./src/score.ts",
+    "./text": "./src/text.ts",
+    "./rng": "./src/rng.ts"
   },
   "scripts": {
     "typecheck": "tsc -p .",
-    "test": "tsx --test src/*.test.ts"
+    "test": "vitest run"
   },
   "dependencies": {
     "spacetimedb": "2.13.0"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "vitest": "^3.2.7"
   }
 }

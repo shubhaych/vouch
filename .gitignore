@@ -9,13 +9,19 @@ node_modules/
 web/.next/
 web/next-env.d.ts
 
-# Python
-.venv/
-__pycache__/
-*.pyc
+# Worker secrets and media: identity tokens, issuer private keys, uploaded videos and frames
+worker/.keys/
+worker/media/
+worker/.lab/
 
-# ML artifacts (retrain with ml/train.py)
-ml/model.pkl
+# Droid candidates are per job; keep the folder, not the jobs
+detectors/candidates/*
+!detectors/candidates/.gitkeep
+detectors/results/
 
-# Threadline generated output is reproducible from fixed seeds
-world/out_hard/
+# Playwright output (screenshots we keep live in e2e/shots and qa/shots)
+test-results/
+playwright-report/
+
+# spacetime publish build output
+module/dist/
