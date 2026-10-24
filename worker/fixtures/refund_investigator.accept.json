@@ -1,0 +1,17 @@
+{
+  "_fixture": "hand-written from Appendix A (not a recorded run)",
+  "claim_id": "{{claim_id}}",
+  "action": "accept",
+  "amount": "{{amount}}",
+  "method": "original_payment",
+  "needs_controller": "{{needs_controller}}",
+  "confidence": 0.78,
+  "reasons": [
+    { "text": "The claimed defect is visible in two frames and matches the claim.", "cites": "frame:3" },
+    { "text": "The claim was filed inside the return window.", "cites": "policy:window" },
+    { "text": "The customer's refund history is in line with typical shoppers.", "cites": "history:refund_ratio_90d" }
+  ],
+  "history_considered": "History was consistent with the evidence and not material to the call.",
+  "what_would_change_my_mind": "Frames reused from another claim, or a failed finger challenge.",
+  "message_to_customer": "Thanks for the video: we have approved your refund to your original payment method."
+}

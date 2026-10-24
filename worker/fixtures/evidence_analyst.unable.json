@@ -1,0 +1,13 @@
+{
+  "_fixture": "hand-written from Appendix A (not a recorded run)",
+  "claim_id": "{{claim_id}}",
+  "frames": [],
+  "unreadable_frames": [],
+  "item_matches_reference": { "value": "uncertain", "confidence": 0.2, "explanation": "The frames do not show the item clearly." },
+  "claimed_defect_visible": { "value": "uncertain", "confidence": 0.2, "frames": [] },
+  "defect_consistent_with_claim": { "value": "cannot_tell", "damage_type": "cannot_tell", "explanation": "Not enough of the item is visible." },
+  "challenge": { "expected": "{{fingers}}", "seen": null, "passed": false },
+  "capture_flags": ["item_not_fully_shown", "low_quality"],
+  "unable_to_verify": true,
+  "summary": "The frames are too dark, short or partial to describe the item or the claimed defect. A new video showing the whole item in good light would settle it."
+}

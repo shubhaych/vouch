@@ -50,7 +50,7 @@ export function requestRefundFor(ctx: Ctx, agentId: number, purchaseId: bigint, 
   // A fresh nonce and a finger-count challenge make a pre-recorded video harder to reuse.
   const c = ctx.db.claim.insert({
     id: 0n, refundId: r.id, agentId, nonce: randomHex(ctx, 12), fingerCount: 1 + Math.floor(ctx.random() * 5), videoUrl: '',
-    frameUrls: [], frameHashes: [], checksJson: '{}', status: 'awaiting_video', kind: 'live', createdAt: ctx.timestamp,
+    frameUrls: [], frameHashes: [], checksJson: '{}', status: 'awaiting_video', kind: p.source === 'showcase' ? 'showcase' : 'live', createdAt: ctx.timestamp,
   });
   w.feed('claim', agentId, p.business, p.amount, c.id, `[Claim] C-${c.id} opened by ${agentLabel(agentId)}: hold up ${c.fingerCount} fingers at the end`);
   w.commit();

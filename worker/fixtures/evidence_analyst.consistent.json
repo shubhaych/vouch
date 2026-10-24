@@ -1,0 +1,18 @@
+{
+  "_fixture": "hand-written from Appendix A (not a recorded run)",
+  "claim_id": "{{claim_id}}",
+  "frames": [
+    { "index": 0, "t": 0.0, "observation": "The item on a table, packaging beside it; shape and colour match the reference.", "boxes": [] },
+    { "index": 3, "t": 4.1, "observation": "Close-up of the claimed part; a visible crack runs across it.", "boxes": [ { "label": "crack", "x": 0.41, "y": 0.30, "w": 0.14, "h": 0.09 } ] },
+    { "index": 4, "t": 5.8, "observation": "Same crack from a second angle under brighter light.", "boxes": [ { "label": "crack", "x": 0.38, "y": 0.34, "w": 0.16, "h": 0.08 } ] },
+    { "index": 9, "t": 13.2, "observation": "A hand beside the item holding up {{fingers}} fingers.", "boxes": [ { "label": "hand", "x": 0.62, "y": 0.22, "w": 0.25, "h": 0.4 } ] }
+  ],
+  "unreadable_frames": [],
+  "item_matches_reference": { "value": "true", "confidence": 0.86, "explanation": "Shape, colour and markings match the reference description." },
+  "claimed_defect_visible": { "value": "true", "confidence": 0.82, "frames": [3, 4] },
+  "defect_consistent_with_claim": { "value": "true", "damage_type": "manufacturing", "explanation": "The crack is where the customer described it and shows no impact marks around it." },
+  "challenge": { "expected": "{{fingers}}", "seen": "{{fingers}}", "passed": true },
+  "capture_flags": [],
+  "unable_to_verify": false,
+  "summary": "The item matches the order and the claimed crack is visible in frames 3 and 4. The finger challenge was passed at the end of the video."
+}

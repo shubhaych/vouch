@@ -1,0 +1,15 @@
+{
+  "_fixture": "hand-written from Appendix A (not a recorded run)",
+  "claim_id": "{{claim_id}}",
+  "action": "more_evidence",
+  "amount": 0,
+  "method": "none",
+  "needs_controller": false,
+  "confidence": 0.55,
+  "reasons": [
+    { "text": "{{reason}}", "cites": "{{cites}}" }
+  ],
+  "history_considered": "Not material: the evidence could not settle the claim either way.",
+  "what_would_change_my_mind": "A new in-app video showing the whole item, the claimed defect up close, and the requested finger count at the end.",
+  "message_to_customer": "Could you record a short new video in the app showing the whole item and the problem up close?"
+}

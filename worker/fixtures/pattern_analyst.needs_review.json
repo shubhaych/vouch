@@ -1,0 +1,12 @@
+{
+  "_fixture": "hand-written from Appendix A (not a recorded run)",
+  "pattern_id": "{{pattern_id}}",
+  "verdict": "needs_review",
+  "confidence": 0.45,
+  "narrative": "The flagged behaviour is consistent with the detector's rule, but a single agent's claims cannot rule out genuine problems with the products bought. A person should look at the claims.",
+  "innocent_explanation_considered": "Genuine defects on the items bought remain plausible.",
+  "agents": "{{roles}}",
+  "evidence_used": ["refund_ratio", "window_edge"],
+  "signals_not_used": "Shared region, business or product alone was not treated as evidence.",
+  "suggested_detector_change": "Report how many of the agent's claims were filed in the last two days of the window, not only the median."
+}

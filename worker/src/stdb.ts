@@ -8,7 +8,8 @@ import { DbConnection } from '../module_bindings/index';
 import { config, log } from './env';
 
 export type Conn = DbConnection;
-export type Label = 'worker' | 'poster';
+/** worker and poster claim their roles once; showcase is a third identity that takes the business seat for the home demo. */
+export type Label = 'worker' | 'poster' | 'showcase';
 
 const tokenFile = (label: Label) => resolve(config.keysDir, `stdb-${label}-token`);
 
@@ -40,7 +41,7 @@ export function connect(label: Label, queries: string[], timeoutMs = 30_000): Pr
           .subscriptionBuilder()
           .onApplied(async () => {
             const mine = [...conn.db.role.iter()].find((r) => r.who.toHexString() === hex);
-            if (!mine) {
+            if (!mine && label !== 'showcase') {
               try {
                 if (label === 'worker') await conn.reducers.bootstrapWorker({});
                 else await conn.reducers.bootstrapPoster({});
@@ -48,7 +49,7 @@ export function connect(label: Label, queries: string[], timeoutMs = 30_000): Pr
               } catch (e) {
                 log(`could not claim the ${label} role: ${(e as Error).message}. If another machine became the ${label} first, republish with --delete-data (demo data only).`);
               }
-            } else if (mine.role !== label) {
+            } else if (mine && label !== 'showcase' && mine.role !== label) {
               log(`warning: this identity holds role ${mine.role}, expected ${label}`);
             }
             clearTimeout(timer);

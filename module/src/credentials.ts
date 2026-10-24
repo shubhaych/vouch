@@ -34,10 +34,11 @@ export const revokeCredential = spacetimedb.reducer({ id: t.string(), revoked: t
 });
 
 /** A business asks for a credential check on a refund; the worker builds the presentation and verifies it. */
-export const requestVerification = spacetimedb.reducer({ credentialId: t.string(), refundId: t.u64(), tamper: t.bool() }, (ctx, a) => {
+export const requestVerification = spacetimedb.reducer({ credentialId: t.string(), refundId: t.u64(), tamper: t.bool(), verifier: t.u16() }, (ctx, a) => {
   const seat = requireRole(ctx, 'business', 'controller', 'worker');
   if (!ctx.db.credential.id.find(a.credentialId)) throw new Error('no such credential');
-  const verifier = seat.role === 'worker' ? BUSINESS_B : seat.businessId || BUSINESS_A;
+  // A business seat always verifies as itself; the worker verifies on behalf of the refund's business.
+  const verifier = seat.role === 'worker' ? a.verifier || BUSINESS_B : seat.businessId || BUSINESS_A;
   ctx.db.verification.insert({
     id: 0n, credentialId: a.credentialId, verifier, refundId: a.refundId, tamper: a.tamper, status: 'requested', stepsJson: '[]',
     passed: false, failedStep: 0, revealedJson: '{}', at: ctx.timestamp,

@@ -14,4 +14,5 @@ export default {
   credentialId: __t.string(),
   refundId: __t.u64(),
   tamper: __t.bool(),
+  verifier: __t.u16(),
 };
