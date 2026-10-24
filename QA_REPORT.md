@@ -12,7 +12,14 @@ The step list is in [qa/checklist.md](qa/checklist.md).
 
 ## Summary: video matrix 10/11 runnable cases as expected (V10 failed), 6 blocked on human videos (V01, V03–V07); personas and other checks 6 passed, 9 failed, 1 not testable in fixture mode
 
-- **Issues:** 1 × P0, 6 × P1, 2 × P2, 3 × P3.
+- **Issues:** 1 × P0, 6 × P1, 2 × P2, 3 × P3 in Loop 2, plus two P1s found by the Loop 3 rerun (QA-013, QA-014).
+- **Loop 3:**
+  - Every P0, P1 and P2 is FIXED, each with a regression test. QA-014 is partly fixed (see its entry).
+  - Short Loop 2 rerun from `demo-reset`:
+    - Video matrix 13/13 as expected.
+    - e2e smoke 4/4 and regressions QA-007/008/009/013 pass.
+    - Personas: P1 (both tests), P5, P8 and the 390 px check pass. P6 passed after its spec was fixed and QA-013 was found and fixed.
+    - P7 still runs out of its 5-minute budget in the software-rendered browser (QA-014).
 - **Human videos:** V01, V03–V07 need real phone recordings and stay **BLOCKED**. V02, V15 and V16 were run with generated stand-in clips: the flow is checked, but not what a vision model makes of the content.
 - **Not testable in fixture mode:** the kill switch flipped mid-run. Fixture runs finish in under a second, so the switch cannot land mid-run; see the note under QA-006. It needs a live run.
 
@@ -200,3 +207,44 @@ The step list is in [qa/checklist.md](qa/checklist.md).
 - **Loop 3: FIXED** in `a4cafad`.
   - The menu is `min(26rem, 100vw − 2rem)` wide and left-aligned on phones.
   - Regression: `e2e/regressions/QA-007.spec.ts`.
+
+### QA-013 [P1] (found in the Loop 3 rerun) The credential check on `/business` re-verifies the claim's original credential, even after the issuer renewed it
+- Persona: P6
+- Steps:
+  1. After `demo-reset`, run the sim past day 303.
+  2. On `/business` as controller, open A-00421's showcase claim.
+  3. Press Verify, then Tamper.
+- Expected: Verify passes; Tamper fails at step 4.
+- Actual: Tamper → "Failed at step 3 (tampered presentation)". The stepper re-checked VC-af14 (expired at day 303), not the renewed VC-b25a or VC-ba6b.
+- Evidence: `qa/results-personas-loop3b.log` (P6).
+- **Loop 3: FIXED** in `cf0af5f` and `8eb49ef`.
+  - The stepper acts on the holder's newest credential from that issuer.
+  - Found while fixing it: renewal re-issued a credential right after the issuer revoked one, which undid the revocation. `needsRenewal` now never replaces a revoked credential.
+  - Regressions: `e2e/regressions/QA-013.spec.ts` (Verify, Tamper fails step 4, Revoke fails step 3, Reinstate: passes) and `worker/test/credentials.test.ts` "QA-013 …".
+
+### QA-014 [P1] (found in the Loop 3 rerun) `/world` keeps the browser's main thread saturated in every mode
+- Persona: P7
+- Steps: `npx playwright test qa/world-perf.spec.ts` measures long tasks over 10 s per mode.
+- Expected: idle time left for clicks.
+- Actual: 11–22 s of long tasks per 10 s window in every mode (`qa/results/world-perf-before-QA-014.json`). A CPU profile of Live mode showed:
+  - About 58% of the time compiling shaders (`getProgramInfoLog`/`getShaderInfoLog`) in a 12-second sample.
+  - Fresh arc and ring objects every 400 ms, and inline accessors (land, arcs, rings, hexbins), made react-globe.gl dispose and rebuild layers, so three.js recompiled their programs.
+  - About 15% in React's development-mode checks.
+- **Loop 3: PARTLY FIXED** in `8eb49ef`:
+  - Accessors are module-level functions.
+  - Arc and ring objects are reused by id.
+  - Particle lists are kept while their points are unchanged, and agents are re-bucketed into bands at most every 5 s.
+  - Result: `createProgram` calls per 5 s went from 14 to 7. Busy time per 10 s (before → after, dev server):
+
+    | Mode | Before (s) | After (s) |
+    | --- | --- | --- |
+    | Live | 19.2 | 13.4 |
+    | Replay list | 21.6 | 15.1 |
+    | Replay open | 16.1 | 12.2 |
+    | Replay playing | 15.5 | 9.1 |
+    | Observatory | 11.2 | 9.7 |
+
+  - On a production build (`npm run build && npm run start`) the same modes measure 9.8 / 8.0 / 9.0 / 6.1 / 4.7 s.
+- What remains is mostly software WebGL in the headless browser, so it must be measured on the demo laptop (45 fps check in LIVE_CHECKLIST.md). The demo should run the production build (docs/SETUP.md).
+- Regression: `qa/world-perf.spec.ts` (a measurement, not a pass/fail gate, because headless numbers say little about a GPU).
+
