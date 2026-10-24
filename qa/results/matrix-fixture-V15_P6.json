@@ -1,0 +1,60 @@
+{
+  "ranAt": "2026-10-24T13:18:45.248Z",
+  "mode": "fixture",
+  "rows": [
+    {
+      "id": "V15",
+      "persona": "P2→fresh shopper",
+      "video": "S03-fresh (stand-in)",
+      "expected": "\"Investigator offline\"; no run; business can only request more evidence",
+      "actual": "offline=true; runs=0; accept → Investigator offline: request more evidence; more_evidence → ok",
+      "match": true,
+      "details": {
+        "checks": {
+          "fresh": true,
+          "uploaded_after_s": 0,
+          "duration_s": 11,
+          "width": 480,
+          "height": 360,
+          "duration_ok": true,
+          "resolution_ok": false,
+          "frame_reuse": [
+            {
+              "frame": 0,
+              "matches_claim": "C-31",
+              "matches_frame": 0,
+              "distance": 0
+            }
+          ],
+          "frame_times": [
+            0.5,
+            1.1,
+            2.2,
+            3.3,
+            4.4,
+            5.5,
+            6.6,
+            7.7,
+            10.5
+          ],
+          "blank_frames": 0,
+          "within_window": true,
+          "reason_allowed": true,
+          "over_video_threshold": true,
+          "policy_line": "30-day window; video required over $100"
+        },
+        "offline": true,
+        "runsStarted": 0
+      }
+    },
+    {
+      "id": "P6",
+      "persona": "P6",
+      "video": "S06-fresh",
+      "expected": "The proposer identity and a shopper cannot decide",
+      "actual": "worker → requires role: business or controller; shopper → requires role: business or controller",
+      "match": true,
+      "details": {}
+    }
+  ]
+}

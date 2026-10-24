@@ -1,6 +1,6 @@
 // Helpers shared by reducer files. Not re-exported from index.ts: SpacetimeDB
 // refuses entry-file exports that are not reducers, views or procedures.
-import type { InferSchema, ReducerCtx } from 'spacetimedb/server';
+import { SenderError, type InferSchema, type ReducerCtx } from 'spacetimedb/server';
 import type { spacetimedb } from './schema';
 import { World } from './sim';
 import type { SimDb } from './simdb';
@@ -12,8 +12,21 @@ export const roleOf = (ctx: Ctx) => ctx.db.role.who.find(ctx.sender);
 
 export function requireRole(ctx: Ctx, ...allowed: Role[]) {
   const r = roleOf(ctx);
-  if (!r || !allowed.includes(r.role as Role)) throw new Error(`requires role: ${allowed.join(' or ')}`);
+  if (!r || !allowed.includes(r.role as Role)) throw new SenderError(`requires role: ${allowed.join(' or ')}`);
   return r;
+}
+
+/**
+ * The engine (sim.ts) stays free of spacetimedb imports, so its refusals are plain
+ * Errors. SpacetimeDB shows the caller only a SenderError's message; anything else is
+ * a panic and the browser sees "The instance encountered a fatal error" (QA-001).
+ */
+export function asSenderError<T>(f: () => T): T {
+  try {
+    return f();
+  } catch (e) {
+    throw e instanceof SenderError ? e : new SenderError(e instanceof Error ? e.message : String(e));
+  }
 }
 
 /** The engine runs against ctx.db exactly as it runs against the in-memory world. */
@@ -39,6 +52,6 @@ export const controlOn = (ctx: Ctx, key: string) => ctx.db.control.key.find(key)
 /** The live shopper agent behind this identity. */
 export function myAgentId(ctx: Ctx): number {
   const link = ctx.db.shopperLink.who.find(ctx.sender);
-  if (!link) throw new Error('join as a shopper first');
+  if (!link) throw new SenderError('join as a shopper first');
   return link.agentId;
 }

@@ -1,4 +1,4 @@
-import { ScheduleAt, t } from 'spacetimedb/server';
+import { ScheduleAt, SenderError, t } from 'spacetimedb/server';
 import { spacetimedb } from './schema';
 import { requireRole, roleOf, setControlValue, type Ctx } from './ctx';
 import { BUSINESS_A, BUSINESS_B } from './world';
@@ -7,15 +7,15 @@ import { BUSINESS_A, BUSINESS_B } from './world';
 
 /** The first identity to call this becomes the worker; later callers are refused. */
 export const bootstrapWorker = spacetimedb.reducer((ctx) => {
-  for (const r of ctx.db.role.iter()) if (r.role === 'worker') throw new Error('a worker already exists');
-  if (roleOf(ctx)) throw new Error('this identity already has a role');
+  for (const r of ctx.db.role.iter()) if (r.role === 'worker') throw new SenderError('a worker already exists');
+  if (roleOf(ctx)) throw new SenderError('this identity already has a role');
   ctx.db.role.insert({ who: ctx.sender, role: 'worker', label: 'desk-lead', businessId: 0 });
 });
 
 /** The ledger poster is a second worker identity: whoever proposes cannot post. */
 export const bootstrapPoster = spacetimedb.reducer((ctx) => {
-  for (const r of ctx.db.role.iter()) if (r.role === 'poster') throw new Error('a poster already exists');
-  if (roleOf(ctx)) throw new Error('this identity already has a role');
+  for (const r of ctx.db.role.iter()) if (r.role === 'poster') throw new SenderError('a poster already exists');
+  if (roleOf(ctx)) throw new SenderError('this identity already has a role');
   ctx.db.role.insert({ who: ctx.sender, role: 'poster', label: 'ledger-poster', businessId: 0 });
 });
 
@@ -35,9 +35,9 @@ export function takeSeat(ctx: Ctx, code: string) {
     return !!row && row.code.length > 0 && row.code === code;
   };
   const role = matches('controller') ? 'controller' : matches('business') ? 'business' : null;
-  if (!role) throw new Error('wrong seat code');
+  if (!role) throw new SenderError('wrong seat code');
   const existing = roleOf(ctx);
-  if (existing?.role === 'worker' || existing?.role === 'poster') throw new Error('worker identities cannot take a business seat');
+  if (existing?.role === 'worker' || existing?.role === 'poster') throw new SenderError('worker identities cannot take a business seat');
   const row = { who: ctx.sender, role, label: role === 'controller' ? 'controller' : 'business', businessId: existing?.businessId || BUSINESS_B };
   if (existing) ctx.db.role.who.update(row);
   else ctx.db.role.insert(row);
@@ -49,7 +49,7 @@ export const takeBusinessSeat = spacetimedb.reducer({ code: t.string() }, (ctx, 
 /** The /business switcher: act for Business A (B-019) or Business B (B-002). */
 export const switchBusiness = spacetimedb.reducer({ businessId: t.u16() }, (ctx, { businessId }) => {
   const r = requireRole(ctx, 'business', 'controller');
-  if (businessId !== BUSINESS_A && businessId !== BUSINESS_B) throw new Error('the demo seats are B-019 and B-002');
+  if (businessId !== BUSINESS_A && businessId !== BUSINESS_B) throw new SenderError('the demo seats are B-019 and B-002');
   ctx.db.role.who.update({ ...r, businessId });
 });
 
@@ -57,8 +57,8 @@ export function setControlImpl(ctx: Ctx, key: string, value: string) {
   // Turning the agents off fails closed, so a business seat may do it; everything else is the controller's.
   if (key === 'creao_enabled') requireRole(ctx, 'business', 'controller', 'worker');
   else requireRole(ctx, 'controller');
-  if (!['creao_enabled', 'demo_mode', 'lab_enabled'].includes(key)) throw new Error(`unknown control ${key}`);
-  if (value !== 'true' && value !== 'false') throw new Error('control values are true or false');
+  if (!['creao_enabled', 'demo_mode', 'lab_enabled'].includes(key)) throw new SenderError(`unknown control ${key}`);
+  if (value !== 'true' && value !== 'false') throw new SenderError('control values are true or false');
   setControlValue(ctx, key, value);
 }
 
@@ -75,9 +75,9 @@ export const setSim = spacetimedb.reducer(
   (ctx, a) => {
     requireRole(ctx, 'controller', 'worker');
     const run = ctx.db.simRun.id.find(1);
-    if (!run) throw new Error('simulation not initialised');
-    if (a.agentsPerTick < 1 || a.agentsPerTick > 20_000) throw new Error('agentsPerTick must be 1 to 20,000');
-    if (a.tickMicros < 20_000n) throw new Error('tickMicros must be at least 20,000 (50 ticks a second)');
+    if (!run) throw new SenderError('simulation not initialised');
+    if (a.agentsPerTick < 1 || a.agentsPerTick > 20_000) throw new SenderError('agentsPerTick must be 1 to 20,000');
+    if (a.tickMicros < 20_000n) throw new SenderError('tickMicros must be at least 20,000 (50 ticks a second)');
     ctx.db.simRun.id.update({ ...run, running: a.running, agentsPerTick: a.agentsPerTick, tickMicros: a.tickMicros, maxDay: a.maxDay || run.maxDay });
     if (a.tickMicros !== run.tickMicros || !ctx.db.simTick.count()) scheduleTick(ctx, a.tickMicros);
   },

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { SenderError } from 'spacetimedb/server';
 import { harness, who } from './testkit';
 import { seedWorldImpl, tickImpl } from './economy';
 import { takeSeat, setControlImpl } from './control';
@@ -173,5 +174,28 @@ describe('patterns and the Droid Lab triggers (T3.7, T4.1)', () => {
     const c = k.as(biz, (ctx) => openInvestigationImpl(ctx, open!.id));
     expect(c.status).toBe('frames_ready');
     expect(k.db.refund.id.find(open!.id)!.path).toBe('investigation');
+  });
+});
+
+// QA-001: SpacetimeDB shows the caller only a SenderError's message; any other throw is a
+// panic and the browser sees "The instance encountered a fatal error."
+describe('refusals reach the caller as SenderError', () => {
+  it('QA-001 role checks, desk rules, seat codes and engine refusals all throw SenderError', () => {
+    const k = world();
+    const { refundId, agentId } = liveClaim(k, 1);
+    const refusals: [string, () => unknown][] = [
+      ['requires role', () => k.as(shopper, (ctx) => decideImpl(ctx, refundId, 'accept', 24_900, ''))],
+      ['wrong seat code', () => k.as(shopper, (ctx) => takeSeat(ctx, 'not-the-code'))],
+      ['already seeded', () => k.as(worker, (ctx) => seedWorldImpl(ctx, 11n, 600, false))],
+      ['does not sell', () => k.as(shopper, (ctx) => buyFor(ctx, agentId, 2, 101, 'live'))],
+    ];
+    k.as(biz, (ctx) => setControlImpl(ctx, 'creao_enabled', 'false'));
+    refusals.push(['Investigator offline', () => k.as(biz, (ctx) => decideImpl(ctx, refundId, 'accept', 24_900, ''))]);
+    for (const [msg, f] of refusals) {
+      let err: unknown;
+      try { f(); } catch (e) { err = e; }
+      expect(err, msg).toBeInstanceOf(SenderError);
+      expect((err as Error).message, msg).toContain(msg);
+    }
   });
 });

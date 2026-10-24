@@ -1,6 +1,6 @@
 import { generateKeyPairSync, randomBytes, sign } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { canonical, digestOf, sha256, signedPart, verifyPresentation, type Presentation } from '../src/credentials';
+import { canonical, digestOf, freshCredential, ratioBand, sha256, signedPart, verifyPresentation, type Presentation } from '../src/credentials';
 
 // T5.4: five steps pass; Tamper fails step 4; Revoke fails step 3; expired fails step 3; a forged signature fails step 2.
 const der = (k: { export(o: object): Buffer }, type: string) => k.export({ type, format: 'der' }).toString('base64');
@@ -43,5 +43,19 @@ describe('Vouch Credential verification', () => {
     const other = der(generateKeyPairSync('ed25519').publicKey, 'spki');
     expect(verifyPresentation(credential, present('n6'), other, 150, policy, 'n6').failedStep).toBe(2);
     expect(verifyPresentation(credential, present('old-nonce'), issuerPub, 150, policy, 'fresh-nonce').failedStep).toBe(4);
+  });
+  it('QA-002 a holder needs a new credential once the last one expired, was revoked, or expires within the renewal margin', () => {
+    const c = (o: Partial<typeof base>) => ({ ...base, ...o });
+    expect(freshCredential([c({})], did, 19, 150)?.id).toBe('VC-test');
+    expect(freshCredential([c({ expiresDay: 300 })], did, 19, 301)).toBeUndefined(); // expired
+    expect(freshCredential([c({ expiresDay: 300 })], did, 19, 290)).toBeUndefined(); // inside the 30-day renewal margin
+    expect(freshCredential([c({ revoked: true })], did, 19, 150)).toBeUndefined();
+    expect(freshCredential([c({ issuer: 2 })], did, 19, 150)).toBeUndefined(); // another issuer
+    expect(freshCredential([c({ expiresDay: 200 }), c({ id: 'VC-new', issuedDay: 180, expiresDay: 360 })], did, 19, 190)?.id).toBe('VC-new');
+  });
+  it('QA-002 a showcase re-run (4 refunds on 40 purchases) keeps a low refund-ratio band', () => {
+    expect(ratioBand(4 / 40)).toBe('low');
+    expect(ratioBand(6 / 40)).toBe('medium');
+    expect(ratioBand(0.5)).toBe('high');
   });
 });

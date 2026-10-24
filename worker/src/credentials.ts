@@ -21,6 +21,21 @@ interface Holder extends KeyPair { did: string; salts: Record<string, Record<str
 
 const HOLDERS_PATH = resolve(config.keysDir, 'holders.json');
 const VALIDITY_DAYS = 180;
+// The sim runs a day every 2 s, so 180 days pass in 6 minutes: issuers renew a
+// credential this many days before it expires, the way a real issuer refreshes one.
+const RENEW_MARGIN_DAYS = 30;
+
+/** Refund-to-purchase bands. 15% sits at the low end of typical online return rates, so one or two extra claims do not flip a good record. */
+export const ratioBand = (ratio: number) => (ratio < 0.15 ? 'low' : ratio < 0.35 ? 'medium' : 'high');
+
+/** The holder's newest credential from `issuer` that is neither revoked nor about to expire. */
+export function freshCredential<C extends { id: string; issuer: number; holder: string; issuedDay: number; expiresDay: number; revoked: boolean }>(
+  creds: Iterable<C>, holderDid: string, issuer: number, today: number, margin = RENEW_MARGIN_DAYS,
+): C | undefined {
+  return [...creds]
+    .filter((c) => c.holder === holderDid && c.issuer === issuer && !c.revoked && c.expiresDay > today + margin)
+    .sort((a, b) => b.issuedDay - a.issuedDay)[0];
+}
 
 /** What each verifying business asks to see. B-002 is Business B in the demo story. */
 export const VERIFIER_POLICY: Record<number, { reveal: string[]; predicate: (c: Record<string, string | number | boolean>) => boolean; text: string }> = {
@@ -157,7 +172,7 @@ export class Credentials {
       const done = purchases.filter((p) => p.status === 'kept' || p.status === 'refunded').length;
       const values: Record<string, string | number | boolean> = {
         completed_purchases_gte: done >= 25 ? 25 : done >= 10 ? 10 : done >= 3 ? 3 : 0,
-        refund_ratio_band: ratio < 0.1 ? 'low' : ratio < 0.3 ? 'medium' : 'high',
+        refund_ratio_band: ratioBand(ratio),
         no_confirmed_fraud_180d: !confirmed,
         score_band: a.band,
       };
@@ -179,6 +194,12 @@ export class Credentials {
     } finally {
       this.issuing = false;
     }
+  }
+
+  /** Issues a new credential from `issuer` when the agent has no fresh one (none, revoked, expired or expiring soon). */
+  async ensureFresh(agentId: number, issuer: number): Promise<void> {
+    const today = this.conn.db.simRun.id.find(1)?.day ?? 0;
+    if (!freshCredential(this.conn.db.credential.iter(), this.holderFor(agentId).did, issuer, today)) await this.issue(agentId, issuer);
   }
 
   /** The holder's side: reveal what the verifier asks for, sign its nonce. `tamper` flips one revealed value (the demo's Tamper button). */

@@ -39,7 +39,9 @@ export class Showcase {
   constructor(private conn: DbConnection, private credentials: Credentials) {}
 
   start() {
-    this.conn.db.simRun.onUpdate((_c, _o, run) => {
+    this.conn.db.simRun.onUpdate((_c, old, run) => {
+      // Business A renews A-00421's credential before it expires, so the home demo and /business never show a stale one.
+      if (run.seeded && run.day !== old.day && run.day % 10 === 0) void this.credentials.ensureFresh(SHOWCASE_AGENT, BUSINESS_A).catch(() => undefined);
       const key = `${run.seed}:${run.startDay}:${run.population}`;
       if (!run.seeded || this.running || run.day < run.startDay + 3) return;
       const already = mirrorOf(this.conn).purchasesOf(SHOWCASE_AGENT).some((p) => p.source === 'showcase');
@@ -86,9 +88,7 @@ export class Showcase {
     const db = this.conn.db;
     const r = this.conn.reducers;
     log(`showcase: A-00421 buy → verify sequence (${live ? 'live CREAO' : 'replay'})`);
-    if (![...db.credential.iter()].some((c) => c.issuer === BUSINESS_A && c.holder === this.credentials.holderFor(SHOWCASE_AGENT).did && !c.revoked)) {
-      await this.credentials.issue(SHOWCASE_AGENT, BUSINESS_A);
-    }
+    await this.credentials.ensureFresh(SHOWCASE_AGENT, BUSINESS_A);
     const m = mirrorOf(this.conn);
     const before = new Set(m.purchasesOf(SHOWCASE_AGENT).map((p) => p.id));
     await call('showcase buy', r.showcaseAct({ action: 'buy', businessId: BUSINESS_B, sku: SHOWCASE_SKU, purchaseId: 0n, reasonCode: '', reasonText: '' }));

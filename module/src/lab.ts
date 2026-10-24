@@ -1,4 +1,4 @@
-import { t } from 'spacetimedb/server';
+import { SenderError, t } from 'spacetimedb/server';
 import { spacetimedb } from './schema';
 import { controlOn, nextCounter, requireRole, type Ctx } from './ctx';
 
@@ -39,11 +39,11 @@ export function enqueueLabJob(ctx: Ctx, trigger: string, goal: string, detectorI
 /** User trigger: anyone may ask, one preset at a time. */
 export const enqueueLab = spacetimedb.reducer({ preset: t.u8() }, (ctx, { preset }) => {
   const p = PRESET_GOALS[preset];
-  if (!p) throw new Error('pick one of the five preset goals');
+  if (!p) throw new SenderError('pick one of the five preset goals');
   for (const j of ctx.db.labJob.iter()) {
-    if (j.trigger === 'user' && (j.status === 'queued' || j.status === 'running')) throw new Error('a user job is already queued or running');
+    if (j.trigger === 'user' && (j.status === 'queued' || j.status === 'running')) throw new SenderError('a user job is already queued or running');
   }
-  if (enqueueLabJob(ctx, 'user', p.goal, p.detectorId) === null) throw new Error('the lab is off or this run already used its 6 jobs');
+  if (enqueueLabJob(ctx, 'user', p.goal, p.detectorId) === null) throw new SenderError('the lab is off or this run already used its 6 jobs');
 });
 
 /** Event and agent triggers come from the worker (an override, a dismissal, two needs_review verdicts). */
@@ -51,7 +51,7 @@ export const enqueueLabTrigger = spacetimedb.reducer(
   { trigger: t.string(), goal: t.string(), detectorId: t.string() },
   (ctx, a) => {
     requireRole(ctx, 'worker');
-    if (!['event', 'agent', 'schedule'].includes(a.trigger)) throw new Error('trigger must be event, agent or schedule');
+    if (!['event', 'agent', 'schedule'].includes(a.trigger)) throw new SenderError('trigger must be event, agent or schedule');
     enqueueLabJob(ctx, a.trigger, a.goal, a.detectorId);
   },
 );
@@ -59,7 +59,7 @@ export const enqueueLabTrigger = spacetimedb.reducer(
 export const startLabJob = spacetimedb.reducer({ jobId: t.u32(), mode: t.string() }, (ctx, { jobId, mode }) => {
   requireRole(ctx, 'worker');
   const j = ctx.db.labJob.id.find(jobId);
-  if (!j || j.status !== 'queued') throw new Error('no queued job');
+  if (!j || j.status !== 'queued') throw new SenderError('no queued job');
   ctx.db.labJob.id.update({ ...j, status: 'running', mode });
 });
 
@@ -68,7 +68,7 @@ export const appendLabEvent = spacetimedb.reducer(
   { jobId: t.u32(), kind: t.string(), text: t.string(), json: t.string() },
   (ctx, a) => {
     requireRole(ctx, 'worker');
-    if (!ctx.db.labJob.id.find(a.jobId)) throw new Error('no such job');
+    if (!ctx.db.labJob.id.find(a.jobId)) throw new SenderError('no such job');
     ctx.db.labEvent.insert({ id: 0n, jobId: a.jobId, kind: a.kind, text: a.text.slice(0, 4_000), json: a.json.slice(0, 60_000), at: ctx.timestamp });
   },
 );
@@ -78,8 +78,8 @@ export const finishLabJob = spacetimedb.reducer(
   (ctx, a) => {
     requireRole(ctx, 'worker');
     const j = ctx.db.labJob.id.find(a.jobId);
-    if (!j) throw new Error('no such job');
-    if (!['succeeded', 'failed', 'cancelled'].includes(a.status)) throw new Error('bad status');
+    if (!j) throw new SenderError('no such job');
+    if (!['succeeded', 'failed', 'cancelled'].includes(a.status)) throw new SenderError('bad status');
     ctx.db.labJob.id.update({ ...j, status: a.status, summary: a.summary, scoresJson: a.scoresJson, candidateDir: a.candidateDir, finishedAt: ctx.timestamp });
   },
 );
@@ -88,7 +88,7 @@ export const finishLabJob = spacetimedb.reducer(
 export const reviewCandidate = spacetimedb.reducer({ jobId: t.u32(), promote: t.bool() }, (ctx, { jobId, promote }) => {
   requireRole(ctx, 'controller');
   const j = ctx.db.labJob.id.find(jobId);
-  if (!j || j.status !== 'succeeded') throw new Error('only a finished job with a candidate can be reviewed');
+  if (!j || j.status !== 'succeeded') throw new SenderError('only a finished job with a candidate can be reviewed');
   ctx.db.labJob.id.update({ ...j, status: promote ? 'promote_requested' : 'rejected' });
   ctx.db.labEvent.insert({ id: 0n, jobId, kind: 'verdict', text: promote ? 'Controller asked to promote the candidate.' : 'Controller rejected the candidate.', json: '', at: ctx.timestamp });
 });
@@ -96,7 +96,7 @@ export const reviewCandidate = spacetimedb.reducer({ jobId: t.u32(), promote: t.
 export const markPromoted = spacetimedb.reducer({ jobId: t.u32(), version: t.u32(), ok: t.bool(), note: t.string() }, (ctx, a) => {
   requireRole(ctx, 'worker');
   const j = ctx.db.labJob.id.find(a.jobId);
-  if (!j || j.status !== 'promote_requested') throw new Error('promotion was not requested');
+  if (!j || j.status !== 'promote_requested') throw new SenderError('promotion was not requested');
   ctx.db.labJob.id.update({ ...j, status: a.ok ? 'promoted' : 'failed', summary: a.ok ? j.summary : `${j.summary}\nPromotion failed: ${a.note}` });
   ctx.db.labEvent.insert({
     id: 0n, jobId: a.jobId, kind: a.ok ? 'promoted' : 'log', text: a.ok ? `Promoted ${j.detectorId} to v${a.version}. ${a.note}` : a.note,

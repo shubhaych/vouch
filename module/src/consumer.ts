@@ -1,6 +1,6 @@
-import { t } from 'spacetimedb/server';
+import { SenderError, t } from 'spacetimedb/server';
 import { spacetimedb } from './schema';
-import { myAgentId, nextCounter, requireRole, worldOf, type Ctx } from './ctx';
+import { asSenderError, myAgentId, nextCounter, requireRole, worldOf, type Ctx } from './ctx';
 import { SHOWCASE_AGENT_ID, agentLabel, createLiveAgent, deliverNow, fileRefund, recordPurchase } from './sim';
 import { REASONS } from './text';
 
@@ -12,7 +12,7 @@ export function joinImpl(ctx: Ctx, name: string) {
   if (ctx.db.shopperLink.who.find(ctx.sender)) return; // already has an agent
   const w = worldOf(ctx);
   const n = Number(nextCounter(ctx, 'live_agent'));
-  const a = createLiveAgent(w, n);
+  const a = asSenderError(() => createLiveAgent(w, n));
   ctx.db.shopperLink.insert({ who: ctx.sender, agentId: a.id, name: name.slice(0, 40) });
   w.commit();
 }
@@ -22,16 +22,16 @@ export const joinAsShopper = spacetimedb.reducer({ name: t.string() }, (ctx, { n
 
 export function buyFor(ctx: Ctx, agentId: number, businessId: number, sku: number, source: string) {
   const w = worldOf(ctx);
-  const p = recordPurchase(w, agentId, businessId, sku, source, 0);
+  const p = asSenderError(() => recordPurchase(w, agentId, businessId, sku, source, 0));
   w.commit();
   return p;
 }
 
 export function fastForwardFor(ctx: Ctx, agentId: number, purchaseId: bigint) {
   const p = ctx.db.purchase.id.find(purchaseId);
-  if (!p || p.buyer !== agentId) throw new Error('not your purchase');
+  if (!p || p.buyer !== agentId) throw new SenderError('not your purchase');
   const w = worldOf(ctx);
-  deliverNow(w, p);
+  asSenderError(() => deliverNow(w, p));
   w.commit();
 }
 
@@ -43,10 +43,10 @@ const randomHex = (ctx: Ctx, n: number) => {
 
 export function requestRefundFor(ctx: Ctx, agentId: number, purchaseId: bigint, reasonCode: string, reasonText: string) {
   const p = ctx.db.purchase.id.find(purchaseId);
-  if (!p || p.buyer !== agentId) throw new Error('not your purchase');
-  if (!(REASONS as readonly string[]).includes(reasonCode)) throw new Error('unknown reason');
+  if (!p || p.buyer !== agentId) throw new SenderError('not your purchase');
+  if (!(REASONS as readonly string[]).includes(reasonCode)) throw new SenderError('unknown reason');
   const w = worldOf(ctx);
-  const r = fileRefund(w, p, reasonCode, reasonText.slice(0, 500), p.source, 'investigation');
+  const r = asSenderError(() => fileRefund(w, p, reasonCode, reasonText.slice(0, 500), p.source, 'investigation'));
   // A fresh nonce and a finger-count challenge make a pre-recorded video harder to reuse.
   const c = ctx.db.claim.insert({
     id: 0n, refundId: r.id, agentId, nonce: randomHex(ctx, 12), fingerCount: 1 + Math.floor(ctx.random() * 5), videoUrl: '',
@@ -81,6 +81,6 @@ export const showcaseAct = spacetimedb.reducer(
     if (a.action === 'buy') buyFor(ctx, SHOWCASE_AGENT_ID, a.businessId, a.sku, 'showcase');
     else if (a.action === 'deliver') fastForwardFor(ctx, SHOWCASE_AGENT_ID, a.purchaseId);
     else if (a.action === 'refund') requestRefundFor(ctx, SHOWCASE_AGENT_ID, a.purchaseId, a.reasonCode, a.reasonText);
-    else throw new Error('action must be buy, deliver or refund');
+    else throw new SenderError('action must be buy, deliver or refund');
   },
 );

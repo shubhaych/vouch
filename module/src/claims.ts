@@ -1,4 +1,4 @@
-import { t } from 'spacetimedb/server';
+import { SenderError, t } from 'spacetimedb/server';
 import { spacetimedb } from './schema';
 import { requireRole, worldOf, type Ctx } from './ctx';
 import { agentLabel } from './sim';
@@ -11,8 +11,8 @@ export const attachVideo = spacetimedb.reducer(
   (ctx, a) => {
     requireRole(ctx, 'worker');
     const c = ctx.db.claim.id.find(a.claimId);
-    if (!c) throw new Error('no such claim');
-    if (c.status !== 'awaiting_video' && c.status !== 'more_evidence') throw new Error(`claim is ${c.status}`);
+    if (!c) throw new SenderError('no such claim');
+    if (c.status !== 'awaiting_video' && c.status !== 'more_evidence') throw new SenderError(`claim is ${c.status}`);
     ctx.db.claim.id.update({ ...c, videoUrl: a.videoUrl, frameUrls: a.frameUrls, frameHashes: a.frameHashes, checksJson: a.checksJson, status: 'frames_ready' });
   },
 );
@@ -20,7 +20,7 @@ export const attachVideo = spacetimedb.reducer(
 export const setClaimStatus = spacetimedb.reducer({ claimId: t.u64(), status: t.string() }, (ctx, a) => {
   requireRole(ctx, 'worker');
   const c = ctx.db.claim.id.find(a.claimId);
-  if (!c) throw new Error('no such claim');
+  if (!c) throw new SenderError('no such claim');
   ctx.db.claim.id.update({ ...c, status: a.status });
 });
 
@@ -42,7 +42,7 @@ export const recordRun = spacetimedb.reducer(
 export const runStep = spacetimedb.reducer({ runId: t.string(), step: t.string() }, (ctx, a) => {
   requireRole(ctx, 'worker');
   const r = ctx.db.agentRun.runId.find(a.runId);
-  if (!r) throw new Error('no such run');
+  if (!r) throw new SenderError('no such run');
   const steps = JSON.parse(r.stepsJson || '[]') as unknown[];
   steps.push({ step: a.step.slice(0, 200), at: Number(ctx.timestamp.microsSinceUnixEpoch / 1000n) });
   ctx.db.agentRun.runId.update({ ...r, stepsJson: JSON.stringify(steps.slice(-20)) });
@@ -51,7 +51,7 @@ export const runStep = spacetimedb.reducer({ runId: t.string(), step: t.string()
 export const finishRun = spacetimedb.reducer({ runId: t.string(), status: t.string(), runUrl: t.string() }, (ctx, a) => {
   requireRole(ctx, 'worker');
   const r = ctx.db.agentRun.runId.find(a.runId);
-  if (!r) throw new Error('no such run');
+  if (!r) throw new SenderError('no such run');
   ctx.db.agentRun.runId.update({ ...r, status: a.status, runUrl: a.runUrl || r.runUrl, finishedAt: ctx.timestamp });
 });
 
@@ -59,7 +59,7 @@ export const recordEvidence = spacetimedb.reducer(
   { claimId: t.u64(), seat: t.string(), runId: t.string(), runUrl: t.string(), json: t.string(), provenance: t.string() },
   (ctx, a) => {
     requireRole(ctx, 'worker');
-    if (!ctx.db.claim.id.find(a.claimId)) throw new Error('no such claim');
+    if (!ctx.db.claim.id.find(a.claimId)) throw new SenderError('no such claim');
     JSON.parse(a.json); // refuse malformed evidence
     ctx.db.evidence.insert({ id: 0n, claimId: a.claimId, seat: a.seat, runId: a.runId, runUrl: a.runUrl, json: a.json, provenance: a.provenance, at: ctx.timestamp });
   },
@@ -68,7 +68,7 @@ export const recordEvidence = spacetimedb.reducer(
 export function openInvestigationImpl(ctx: Ctx, refundId: bigint) {
   requireRole(ctx, 'business', 'controller');
   const r = ctx.db.refund.id.find(refundId);
-  if (!r) throw new Error('no such refund');
+  if (!r) throw new SenderError('no such refund');
   for (const c of ctx.db.claim.refundId.filter(refundId)) return c; // already open
   const open = r.status === 'requested' || r.status === 'more_evidence';
   if (open) {

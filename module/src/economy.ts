@@ -1,6 +1,6 @@
-import { t } from 'spacetimedb/server';
+import { SenderError, t } from 'spacetimedb/server';
 import { simTick, spacetimedb } from './schema';
-import { requireRole, setControlValue, type Ctx } from './ctx';
+import { asSenderError, requireRole, setControlValue, type Ctx } from './ctx';
 import { scheduleTick } from './control';
 import { enqueueLabJob } from './lab';
 import { DEFAULT_AGENTS_PER_TICK, DEFAULT_MAX_DAY, DEFAULT_TICK_MICROS, seedWorld as seedEngine, step } from './sim';
@@ -34,7 +34,7 @@ const RESET_TABLES = [
 export function seedWorldImpl(ctx: Ctx, seed: bigint, population: number, force: boolean) {
   requireRole(ctx, 'worker', 'controller');
   const run = ctx.db.simRun.id.find(1);
-  if (run?.seeded && !force) throw new Error('world already seeded; pass force to reseed');
+  if (run?.seeded && !force) throw new SenderError('world already seeded; pass force to reseed');
   if (force) {
     for (const name of RESET_TABLES) (ctx.db[name] as { clear(): bigint }).clear();
     for (const key of ['live_agent', 'pattern', 'credential_status']) {
@@ -43,10 +43,10 @@ export function seedWorldImpl(ctx: Ctx, seed: bigint, population: number, force:
     }
     if (run) ctx.db.simRun.id.update({ ...run, seeded: false, running: false });
   }
-  const seeded = seedEngine(ctx.db as unknown as SimDb, {
+  const seeded = asSenderError(() => seedEngine(ctx.db as unknown as SimDb, {
     seed, population, agentsPerTick: run?.agentsPerTick || DEFAULT_AGENTS_PER_TICK, tickMicros: run?.tickMicros || DEFAULT_TICK_MICROS,
     maxDay: run?.maxDay || DEFAULT_MAX_DAY,
-  });
+  }));
   scheduleTick(ctx, seeded.tickMicros);
 }
 
@@ -86,6 +86,6 @@ export function tickImpl(ctx: Ctx) {
 
 /** The scheduled tick. Only the database itself may call it. */
 export const tick = spacetimedb.reducer({ onSchedule: simTick }, { scheduledMessage: simTick.rowType }, (ctx) => {
-  if (!ctx.sender.isEqual(ctx.databaseIdentity)) throw new Error('tick is called by the scheduler only');
+  if (!ctx.sender.isEqual(ctx.databaseIdentity)) throw new SenderError('tick is called by the scheduler only');
   tickImpl(ctx);
 });

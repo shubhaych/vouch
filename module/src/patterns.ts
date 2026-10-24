@@ -1,4 +1,4 @@
-import { t } from 'spacetimedb/server';
+import { SenderError, t } from 'spacetimedb/server';
 import { spacetimedb } from './schema';
 import { nextCounter, requireRole, worldOf, type Ctx } from './ctx';
 import { enqueueLabJob } from './lab';
@@ -62,8 +62,8 @@ export const flagPattern = spacetimedb.reducer(
 export const setPatternStatus = spacetimedb.reducer({ patternId: t.u32(), status: t.string(), runId: t.string(), runUrl: t.string() }, (ctx, a) => {
   requireRole(ctx, 'worker');
   const p = ctx.db.fraudPattern.id.find(a.patternId);
-  if (!p) throw new Error('no such pattern');
-  if (!['reviewing', 'awaiting_review', 'detected'].includes(a.status)) throw new Error('bad status');
+  if (!p) throw new SenderError('no such pattern');
+  if (!['reviewing', 'awaiting_review', 'detected'].includes(a.status)) throw new SenderError('bad status');
   ctx.db.fraudPattern.id.update({ ...p, status: a.status, runId: a.runId || p.runId, runUrl: a.runUrl || p.runUrl });
 });
 
@@ -72,10 +72,10 @@ interface Role { id: string; role: string }
 export function confirmPatternImpl(ctx: Ctx, a: { patternId: number; verdict: string; runId: string; runUrl: string; narrative: string; rolesJson: string }) {
   requireRole(ctx, 'worker');
   const p = ctx.db.fraudPattern.id.find(a.patternId);
-  if (!p) throw new Error('no such pattern');
-  if (p.status === 'confirmed' || p.status === 'dismissed') throw new Error(`pattern already ${p.status}`);
+  if (!p) throw new SenderError('no such pattern');
+  if (p.status === 'confirmed' || p.status === 'dismissed') throw new SenderError(`pattern already ${p.status}`);
   const status = a.verdict === 'confirm' ? 'confirmed' : a.verdict === 'dismiss' ? 'dismissed' : a.verdict === 'needs_review' ? 'needs_review' : null;
-  if (!status) throw new Error('verdict must be confirm, dismiss or needs_review');
+  if (!status) throw new SenderError('verdict must be confirm, dismiss or needs_review');
   const roles = (JSON.parse(a.rolesJson || '[]') as Role[]).filter((r) => r && typeof r.id === 'string');
   const run = ctx.db.simRun.id.find(1);
   ctx.db.fraudPattern.id.update({ ...p, status, runId: a.runId, runUrl: a.runUrl, narrative: a.narrative.slice(0, 4_000), rolesJson: JSON.stringify(roles), reviewedDay: run?.day ?? 0 });
