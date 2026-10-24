@@ -53,7 +53,15 @@ Seats:
 ## Maincloud and the demo laptop
 
 1. `spacetime login`, then `STDB_SERVER=maincloud STDB_DB=vouch-world npm run stdb:publish`.
-2. Set `STDB_URI=https://maincloud.spacetimedb.com`, `STDB_DB=vouch-world` and the matching `NEXT_PUBLIC_STDB_*` values.
+   - The CLI may print "tsc not found in node_modules". That is harmless: npm workspaces keep TypeScript in the root `node_modules`, and the build still finishes.
+2. Put these in `.env` at the repo root (`cp .env.example .env` first). One file serves the worker and the web app; `web/next.config.ts` copies only the `NEXT_PUBLIC_*` lines into the browser build:
+   ```bash
+   STDB_URI=https://maincloud.spacetimedb.com
+   STDB_DB=vouch-world
+   NEXT_PUBLIC_STDB_URI=https://maincloud.spacetimedb.com
+   NEXT_PUBLIC_STDB_DB=vouch-world
+   ```
+   Without them the worker connects to `ws://localhost:3011/vouch` and fails with "non-101 status code". Each server and database gets its own saved token in `worker/.keys/`, so switching between local and Maincloud is safe.
 3. Start the worker once, right after publishing. The first identity to call `bootstrapWorker` becomes the worker, and the ledger poster is a second identity. If another machine claimed the role first, republish with `RESET=1` (demo data only).
 4. Start a tunnel to `:8787` and set `NEXT_PUBLIC_WORKER_URL` to its URL, so phones can upload. On the laptop, `CREAO_WEBHOOK_URL` is the tunnel URL plus `/creao/webhook`.
 5. Run the demo on a production build: `npm run build && npm run start`.

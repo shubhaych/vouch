@@ -11,7 +11,10 @@ export type Conn = DbConnection;
 /** worker and poster claim their roles once; showcase is a third identity that takes the business seat for the home demo. */
 export type Label = 'worker' | 'poster' | 'showcase';
 
-const tokenFile = (label: Label) => resolve(config.keysDir, `stdb-${label}-token`);
+// One token per server and database: a token issued by the local server is rejected by
+// Maincloud (and the other way round), so switching servers must not reuse it.
+const serverKey = `${new URL(config.stdbUri).host}-${config.stdbDb}`.replace(/[^a-z0-9.-]/gi, '_');
+export const tokenFile = (label: Label) => resolve(config.keysDir, `stdb-${label}-${serverKey}-token`);
 
 function savedToken(label: Label): string {
   if (label === 'worker' && config.stdbWorkerToken) return config.stdbWorkerToken;

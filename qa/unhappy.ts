@@ -6,6 +6,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { DbConnection } from '../worker/module_bindings/index';
+import { tokenFile } from '../worker/src/stdb';
 import { loadEnv } from '../scripts/_env';
 
 loadEnv();
@@ -87,7 +88,7 @@ if (!process.argv.includes('--kill-only')) {
   execFileSync('bash', ['-c', 'fuser -k 8787/tcp || true']);
   await sleep(1500);
   const { claim, refund } = await newClaim(conn);
-  const token = readFileSync('worker/.keys/stdb-worker-token', 'utf8').trim();
+  const token = readFileSync(tokenFile('worker'), 'utf8').trim();
   const w = await new Promise<DbConnection>((res, rej) => {
     DbConnection.builder().withUri(uri).withDatabaseName(dbName).withToken(token).onConnect((c) => res(c)).onConnectError((_c, e) => rej(e)).build();
   });
