@@ -5,6 +5,9 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AutonomyLevel, DroidMessageType, ToolConfirmationOutcome, createSession } from '@factory/droid-sdk/node';
+import { loadEnv } from './_env';
+
+loadEnv(); // FACTORY_API_KEY usually lives in the root .env; the droid CLI it spawns inherits it
 
 if (!process.env.FACTORY_API_KEY) { console.error('FACTORY_API_KEY is not set (UNVERIFIED-LIVE: run this on the worker laptop)'); process.exit(2); }
 const cwd = mkdtempSync(join(tmpdir(), 'vouch-droid-hello-'));
