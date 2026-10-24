@@ -5,6 +5,7 @@
 //   npx tsx scripts/demo-reset.ts [--seed 11] [--agents 10000]
 import { config, log } from '../worker/src/env';
 import { connect } from '../worker/src/stdb';
+import { DEFAULT_MAX_DAY } from '../module/src/sim';
 
 const arg = (name: string, d: string) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -16,7 +17,7 @@ const population = Number(arg('agents', String(config.population)));
 const { conn } = await connect('worker', ['SELECT * FROM sim_run']);
 const t0 = Date.now();
 await conn.reducers.seedWorld({ seed, population, force: true });
-await conn.reducers.setSim({ running: true, agentsPerTick: 1000, tickMicros: 200_000n, maxDay: 720 });
+await conn.reducers.setSim({ running: true, agentsPerTick: 1000, tickMicros: 200_000n, maxDay: DEFAULT_MAX_DAY });
 const run = conn.db.simRun.id.find(1);
 log(`demo reset in ${Date.now() - t0} ms: seed ${seed}, ${population} agents, day ${run?.day}, running=${run?.running}`);
 conn.disconnect();

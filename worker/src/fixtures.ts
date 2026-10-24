@@ -53,7 +53,15 @@ export function fixtureResponse(seat: Seat, c: unknown): unknown {
     else if (recapture) { reason = 'The video looks like a recording of a screen.'; cites = 'check:capture'; }
     else if (get(c, 'deterministic_checks.within_window') === false) { reason = 'The claim was filed outside the return window.'; cites = 'policy:window'; }
     if (reason) return fill(load(seat, 'more_evidence'), { claim_id: get(c, 'claim_id'), reason, cites });
-    return fill(load(seat, 'accept'), { claim_id: get(c, 'claim_id'), amount, needs_controller: amount > Number(get(c, 'controller_threshold') ?? 500) });
+    const accept = fill(load(seat, 'accept'), { claim_id: get(c, 'claim_id'), amount, needs_controller: amount > Number(get(c, 'controller_threshold') ?? 500) }) as Obj;
+    // The prompt weighs a verified credential from another store as context, and every reason cites its source.
+    const issuer = get(c, 'credential.issuer');
+    if (get(c, 'credential.verified') === true && issuer) {
+      const band = get(c, 'credential.claims.refund_ratio_band');
+      const text = `A credential from ${String(issuer)} verified in all five steps${band ? ` and shows a ${String(band)} refund ratio there` : ''}.`;
+      accept.reasons = [...(accept.reasons as Obj[]), { text, cites: `credential:${String(issuer)}` }];
+    }
+    return accept;
   }
   const pattern = get(c, 'pattern') as Obj;
   const agents = ((get(c, 'agents') as Obj[] | undefined) ?? []).map((a) => String(a.id));

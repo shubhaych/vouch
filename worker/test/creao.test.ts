@@ -85,6 +85,13 @@ describe('fixtures follow each prompt\'s hard rules', () => {
     expect(inv({ evidence: { unable_to_verify: true } }).action).toBe('more_evidence');
     expect(inv({ evidence: { challenge: { passed: false } } }).action).toBe('more_evidence');
   });
+  it('T5.5 the Investigator cites a verified credential, and ignores one that failed', () => {
+    const cited = (r: { reasons: { cites: string }[] }) => r.reasons.map((x) => x.cites);
+    const ok = inv({ credential: { presented: true, verified: true, failed_step: null, issuer: 'B-019', claims: { refund_ratio_band: 'low' } } }) as unknown as { reasons: { cites: string }[] };
+    expect(cited(ok)).toContain('credential:B-019');
+    const failed = inv({ credential: { presented: true, verified: false, failed_step: 4, issuer: 'B-019', claims: {} } }) as unknown as { reasons: { cites: string }[] };
+    expect(cited(failed)).not.toContain('credential:B-019');
+  });
   it('the Evidence Analyst fixture is unable to verify mostly blank videos', () => {
     const r = fixtureResponse('evidence_analyst', { claim_id: 'C-1', challenge: { fingers: 3 }, frames: [1, 2, 3, 4, 5, 6], deterministic_checks: { blank_frames: 6 } }) as { unable_to_verify: boolean };
     expect(r.unable_to_verify).toBe(true);

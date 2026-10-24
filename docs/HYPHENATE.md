@@ -1,14 +1,18 @@
-# Hyphenate: the seats Vouch Desk fills
+# Hyphenate: the finance seat Vouch fills (kept eligible, not the centre)
 
-Company: Threadline (simulated fashion marketplace). Corner: refunds, from the customer's request to the ledger entry, including the credit decision of how fast to pay.
+Hyphenate is not one of the three sponsors this build centres on. It stays eligible because the business dashboard already fills a finance seat.
 
-| Seat | Vouch Desk agent | Access and limits | Asks a person when |
+**Company:** a simulated online retailer (businesses B-002 Circuit Yard and B-019 Lakeshore Audio in Vouch World). **Corner:** refunds, from the customer's claim to the journal entry.
+
+| Seat | Who fills it in Vouch | Access and limits | Asks a person when |
 | --- | --- | --- | --- |
-| Refund and dispute analyst | Refund Desk (CREAO) | Reads orders, claims, carrier, ledger summaries; writes proposals only | Lane C or D, an amount above the cap, sources that disagree |
-| Credit analyst | Credit Analyst (people), Agent-Order Underwriter (shopping agents) | Reads identity, payment, order and refund history; writes a Vouch Record with an expiry; cannot pay | A new customer with a large claim, an agent outside its mandate, a limit increase |
-| Cash applier and reconciler | Reconciler (CREAO) | Read-only on all four sources; writes findings | A break above materiality, or a cause it cannot establish |
-| Revenue and close accountant | Ledger Poster (deterministic worker; a CREAO agent drafts the memo) | Posts only balanced entries that cite an approved decision | Cutoff items and anything above materiality |
+| Refund and dispute analyst | The Refund Investigator (CREAO) proposes; the business seat decides | The agent reads the claim, the Evidence Analyst's findings, the history summary, any credential check and the policy. It writes nothing; the worker turns its JSON into a proposal. | Always: an agent only proposes. Unverifiable evidence becomes "more evidence", never a decline. |
+| Controller | A person with the controller code | Decides any accept above $500, flips controls, promotes Droid candidates | — |
+| Revenue and close accountant | The ledger poster: a second worker identity, deterministic code, not an agent | Posts only a balanced entry (4100 Refunds and returns against 1000 Cash or 2300 Store credit liability) for a decided refund | An entry that does not balance is refused |
 
-The controller approves anything above $500 and any policy change. The Desk Lead is worker code, not an agent.
+Controls, all in `module/src/desk.ts` and tested in `module/src/reducers.test.ts`:
+- whoever proposes cannot decide; whoever decides cannot post;
+- an accept above $500 by a business seat goes to the controller;
+- with the agents switched off, the business can only request more evidence.
 
-Where each control lives: segregation of duties in `module/src/desk.ts`; the lane rule in `module/src/policy.ts`; the kill switch in `module/src/claims.ts` and `worker/src/breaker.ts`. Proof (planted errors, answer key, Beancount books) comes from `world/` once added.
+What is real and what is simulated: the decisions, the role checks and the journal entries are live reducers; the money, the businesses and the shoppers are simulated. See [REAL_VS_SIMULATED.md](REAL_VS_SIMULATED.md).

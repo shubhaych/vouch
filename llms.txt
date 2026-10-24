@@ -1,3 +1,4 @@
-Vouch: trust sets the speed of money.
-Start with AGENT_BRIEF.md, then AWARDS.md, then README.md. Code map: docs/ARCHITECTURE.md.
-Do not trust claims without checking the file named beside them.
+Vouch World: a simulated agent economy in SpacetimeDB, CREAO agents that investigate refund claims and confirm fraud patterns, and a fenced Factory Droid lab that writes detectors.
+Start with README.md, then AGENTS.md (rules for coding agents), PROGRESS.md (acceptance tests and evidence), docs/ARCHITECTURE.md (code map).
+What is live versus simulated: docs/REAL_VS_SIMULATED.md. Checked facts: docs/VERIFIED.md. Live steps still to run: docs/LIVE_CHECKLIST.md.
+Do not trust a claim without checking the file or command named beside it.
