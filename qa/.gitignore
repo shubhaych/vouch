@@ -1,0 +1,4 @@
+# make-agent.ts saves test identity tokens here; tokens never go in git.
+agent-*.json
+traces/
+results/clip-*.mp4
