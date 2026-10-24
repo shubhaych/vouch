@@ -36,7 +36,7 @@ Environment for this session: local SpacetimeDB 2.13.0 standalone on `ws://local
 - [x] T2.3 The worker extracts 8 to 10 frames including the first and last second, stores hashes, calls `attachVideo`. (`npx tsx scripts/claim-flow.ts`: "9 frames, 8.0 s 640x480")
 - [x] T2.4 Frame reuse: uploading the same video for a second claim shows "Matches frames from claim ...". (claim-flow twice; `worker/test/video.test.ts` matches a re-encoded copy)
 - [x] T2.5 The orchestrator runs Evidence Analyst then Investigator; `/business` shows both runs progressing, then findings with boxes and a recommendation with cited reasons. (fixture mode, labelled Fixture; worker log "C-14: Investigator recommends accept $249.00 (fixture)")
-  - UNVERIFIED-LIVE: CREAO: `CREAO_MODE=live npm run worker` then `npx tsx scripts/claim-flow.ts qa/videos/G01-testsrc.mp4`
+  - UNVERIFIED-LIVE: CREAO: `CREAO_MODE=live npm run worker` then `npx tsx scripts/claim-flow.ts`
 - [x] T2.6 Unparseable agent output fails closed (`unable_to_verify`, `more_evidence`). (worker test "app path: … unparseable output fails closed")
 - [x] T2.7 Kill switch off: a new claim gets "Investigator offline" and no CREAO run starts. (module test "with no recommendation a person can only request more evidence"; orchestrator checks the switch before each run and before the proposal; end to end in Loop 2)
 - [x] T2.8 Accept writes a decision, a balanced journal entry and +12 credit; the phone shows the decision and the score tween; the globe shows the arc and the credit event. (module test "T2.8 accept pays +12…"; e2e "T2.1/T2.8": credit 600 → 612)

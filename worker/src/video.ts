@@ -117,11 +117,26 @@ export function findReuse(hashes: string[], claimId: bigint, others: { id: bigin
 
 export interface Checks {
   fresh: boolean; uploaded_after_s: number; duration_s: number; width: number; height: number; duration_ok: boolean; resolution_ok: boolean;
-  frame_reuse: ReuseMatch[]; frame_times: number[]; blank_frames: number; within_window: boolean; reason_allowed: boolean; over_video_threshold: boolean; policy_line: string;
+  frame_reuse: ReuseMatch[]; frame_times: number[]; blank_frames: number; frame_motion: number | null; still_image: boolean; within_window: boolean; reason_allowed: boolean; over_video_threshold: boolean; policy_line: string;
 }
 
 /** A flat frame (black, white, a lens cap) has no left/right brightness steps, so its dHash is (almost) all zeros. */
 export const isBlank = (h: string) => hamming(h, '0000000000000000') <= 2;
+
+/**
+ * Median dHash distance between consecutive non-blank frames, or null with fewer than two.
+ * A phone filming an item moves (about 16 on our clips); a slideshow of one photo barely
+ * changes (about 2), and neither does a test pattern (0).
+ */
+export function frameMotion(hashes: string[]): number | null {
+  const live = hashes.filter((h) => !isBlank(h));
+  if (live.length < 2) return null;
+  const d = live.slice(1).map((h, i) => hamming(h, live[i]!)).sort((a, b) => a - b);
+  return d[Math.floor(d.length / 2)]!;
+}
+export const STILL_MOTION_MAX = 3;
+/** Little motion is a reason for more evidence, never a decline: a steady, honest shot can be still too. */
+export const isStill = (motion: number | null) => motion !== null && motion <= STILL_MOTION_MAX;
 
 /** Handles one upload end to end. Throws UploadError with a message the phone shows. */
 export async function processUpload(conn: DbConnection, claimId: bigint, nonce: string, data: Buffer, ext: string, now = Date.now()): Promise<{ frames: number; checks: Checks }> {
@@ -176,6 +191,8 @@ export async function processUpload(conn: DbConnection, claimId: bigint, nonce: 
     frame_reuse: findReuse(hashes, claimId, others),
     frame_times: times,
     blank_frames: hashes.filter(isBlank).length,
+    frame_motion: frameMotion(hashes),
+    still_image: isStill(frameMotion(hashes)),
     within_window: withinWindow,
     reason_allowed: refund?.reasonCode !== 'changed_mind' || policy.windowDays >= 14,
     over_video_threshold: !!refund && refund.amount > policy.needsVideoOverCents,

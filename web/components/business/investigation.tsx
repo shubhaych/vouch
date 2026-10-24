@@ -22,7 +22,7 @@ export interface EvidenceJson {
 }
 interface Checks {
   fresh?: boolean; uploaded_after_s?: number; duration_s?: number; width?: number; height?: number; duration_ok?: boolean; resolution_ok?: boolean;
-  frame_reuse?: { frame: number; matches_claim: string; matches_frame: number; distance: number }[]; frame_times?: number[]; blank_frames?: number;
+  frame_reuse?: { frame: number; matches_claim: string; matches_frame: number; distance: number }[]; frame_times?: number[]; blank_frames?: number; frame_motion?: number | null; still_image?: boolean;
   within_window?: boolean; reason_allowed?: boolean; over_video_threshold?: boolean; policy_line?: string;
 }
 
@@ -91,6 +91,7 @@ export function Investigation({ claim, refund, purchase, evidence, frame, onFram
         <Chip ok={checks.frame_reuse ? checks.frame_reuse.length === 0 : undefined} label="Frame reuse" detail={checks.frame_reuse?.length ? `matches ${checks.frame_reuse.map((r) => r.matches_claim).join(", ")}` : "no match in other claims"} />
         <Chip ok={checks.within_window !== undefined ? checks.within_window && checks.reason_allowed !== false : undefined} label="Policy fit" detail={checks.policy_line} />
         {checks.blank_frames ? <Chip ok={false} label="Blank frames" detail={`${checks.blank_frames} of ${claim.frameUrls.length}`} /> : null}
+        {checks.still_image ? <Chip ok={false} label="Little motion" detail={`frames barely change (median difference ${checks.frame_motion} of 64 bits)`} /> : null}
       </div>
 
       {checks.frame_reuse?.length ? (

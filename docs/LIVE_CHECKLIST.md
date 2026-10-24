@@ -35,7 +35,7 @@ curl -s https://developer.creao.ai/v1/agents -H "Authorization: Bearer $CREAO_AP
 CREAO_MODE=live npx tsx scripts/hello-creao.ts --record   # T0.5: one run per agent; saves real responses as fixtures
 ```
 - **T0.5:** paste the three `agent_id`s into the README and CREAO.md tables. Copy one run's share link per agent from the CREAO interface.
-- **T2.5 live:** restart the worker with `CREAO_MODE=live npm run worker`. Run `npx tsx scripts/claim-flow.ts qa/videos/G01-testsrc.mp4`, or use a phone video. On `/business`, both runs progress with "Open run" links, then the findings and the recommendation appear.
+- **T2.5 live:** restart the worker with `CREAO_MODE=live npm run worker`. Run `npx tsx scripts/claim-flow.ts`, or use a phone video. On `/business`, both runs progress with "Open run" links, then the findings and the recommendation appear.
 - **T3.7 live:** with the worker live, the next new pattern gets one Pattern Analyst run (at most 12 per simulation run). Check that `/world` shows its verdict and that the run link opens.
 - **T5.3:** `curl -X POST localhost:8787/showcase/run -H 'content-type: application/json' -d "{\"code\":\"$DEMO_CONTROLLER_CODE\"}"` records a live showcase run to `worker/fixtures/showcase/recorded.json`. The home demo's CREAO steps then show "Replay of real run" with that run's link.
 - **Kill switch:** on `/business`, switch CREAO off, file a claim, and see "Investigator offline". Switch it back on.

@@ -1,7 +1,10 @@
 // Drives one live claim end to end through the real reducers and the worker's
 // upload route, the way the phone does. Used by the QA loop and as a smoke test.
 //   npx tsx scripts/claim-flow.ts [video] [--sku 1] [--business 2] [--accept]
-import { readFileSync } from 'node:fs';
+// Without a video it records a fresh moving clip, so frames never match an earlier claim
+// and the still-image check does not fire.
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { DbConnection } from '../worker/module_bindings/index';
 import { loadEnv } from './_env';
 
@@ -11,7 +14,13 @@ const dbName = process.env.STDB_DB || 'vouch';
 const worker = process.env.NEXT_PUBLIC_WORKER_URL || 'http://localhost:8787';
 const args = process.argv.slice(2);
 const opt = (n: string, d: string) => { const i = args.indexOf(`--${n}`); return i >= 0 ? args[i + 1]! : d; };
-const video = args.find((a) => !a.startsWith('--') && !/^\d+$/.test(a)) ?? 'qa/videos/G01-testsrc.mp4';
+function freshClip(): string {
+  mkdirSync('test-results', { recursive: true });
+  const out = `test-results/claim-flow-${Date.now()}.mp4`;
+  execFileSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', `life=s=640x480:mold=10:r=15:ratio=0.1:seed=${Date.now() % 1e9}`, '-t', '8', '-pix_fmt', 'yuv420p', out]);
+  return out;
+}
+const video = args.find((a) => !a.startsWith('--') && !/^\d+$/.test(a)) ?? freshClip();
 const sku = Number(opt('sku', '1'));
 const businessId = Number(opt('business', '2'));
 

@@ -18,7 +18,7 @@ In this build "Live" means a local SpacetimeDB 2.13.0 server; Maincloud is step 
 | Agent kinds (honest, opportunist, serial, ring) | **Simulated** ground truth in the private `agent_truth` table; never sent to a browser | `module/src/schema.ts` (not public); T3.9 |
 | Losses and honest-customer declines (Observatory) | **Simulated**, computed against the ground truth inside reducers | `region_stat` columns `loss_cents`, `honest_declines` |
 | The shopper's join, purchase and refund request on `/shop` | **Live** rows; the payment is simulated (no money moves) | `/shop`, then `SELECT * FROM purchase WHERE source = 'live'` |
-| Claim video: upload, ffprobe, frames, dHash, freshness, blank-frame and reuse checks | **Live** (ffmpeg in the worker) | `npx tsx scripts/claim-flow.ts qa/videos/G01-testsrc.mp4` |
+| Claim video: upload, ffprobe, frames, dHash, freshness, blank-frame and reuse checks | **Live** (ffmpeg in the worker) | `npx tsx scripts/claim-flow.ts` |
 | Evidence Analyst, Refund Investigator, Pattern Analyst results | **Fixture** (`CREAO_MODE=fixture`, hand-written to the agents' schemas in `worker/fixtures/`); live runs not yet made | `/business` badges; LIVE_CHECKLIST.md step 2 |
 | The showcase run on the home page (A-00421) | **Replay** of the recorded showcase sequence; the CREAO steps are fixture until a real run is recorded | `worker/fixtures/showcase/recorded.json` |
 | Decisions, segregation of duties, journal entries | **Live** reducers (`module/src/desk.ts`); the ledger is a demo ledger, not real books | `npm test -w module` (T2.8, T2.9) |

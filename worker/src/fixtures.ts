@@ -36,7 +36,9 @@ export function fixtureResponse(seat: Seat, c: unknown): unknown {
     const frames = (get(c, 'frames') as unknown[] | undefined) ?? [];
     const blank = Number(get(c, 'deterministic_checks.blank_frames') ?? 0);
     const vars = { claim_id: get(c, 'claim_id'), fingers: get(c, 'challenge.fingers') ?? 0 };
-    return fill(load(seat, frames.length >= 4 && blank * 2 < frames.length ? 'consistent' : 'unable'), vars);
+    const r = fill(load(seat, frames.length >= 4 && blank * 2 < frames.length ? 'consistent' : 'unable'), vars) as Obj;
+    if (get(c, 'deterministic_checks.still_image') === true) r.capture_flags = [...((r.capture_flags as string[] | undefined) ?? []), 'possible_still_image'];
+    return r;
   }
   if (seat === 'refund_investigator') {
     const evidence = get(c, 'evidence') as Obj | undefined;
@@ -51,6 +53,7 @@ export function fixtureResponse(seat: Seat, c: unknown): unknown {
     else if (reuse.length) { reason = 'Frames match frames from another claim.'; cites = 'check:frame_reuse'; }
     else if (challengeFailed) { reason = 'The finger challenge at the end of the video was not passed.'; cites = 'check:challenge'; }
     else if (recapture) { reason = 'The video looks like a recording of a screen.'; cites = 'check:capture'; }
+    else if (get(c, 'deterministic_checks.still_image') === true) { reason = 'The video barely changes from frame to frame, as a photo or a slideshow would; a short handheld clip of the item would settle it.'; cites = 'check:still_image'; }
     else if (get(c, 'deterministic_checks.within_window') === false) { reason = 'The claim was filed outside the return window.'; cites = 'policy:window'; }
     if (reason) return fill(load(seat, 'more_evidence'), { claim_id: get(c, 'claim_id'), reason, cites });
     const accept = fill(load(seat, 'accept'), { claim_id: get(c, 'claim_id'), amount, needs_controller: amount > Number(get(c, 'controller_threshold') ?? 500) }) as Obj;

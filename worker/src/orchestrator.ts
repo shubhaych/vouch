@@ -132,7 +132,7 @@ export class Orchestrator {
         policy: { window_days: policy.windowDays, requires_video_over: policy.needsVideoOverCents / 100, notes: policy.notes },
         challenge: { fingers: c.fingerCount },
         frames: c.frameUrls.map((url, index) => ({ index, t: Number((checks.frame_times as number[] | undefined)?.[index] ?? index), url })),
-        deterministic_checks: { fresh: checks.fresh ?? true, duration_s: checks.duration_s ?? null, frame_reuse: checks.frame_reuse ?? [], blank_frames: checks.blank_frames ?? 0 },
+        deterministic_checks: { fresh: checks.fresh ?? true, duration_s: checks.duration_s ?? null, frame_reuse: checks.frame_reuse ?? [], blank_frames: checks.blank_frames ?? 0, frame_motion: checks.frame_motion ?? null, still_image: checks.still_image ?? false },
       };
       const r = await this.runSeat<EvidenceJson>('evidence_analyst', caseRef, evCase,
         { unable_to_verify: true, summary: 'The Evidence Analyst output could not be read, so the claim is treated as unable to verify.', capture_flags: [] },
@@ -161,7 +161,7 @@ export class Orchestrator {
       claim: { reason_code: refund.reasonCode, reason_text: refund.reasonText },
       policy: { window_days: policy.windowDays, restocking_fee_pct: policy.restockingFeePct, store_credit_allowed: policy.storeCreditAllowed, notes: policy.notes },
       evidence,
-      deterministic_checks: { fresh: checks.fresh ?? true, duration_s: checks.duration_s ?? null, frame_reuse: checks.frame_reuse ?? [], within_window: withinWindow },
+      deterministic_checks: { fresh: checks.fresh ?? true, duration_s: checks.duration_s ?? null, frame_reuse: checks.frame_reuse ?? [], still_image: checks.still_image ?? false, within_window: withinWindow },
       history: await historySummary(this.conn, refund.agentId),
       credential: credential ?? { presented: false, verified: false, failed_step: null, issuer: null, claims: {} },
       patterns,

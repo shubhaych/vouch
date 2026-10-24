@@ -84,6 +84,7 @@ describe('fixtures follow each prompt\'s hard rules', () => {
     expect(inv({ evidence: { offline: true } }).action).toBe('more_evidence');
     expect(inv({ evidence: { unable_to_verify: true } }).action).toBe('more_evidence');
     expect(inv({ evidence: { challenge: { passed: false } } }).action).toBe('more_evidence');
+    expect(inv({ deterministic_checks: { frame_reuse: [], within_window: true, still_image: true } }).action).toBe('more_evidence'); // QA-003
   });
   it('T5.5 the Investigator cites a verified credential, and ignores one that failed', () => {
     const cited = (r: { reasons: { cites: string }[] }) => r.reasons.map((x) => x.cites);

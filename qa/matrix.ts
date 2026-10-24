@@ -142,7 +142,7 @@ if (want('V02') || want('V08') || want('V09')) {
   const { claim, refund } = await fileClaim(s);
   firstClaim = claim.id;
   const before = score(s.conn, s.agentId);
-  const u = await upload(claim.id, claim.nonce, V('G01-testsrc.mp4'));
+  const u = await upload(claim.id, claim.nonce, V('S01-fresh.mp4'));
   const o = await outcome(s.conn, claim.id, refund.id, u.t0);
   let decided = '';
   if (o.recommendation?.action === 'accept') {
@@ -152,7 +152,7 @@ if (want('V02') || want('V08') || want('V09')) {
     decided = `business accepted; credit ${before} → ${after}; journal entry ${je ? `#${je.id}` : 'missing'}`;
   }
   const ok = !!o.recommendation && o.recommendation.action !== 'decline' && u.status === 200;
-  if (want('V02')) record({ id: 'V02', persona: 'P1', video: 'G01-testsrc (generated stand-in)', expected: 'Accept or smaller amount; never decline', actual: `upload ${u.status}; ${o.recommendation ? `${o.recommendation.action} $${(o.recommendation.amount / 100).toFixed(2)} ${o.recommendation.method} conf ${o.recommendation.confidence}` : 'no recommendation'} after ${o.secondsToRec}s; ${decided}`, match: ok, details: { upload: u.body, ...o } });
+  if (want('V02')) record({ id: 'V02', persona: 'P1', video: 'S01-fresh (generated moving stand-in)', expected: 'Accept or smaller amount; never decline', actual: `upload ${u.status}; ${o.recommendation ? `${o.recommendation.action} $${(o.recommendation.amount / 100).toFixed(2)} ${o.recommendation.method} conf ${o.recommendation.confidence}` : 'no recommendation'} after ${o.secondsToRec}s; ${decided}`, match: ok, details: { upload: u.body, ...o } });
 }
 
 // ---------------------------------------------------------------- V08 / V09: reuse on new accounts
