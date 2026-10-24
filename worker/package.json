@@ -1,17 +1,26 @@
 {
   "name": "@vouch/worker",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
-  "description": "Desk Lead: slow and secret work (CREAO agent calls, risk model, CRS, Nessie). Subscribes to SpacetimeDB and writes back through reducers.",
+  "description": "The worker: slow, secret or heavy work. CREAO orchestration, video frames, detectors, the Droid Lab and credential signing. Connects to SpacetimeDB as the privileged worker identity.",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
     "typecheck": "tsc -p .",
-    "test": "tsx --test src/*.test.ts"
+    "test": "CREAO_MODE=fixture vitest run"
   },
   "dependencies": {
+    "@factory/droid-sdk": "0.10.0",
+    "@fastify/cors": "^11",
+    "@fastify/multipart": "^10",
     "@vouch/module": "*",
-    "spacetimedb": "2.13.0"
+    "fastify": "^5",
+    "spacetimedb": "2.13.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "vitest": "^3"
   }
 }

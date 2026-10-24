@@ -1,0 +1,17 @@
+
+Running 7 tests using 1 worker
+
+[1/7] e2e/regressions/QA-007.spec.ts:5:1 › QA-007/QA-012 Ask Droid presets are clickable and fit a phone
+[2/7] e2e/regressions/QA-008.spec.ts:5:1 › QA-008 Observatory metric switches stay responsive and a globe click opens the region
+e2e/regressions/QA-008.spec.ts:5:1 › QA-008 Observatory metric switches stay responsive and a globe click opens the region
+{"refunds":5735,"losses":4119,"honest_declines":1185,"fraud":2103,"credit":7532,"business":491,"shopping":6497}
+
+[3/7] e2e/regressions/QA-009.spec.ts:4:1 › QA-009 /system has no horizontal scroll at 390 px
+[4/7] e2e/smoke.spec.ts:23:1 › T1.5/T1.6 /world renders 10,000 agents, businesses and a streaming event monitor
+[5/7] e2e/smoke.spec.ts:38:1 › T0.3 a row inserted by one client shows up live in two other tabs
+[6/7] e2e/smoke.spec.ts:59:1 › T1.7 /system shows live counts, throughput and latency
+[7/7] e2e/smoke.spec.ts:69:1 › T2.1/T2.8 shop → claim video → business accepts → shopper sees the decision
+e2e/smoke.spec.ts:69:1 › T2.1/T2.8 shop → claim video → business accepts → shopper sees the decision
+
+
+  7 passed (6.3m)

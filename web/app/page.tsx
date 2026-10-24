@@ -1,37 +1,49 @@
 import Link from "next/link";
-import { Card } from "@/components/card";
-import { HomeCounters } from "@/components/home-counters";
-import { LAYERS, THESIS } from "@/lib/product";
+import { HeroCanvas } from "@/components/background/hero-canvas";
+import { LiveDemo } from "@/components/home/live-demo";
+import { BuiltOn, ClosingCta, Experiences, HeroCounters, HowItWorks } from "@/components/home/sections";
+import { SectionDivider } from "@/components/ui/divider";
+import { Footer } from "@/components/ui/footer";
 
+// Constructa's home in Vouch's words: the same section order and look (web/DESIGN.md).
 export default function Home() {
   return (
-    <div className="space-y-10">
-      <section className="max-w-3xl">
-        <h1 className="text-4xl font-bold tracking-tight">{THESIS}</h1>
-        <p className="mt-4 text-xl text-muted">
-          Vouch gives a retailer&apos;s refunds team a stored, expiring Vouch Record for each customer and each shopping
-          agent. The record sets how fast a refund moves, an AI checks the contested claims against the evidence, and every
-          decision shows its reasons.
-        </p>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Link href="/shopper/return" className="rounded-lg bg-accent px-5 py-2.5 font-semibold text-white hover:opacity-90">Run the demo</Link>
-          <Link href="/atlas#proof" className="rounded-lg border border-line bg-surface px-5 py-2.5 font-semibold hover:border-accent">See the proof</Link>
+    <main className="landing" data-testid="home">
+      <section className="hero">
+        <div className="hero__grid-overlay" aria-hidden />
+        <div className="hero__visual"><HeroCanvas /></div>
+        <div className="hero__scrim" aria-hidden />
+        <div className="hero__inner">
+          <div className="hud-glass">
+            <span className="hero__eyebrow"><span className="hero__eyebrow-dot" aria-hidden />Cal Hacks 13.0</span>
+            <h1 className="hero__title">Trust that travels with every purchase.</h1>
+            <p className="hero__sub">Vouch investigates refunds with AI agents, scores shopping behaviour, and lets any business verify a shopper&apos;s record without seeing it.</p>
+            <div className="hero__cta">
+              <Link href="/world" className="btn btn--glow" data-testid="enter-world">Enter Vouch World</Link>
+              <Link href="/shop" className="btn btn--ghost-dark" data-testid="file-refund">File a refund</Link>
+            </div>
+            <HeroCounters />
+          </div>
         </div>
       </section>
 
-      <HomeCounters />
-
-      <section>
-        <h2 className="mb-4 text-2xl font-semibold">Four layers, one engine</h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          {LAYERS.map((l) => (
-            <Card key={l.n} title={`${l.n}. ${l.name}`}>
-              <p>{l.does}</p>
-              <p className="mt-3 text-sm text-muted">AI: {l.ai}</p>
-            </Card>
-          ))}
-        </div>
+      <SectionDivider />
+      <section className="section section--compact">
+        <p className="section__eyebrow">Live demo</p>
+        <h2 className="section__title">Buy, then verify.</h2>
+        <p className="mt-2 max-w-2xl text-ink-soft">A purchase becomes a verified refund and a credit change, row by row. This is the whole product in twenty seconds.</p>
+        <LiveDemo />
       </section>
-    </div>
+
+      <SectionDivider />
+      <Experiences />
+      <SectionDivider />
+      <HowItWorks />
+      <SectionDivider />
+      <BuiltOn />
+      <SectionDivider />
+      <ClosingCta />
+      <Footer />
+    </main>
   );
 }

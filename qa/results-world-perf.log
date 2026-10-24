@@ -1,0 +1,8 @@
+
+Running 1 test using 1 worker
+
+[1/1] qa/world-perf.spec.ts:6:1 › world modes: long-task load over 10 s
+qa/world-perf.spec.ts:6:1 › world modes: long-task load over 10 s
+{"live":{"busyMs":19184,"count":50,"max":2122},"replayList":{"busyMs":21568,"count":64,"max":1364},"replayOpen":{"busyMs":16139,"count":58,"max":1448},"replayPlaying":{"busyMs":15473,"count":52,"max":1452},"observatory":{"busyMs":11215,"count":40,"max":1829}}
+
+  1 passed (4.2m)

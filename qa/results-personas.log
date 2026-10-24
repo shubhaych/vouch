@@ -1,0 +1,196 @@
+
+Running 7 tests using 1 worker
+
+[1/7] qa/personas.spec.ts:36:1 › P1 new shopper lands on / and watches the live demo
+[2/7] qa/personas.spec.ts:51:1 › P1 unhappy paths on /shop and /claim: double-click pay, short video, refresh, two tabs
+[3/7] qa/personas.spec.ts:92:1 › P5 business: wrong seat code, queue, frames and checks, more evidence, kill switch
+  1) qa/personas.spec.ts:92:1 › P5 business: wrong seat code, queue, frames and checks, more evidence, kill switch 
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByTestId('toaster')
+    Expected pattern: /wrong seat code/i
+    Received string:  ""
+    Timeout: 10000ms
+
+    Call log:
+      - Expect "toContainText" getByTestId('toaster') with timeout 10000ms
+      - waiting for getByTestId('toaster')
+        16 × locator resolved to <div data-testid="toaster" class="pointer-events-none fixed bottom-4 right-4 z-[100] flex w-[min(26rem,calc(100vw-2rem))] flex-col gap-2">…</div>
+           - unexpected value "takeBusinessSeat: The instance encountered a fatal error."
+        8 × locator resolved to <div data-testid="toaster" class="pointer-events-none fixed bottom-4 right-4 z-[100] flex w-[min(26rem,calc(100vw-2rem))] flex-col gap-2"></div>
+          - unexpected value ""
+
+
+       99 |     await page.getByTestId('seat-submit').click();
+      100 |     const toast = page.getByTestId('toaster');
+    > 101 |     await expect(toast).toContainText(/wrong seat code/i, { timeout: 10_000 });
+          |                         ^
+      102 |     await shot(page, 'P5-wrong-code');
+      103 |   }
+      104 |   await seat(page, BUSINESS_CODE);
+        at /home/user/vouch/qa/personas.spec.ts:101:25
+
+    Error Context: test-results/qa-personas-P5-business-wr-55d74-s-more-evidence-kill-switch/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/qa-personas-P5-business-wr-55d74-s-more-evidence-kill-switch/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/qa-personas-P5-business-wr-55d74-s-more-evidence-kill-switch/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[4/7] qa/personas.spec.ts:126:1 › P6 controller: credential verify, tamper and revoke in the five-step check
+  2) qa/personas.spec.ts:126:1 › P6 controller: credential verify, tamper and revoke in the five-step check 
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByTestId('cred-result')
+    Expected pattern: /pass|verified/i
+    Received string:  "Failed at step 3"
+    Timeout: 30000ms
+
+    Call log:
+      - Expect "toContainText" getByTestId('cred-result') with timeout 30000ms
+      - waiting for getByTestId('cred-result')
+        57 × locator resolved to <li data-testid="cred-result" class="mt-1 text-sm font-semibold text-fraud">Failed at step 3</li>
+           - unexpected value "Failed at step 3"
+
+
+      130 |   await seat(page, CONTROLLER_CODE);
+      131 |   await expect(page.getByTestId('credential-stepper')).toBeVisible({ timeout: 30_000 });
+    > 132 |   await page.getByTestId('cred-verify').click();
+          |                                                 ^
+      133 |   await expect(page.getByTestId('cred-result')).toContainText(/pass|verified/i, { timeout: 30_000 });
+      134 |   await page.getByTestId('cred-tamper').click();
+      135 |   await expect(page.getByTestId('cred-result')).toContainText(/step 4/i, { timeout: 30_000 });
+        at /home/user/vouch/qa/personas.spec.ts:132:49
+
+    Error Context: test-results/qa-personas-P6-controller--a94f9-voke-in-the-five-step-check/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/qa-personas-P6-controller--a94f9-voke-in-the-five-step-check/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/qa-personas-P6-controller--a94f9-voke-in-the-five-step-check/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[5/7] qa/personas.spec.ts:143:1 › P7 judge on the globe: layers, agent, graph click-through, replay, observatory, region
+  3) qa/personas.spec.ts:143:1 › P7 judge on the globe: layers, agent, graph click-through, replay, observatory, region 
+
+    Test timeout of 300000ms exceeded.
+
+    Error: locator.click: Test timeout of 300000ms exceeded.
+    Call log:
+      - waiting for getByTestId('metric-refunds')
+        - locator resolved to <button data-testid="metric-refunds" class="rounded-md px-2.5 py-1.5 text-xs font-semibold transition text-ink-soft-dark hover:text-ink-dark">Refund requests</button>
+
+
+      175 |
+      176 |   await page.getByTestId('mode-observatory').click();
+    > 177 |   for (const m of ['shopping', 'refunds', 'losses', 'honest_declines', 'fraud', 'credit', 'business']) {
+          |                                           ^
+      178 |     await page.getByTestId(`metric-${m}`).click();
+      179 |     await page.waitForTimeout(600);
+      180 |   }
+        at /home/user/vouch/qa/personas.spec.ts:177:43
+
+    Error Context: test-results/qa-personas-P7-judge-on-th-bb31e-h-replay-observatory-region/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/qa-personas-P7-judge-on-th-bb31e-h-replay-observatory-region/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/qa-personas-P7-judge-on-th-bb31e-h-replay-observatory-region/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[6/7] qa/personas.spec.ts:197:1 › P8 engineer: /lab user trigger and stream, /system bench
+  4) qa/personas.spec.ts:197:1 › P8 engineer: /lab user trigger and stream, /system bench ──────────
+
+    Test timeout of 120000ms exceeded.
+
+    Error: locator.click: Test timeout of 120000ms exceeded.
+    Call log:
+      - waiting for getByTestId('preset-0')
+        - locator resolved to <button data-testid="preset-0" class="w-full rounded-lg px-2 py-1.5 text-left text-sm hover:bg-white/5">Reduce honest agents flagged by the coordinated-c…</button>
+      - attempting click action
+        2 × waiting for element to be visible, enabled and stable
+          - element is not visible
+        - retrying click action
+        - waiting 20ms
+        2 × waiting for element to be visible, enabled and stable
+          - element is not visible
+        - retrying click action
+          - waiting 100ms
+        223 × waiting for element to be visible, enabled and stable
+            - element is not visible
+          - retrying click action
+            - waiting 500ms
+
+
+      201 |   await page.goto('/lab');
+      202 |   await expect(page.getByTestId('lab-queue')).toBeVisible({ timeout: 30_000 });
+    > 203 |   await page.getByTestId('ask-droid').scrollIntoViewIfNeeded();
+          |                                      ^
+      204 |   await page.getByTestId('preset-0').click();
+      205 |   await expect(page.getByTestId('toaster')).toBeVisible({ timeout: 10_000 });
+      206 |   const toast = await page.getByTestId('toaster').innerText();
+        at /home/user/vouch/qa/personas.spec.ts:203:38
+
+    Error Context: test-results/qa-personas-P8-engineer-la-62eb3-ger-and-stream-system-bench/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/qa-personas-P8-engineer-la-62eb3-ger-and-stream-system-bench/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/qa-personas-P8-engineer-la-62eb3-ger-and-stream-system-bench/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[7/7] qa/personas.spec.ts:222:1 › Every page at 390 px has no horizontal scroll
+  5) qa/personas.spec.ts:222:1 › Every page at 390 px has no horizontal scroll ─────────────────────
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 3
+
+    - Array []
+    + Array [
+    +   "/system: scrollWidth 533 > 390",
+    + ]
+
+      231 |     if (r !== 'ok') bad.push(`${path}: ${r}`);
+      232 |     await shot(page, `W390${path === '/' ? '-home' : path.replace('/', '-')}`);
+    > 233 |   }
+          |    ^
+      234 |   expect(bad).toEqual([]);
+      235 | });
+      236 |
+        at /home/user/vouch/qa/personas.spec.ts:233:15
+
+    Error Context: test-results/qa-personas-Every-page-at-390-px-has-no-horizontal-scroll/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/qa-personas-Every-page-at-390-px-has-no-horizontal-scroll/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/qa-personas-Every-page-at-390-px-has-no-horizontal-scroll/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  5 failed
+    qa/personas.spec.ts:92:1 › P5 business: wrong seat code, queue, frames and checks, more evidence, kill switch 
+    qa/personas.spec.ts:126:1 › P6 controller: credential verify, tamper and revoke in the five-step check 
+    qa/personas.spec.ts:143:1 › P7 judge on the globe: layers, agent, graph click-through, replay, observatory, region 
+    qa/personas.spec.ts:197:1 › P8 engineer: /lab user trigger and stream, /system bench ───────────
+    qa/personas.spec.ts:222:1 › Every page at 390 px has no horizontal scroll ──────────────────────
+  2 passed (10.4m)

@@ -1,26 +1,28 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
-import { SiteHeader } from "@/components/site-header";
-import { SiteFooter } from "@/components/site-footer";
+import { Nav } from "@/components/ui/nav";
+import { FixtureBanner } from "@/components/ui/fixture-banner";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+const jakarta = Plus_Jakarta_Sans({ variable: "--font-jakarta", subsets: ["latin"] });
+const jetbrains = JetBrains_Mono({ variable: "--font-jetbrains", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: { default: "Vouch Refunds", template: "%s · Vouch" },
-  description: "Refund good customers faster, and let an AI check the rest.",
+  title: { default: "Vouch World", template: "%s · Vouch" },
+  description: "Trust that travels with every purchase: AI refund investigation, a live shopping economy, and fraud detectors that improve themselves.",
 };
+
+export const viewport: Viewport = { themeColor: "#0b0f14", width: "device-width", initialScale: 1 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="flex min-h-full flex-col">
+    <html lang="en" className={`${jakarta.variable} ${jetbrains.variable}`}>
+      <body className="min-h-screen">
         <Providers>
-          <SiteHeader />
-          <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-8">{children}</main>
-          <SiteFooter />
+          <FixtureBanner />
+          <Nav />
+          {children}
         </Providers>
       </body>
     </html>

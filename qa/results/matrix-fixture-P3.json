@@ -1,0 +1,114 @@
+{
+  "ranAt": "2026-10-24T13:30:04.182Z",
+  "mode": "fixture",
+  "rows": [
+    {
+      "id": "P3",
+      "persona": "P3",
+      "video": "S05-fresh",
+      "expected": "More scrutiny; never an automatic decline",
+      "actual": "upload 200; more_evidence $0.00; reasons: check:frame_reuse: Frames match frames from another claim.",
+      "match": true,
+      "details": {
+        "upload": {
+          "ok": true,
+          "frames": 9,
+          "checks": {
+            "fresh": true,
+            "uploaded_after_s": 2,
+            "duration_s": 11,
+            "width": 480,
+            "height": 360,
+            "duration_ok": true,
+            "resolution_ok": false,
+            "frame_reuse": [
+              {
+                "frame": 0,
+                "matches_claim": "C-16",
+                "matches_frame": 0,
+                "distance": 0
+              }
+            ],
+            "frame_times": [
+              0.5,
+              1.1,
+              2.2,
+              3.3,
+              4.4,
+              5.5,
+              6.6,
+              7.7,
+              10.5
+            ],
+            "blank_frames": 0,
+            "frame_motion": 12,
+            "still_image": false,
+            "within_window": true,
+            "reason_allowed": true,
+            "over_video_threshold": true,
+            "policy_line": "30-day window; video required over $100"
+          }
+        },
+        "checks": {
+          "fresh": true,
+          "uploaded_after_s": 2,
+          "duration_s": 11,
+          "width": 480,
+          "height": 360,
+          "duration_ok": true,
+          "resolution_ok": false,
+          "frame_reuse": [
+            {
+              "frame": 0,
+              "matches_claim": "C-16",
+              "matches_frame": 0,
+              "distance": 0
+            }
+          ],
+          "frame_times": [
+            0.5,
+            1.1,
+            2.2,
+            3.3,
+            4.4,
+            5.5,
+            6.6,
+            7.7,
+            10.5
+          ],
+          "blank_frames": 0,
+          "frame_motion": 12,
+          "still_image": false,
+          "within_window": true,
+          "reason_allowed": true,
+          "over_video_threshold": true,
+          "policy_line": "30-day window; video required over $100"
+        },
+        "evidenceFlags": {
+          "unable_to_verify": false,
+          "capture_flags": [],
+          "challenge": {
+            "expected": 3,
+            "seen": 3,
+            "passed": true
+          },
+          "provenance": "fixture",
+          "summary": "The item matches the order and the claimed crack is visible in frames 3 and 4. The finger challenge was passed at the end of the video."
+        },
+        "recommendation": {
+          "action": "more_evidence",
+          "amount": 0,
+          "method": "none",
+          "confidence": 0.55,
+          "status": "proposed",
+          "reasons": [
+            "check:frame_reuse: Frames match frames from another claim."
+          ]
+        },
+        "offline": false,
+        "runsStarted": 2,
+        "secondsToRec": 3.8
+      }
+    }
+  ]
+}

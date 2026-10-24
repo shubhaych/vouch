@@ -1,0 +1,292 @@
+// Static world data for the simulated economy. Positions are illustrative
+// home regions for synthetic agents, never anyone's real location.
+
+export interface Region { id: number; name: string; continent: string; lat: number; lng: number; weight: number; cashDollars: number }
+
+// 40 regions named after large metros on six continents. weight = share of agents.
+export const REGIONS: readonly Region[] = [
+  { id: 1, name: 'New York', continent: 'North America', lat: 40.71, lng: -74.01, weight: 5, cashDollars: 2600 },
+  { id: 2, name: 'Los Angeles', continent: 'North America', lat: 34.05, lng: -118.24, weight: 4, cashDollars: 2400 },
+  { id: 3, name: 'Chicago', continent: 'North America', lat: 41.88, lng: -87.63, weight: 3, cashDollars: 2300 },
+  { id: 4, name: 'Toronto', continent: 'North America', lat: 43.65, lng: -79.38, weight: 3, cashDollars: 2200 },
+  { id: 5, name: 'Mexico City', continent: 'North America', lat: 19.43, lng: -99.13, weight: 4, cashDollars: 900 },
+  { id: 6, name: 'San Francisco', continent: 'North America', lat: 37.77, lng: -122.42, weight: 2, cashDollars: 3000 },
+  { id: 7, name: 'Houston', continent: 'North America', lat: 29.76, lng: -95.37, weight: 2, cashDollars: 2100 },
+  { id: 8, name: 'Atlanta', continent: 'North America', lat: 33.75, lng: -84.39, weight: 2, cashDollars: 2000 },
+  { id: 9, name: 'Seattle', continent: 'North America', lat: 47.61, lng: -122.33, weight: 2, cashDollars: 2700 },
+  { id: 10, name: 'Miami', continent: 'North America', lat: 25.76, lng: -80.19, weight: 2, cashDollars: 1900 },
+  { id: 11, name: 'Sao Paulo', continent: 'South America', lat: -23.55, lng: -46.63, weight: 4, cashDollars: 800 },
+  { id: 12, name: 'Buenos Aires', continent: 'South America', lat: -34.6, lng: -58.38, weight: 3, cashDollars: 700 },
+  { id: 13, name: 'Bogota', continent: 'South America', lat: 4.71, lng: -74.07, weight: 2, cashDollars: 600 },
+  { id: 14, name: 'Lima', continent: 'South America', lat: -12.05, lng: -77.04, weight: 2, cashDollars: 600 },
+  { id: 15, name: 'Santiago', continent: 'South America', lat: -33.45, lng: -70.67, weight: 2, cashDollars: 900 },
+  { id: 16, name: 'London', continent: 'Europe', lat: 51.51, lng: -0.13, weight: 4, cashDollars: 2500 },
+  { id: 17, name: 'Paris', continent: 'Europe', lat: 48.86, lng: 2.35, weight: 3, cashDollars: 2300 },
+  { id: 18, name: 'Berlin', continent: 'Europe', lat: 52.52, lng: 13.41, weight: 3, cashDollars: 2200 },
+  { id: 19, name: 'Madrid', continent: 'Europe', lat: 40.42, lng: -3.7, weight: 2, cashDollars: 1700 },
+  { id: 20, name: 'Milan', continent: 'Europe', lat: 45.46, lng: 9.19, weight: 2, cashDollars: 1900 },
+  { id: 21, name: 'Amsterdam', continent: 'Europe', lat: 52.37, lng: 4.9, weight: 2, cashDollars: 2300 },
+  { id: 22, name: 'Stockholm', continent: 'Europe', lat: 59.33, lng: 18.07, weight: 1, cashDollars: 2400 },
+  { id: 23, name: 'Warsaw', continent: 'Europe', lat: 52.23, lng: 21.01, weight: 2, cashDollars: 1300 },
+  { id: 24, name: 'Istanbul', continent: 'Europe', lat: 41.01, lng: 28.98, weight: 3, cashDollars: 900 },
+  { id: 25, name: 'Lagos', continent: 'Africa', lat: 6.52, lng: 3.38, weight: 3, cashDollars: 400 },
+  { id: 26, name: 'Cairo', continent: 'Africa', lat: 30.04, lng: 31.24, weight: 3, cashDollars: 400 },
+  { id: 27, name: 'Nairobi', continent: 'Africa', lat: -1.29, lng: 36.82, weight: 2, cashDollars: 400 },
+  { id: 28, name: 'Johannesburg', continent: 'Africa', lat: -26.2, lng: 28.05, weight: 2, cashDollars: 800 },
+  { id: 29, name: 'Casablanca', continent: 'Africa', lat: 33.57, lng: -7.59, weight: 1, cashDollars: 600 },
+  { id: 30, name: 'Tokyo', continent: 'Asia', lat: 35.68, lng: 139.69, weight: 5, cashDollars: 2400 },
+  { id: 31, name: 'Seoul', continent: 'Asia', lat: 37.57, lng: 126.98, weight: 3, cashDollars: 2100 },
+  { id: 32, name: 'Shanghai', continent: 'Asia', lat: 31.23, lng: 121.47, weight: 4, cashDollars: 1500 },
+  { id: 33, name: 'Singapore', continent: 'Asia', lat: 1.35, lng: 103.82, weight: 2, cashDollars: 2600 },
+  { id: 34, name: 'Mumbai', continent: 'Asia', lat: 19.08, lng: 72.88, weight: 4, cashDollars: 500 },
+  { id: 35, name: 'Bangalore', continent: 'Asia', lat: 12.97, lng: 77.59, weight: 3, cashDollars: 600 },
+  { id: 36, name: 'Jakarta', continent: 'Asia', lat: -6.21, lng: 106.85, weight: 3, cashDollars: 500 },
+  { id: 37, name: 'Dubai', continent: 'Asia', lat: 25.2, lng: 55.27, weight: 2, cashDollars: 2500 },
+  { id: 38, name: 'Bangkok', continent: 'Asia', lat: 13.76, lng: 100.5, weight: 2, cashDollars: 700 },
+  { id: 39, name: 'Sydney', continent: 'Oceania', lat: -33.87, lng: 151.21, weight: 3, cashDollars: 2400 },
+  { id: 40, name: 'Auckland', continent: 'Oceania', lat: -36.85, lng: 174.76, weight: 1, cashDollars: 2000 },
+];
+
+export const CATEGORIES = ['electronics', 'apparel', 'home', 'beauty', 'sporting goods', 'toys'] as const;
+export type Category = (typeof CATEGORIES)[number];
+
+export interface Policy {
+  windowDays: number;
+  restockingFeePct: number;
+  /** Claims above this many cents need a video. The fast path sends them to more evidence. */
+  needsVideoOverCents: number;
+  storeCreditAllowed: boolean;
+  notes: string;
+}
+
+export interface BusinessDef { id: number; name: string; regionId: number; category: Category; policy: Policy }
+
+const P = (windowDays: number, needsVideoOver: number, restockingFeePct = 0, storeCreditAllowed = true, notes = ''): Policy =>
+  ({ windowDays, restockingFeePct, needsVideoOverCents: needsVideoOver * 100, storeCreditAllowed, notes });
+
+// 60 fixed businesses (B-001..B-060), 10 per category. B-019 (Business A) and
+// B-002 (Business B) are the two electronics stores the demo uses.
+export const BUSINESSES: readonly BusinessDef[] = [
+  { id: 1, name: 'Harbor Threads', regionId: 1, category: 'apparel', policy: P(30, 150) },
+  { id: 2, name: 'Circuit Yard', regionId: 6, category: 'electronics', policy: P(30, 100, 0, true, 'Physical damage from misuse is not covered') },
+  { id: 3, name: 'Hearth & Loom', regionId: 16, category: 'home', policy: P(30, 150) },
+  { id: 4, name: 'Glow Theory', regionId: 17, category: 'beauty', policy: P(14, 100, 0, false, 'Opened cosmetics only if defective') },
+  { id: 5, name: 'Summit Supply', regionId: 9, category: 'sporting goods', policy: P(45, 200) },
+  { id: 6, name: 'Little Orbit', regionId: 30, category: 'toys', policy: P(30, 100) },
+  { id: 7, name: 'Voltline', regionId: 30, category: 'electronics', policy: P(14, 150, 10) },
+  { id: 8, name: 'Atelier Nove', regionId: 20, category: 'apparel', policy: P(30, 200) },
+  { id: 9, name: 'Casa Clara', regionId: 19, category: 'home', policy: P(30, 150) },
+  { id: 10, name: 'Petal & Pore', regionId: 31, category: 'beauty', policy: P(30, 100, 0, false) },
+  { id: 11, name: 'Ridgeback Sports', regionId: 39, category: 'sporting goods', policy: P(30, 150) },
+  { id: 12, name: 'Kite & Crayon', regionId: 4, category: 'toys', policy: P(45, 100) },
+  { id: 13, name: 'Signal House', regionId: 16, category: 'electronics', policy: P(30, 250, 0, true, 'Physical damage from misuse is not covered') },
+  { id: 14, name: 'Linen Republic', regionId: 21, category: 'apparel', policy: P(45, 150) },
+  { id: 15, name: 'Nest Lane', regionId: 3, category: 'home', policy: P(30, 200) },
+  { id: 16, name: 'Rosin Beauty', regionId: 11, category: 'beauty', policy: P(14, 100, 0, false) },
+  { id: 17, name: 'Trailhead Co', regionId: 7, category: 'sporting goods', policy: P(30, 200, 5) },
+  { id: 18, name: 'Toybox Junction', regionId: 34, category: 'toys', policy: P(30, 100) },
+  { id: 19, name: 'Lakeshore Audio', regionId: 3, category: 'electronics', policy: P(30, 150, 0, true, 'Physical damage from misuse is not covered') },
+  { id: 20, name: 'Denim District', regionId: 2, category: 'apparel', policy: P(30, 150) },
+  { id: 21, name: 'Oak & Ember', regionId: 18, category: 'home', policy: P(45, 150) },
+  { id: 22, name: 'Velvet Ritual', regionId: 37, category: 'beauty', policy: P(30, 150, 0, false) },
+  { id: 23, name: 'Pace Athletics', regionId: 12, category: 'sporting goods', policy: P(30, 150) },
+  { id: 24, name: 'Wonder Crate', regionId: 32, category: 'toys', policy: P(30, 100) },
+  { id: 25, name: 'Pixel Pier', regionId: 33, category: 'electronics', policy: P(30, 100, 10) },
+  { id: 26, name: 'Kimono Lane', regionId: 30, category: 'apparel', policy: P(14, 150) },
+  { id: 27, name: 'Terracotta Home', regionId: 5, category: 'home', policy: P(30, 150) },
+  { id: 28, name: 'Saffron Skin', regionId: 34, category: 'beauty', policy: P(30, 100, 0, false) },
+  { id: 29, name: 'Fjord Outfitters', regionId: 22, category: 'sporting goods', policy: P(45, 250) },
+  { id: 30, name: 'Puzzle Parade', regionId: 17, category: 'toys', policy: P(30, 100) },
+  { id: 31, name: 'Ampere & Co', regionId: 18, category: 'electronics', policy: P(30, 150, 0, true, 'Physical damage from misuse is not covered') },
+  { id: 32, name: 'Copper Stitch', regionId: 24, category: 'apparel', policy: P(30, 150) },
+  { id: 33, name: 'Brick & Basil', regionId: 39, category: 'home', policy: P(30, 150) },
+  { id: 34, name: 'Lumen Botanics', regionId: 27, category: 'beauty', policy: P(30, 100, 0, false) },
+  { id: 35, name: 'Volley Point', regionId: 11, category: 'sporting goods', policy: P(30, 150) },
+  { id: 36, name: 'Gizmo Grove', regionId: 2, category: 'toys', policy: P(30, 100) },
+  { id: 37, name: 'Northwind Electronics', regionId: 4, category: 'electronics', policy: P(30, 200) },
+  { id: 38, name: 'Tailor Row', regionId: 16, category: 'apparel', policy: P(30, 200) },
+  { id: 39, name: 'Mesa Living', regionId: 7, category: 'home', policy: P(30, 150) },
+  { id: 40, name: 'Dew Drop Lab', regionId: 31, category: 'beauty', policy: P(14, 100, 0, false) },
+  { id: 41, name: 'Crest Cycling', regionId: 21, category: 'sporting goods', policy: P(30, 250) },
+  { id: 42, name: 'Marble Moon Toys', regionId: 28, category: 'toys', policy: P(30, 100) },
+  { id: 43, name: 'Ohm Street', regionId: 35, category: 'electronics', policy: P(14, 100) },
+  { id: 44, name: 'Batik House', regionId: 36, category: 'apparel', policy: P(30, 100) },
+  { id: 45, name: 'Willow Works', regionId: 40, category: 'home', policy: P(30, 150) },
+  { id: 46, name: 'Amber Apothecary', regionId: 26, category: 'beauty', policy: P(30, 100, 0, false) },
+  { id: 47, name: 'Goalpost Gear', regionId: 25, category: 'sporting goods', policy: P(30, 150) },
+  { id: 48, name: 'Robot Rumpus', regionId: 31, category: 'toys', policy: P(30, 100) },
+  { id: 49, name: 'Delta Devices', regionId: 10, category: 'electronics', policy: P(30, 150, 0, true, 'Physical damage from misuse is not covered') },
+  { id: 50, name: 'Andes Alpaca', regionId: 14, category: 'apparel', policy: P(30, 150) },
+  { id: 51, name: 'Sunroom Supply', regionId: 8, category: 'home', policy: P(30, 150) },
+  { id: 52, name: 'Clay & Cleanse', regionId: 29, category: 'beauty', policy: P(30, 100, 0, false) },
+  { id: 53, name: 'Peak Paddle', regionId: 15, category: 'sporting goods', policy: P(45, 200) },
+  { id: 54, name: 'Bricktown Toys', regionId: 23, category: 'toys', policy: P(30, 100) },
+  { id: 55, name: 'Quantum Quay', regionId: 32, category: 'electronics', policy: P(30, 200, 5) },
+  { id: 56, name: 'Thread & Thistle', regionId: 40, category: 'apparel', policy: P(30, 150) },
+  { id: 57, name: 'Cedar Commons', regionId: 13, category: 'home', policy: P(30, 150) },
+  { id: 58, name: 'Mint Mirror', regionId: 38, category: 'beauty', policy: P(30, 100, 0, false) },
+  { id: 59, name: 'Rally Republic', regionId: 1, category: 'sporting goods', policy: P(30, 150) },
+  { id: 60, name: 'Fable Factory', regionId: 20, category: 'toys', policy: P(30, 100) },
+];
+
+export const BUSINESS_A = 19;
+export const BUSINESS_B = 2;
+
+export interface CatalogItem { sku: number; name: string; category: Category; priceCents: number; description: string; parts: string[] }
+
+type Row = [name: string, dollars: number, description: string, parts: string];
+const RAW: Record<Category, Row[]> = {
+  electronics: [
+    ['Noise-cancelling headphones', 249, 'Matte black over-ear headphones, silver hinges, logo on each cup', 'ear cup,hinge,headband,charging port'],
+    ['Wireless earbuds', 89, 'White in-ear buds in a pill-shaped charging case with a status light', 'left bud,right bud,case,charging port'],
+    ['Smartwatch', 199, 'Square face smartwatch with a black silicone strap and side crown', 'screen,strap,crown,sensor'],
+    ['Bluetooth speaker', 79, 'Cylindrical fabric-wrapped speaker in grey with rubber end caps', 'grille,button,charging port,end cap'],
+    ['Mechanical keyboard', 129, 'Tenkeyless keyboard with white keycaps and an aluminium frame', 'keycap,switch,cable,frame'],
+    ['Gaming mouse', 59, 'Black ergonomic mouse with RGB strip and two side buttons', 'scroll wheel,side button,cable,sensor'],
+    ['4K action camera', 299, 'Compact black action camera with front screen and waterproof housing', 'lens,screen,housing,battery door'],
+    ['Tablet 10-inch', 349, 'Slim aluminium tablet with a 10-inch screen and rear camera', 'screen,camera,charging port,frame'],
+    ['E-reader', 139, 'Matte grey e-reader with a 6-inch glare-free screen', 'screen,page button,charging port,back'],
+    ['Portable charger', 39, 'Black 20000 mAh power bank with two USB ports and LED dots', 'USB port,LED,casing,button'],
+    ['USB-C hub', 49, 'Space grey hub with HDMI, SD and three USB ports on a short cable', 'HDMI port,cable,SD slot,casing'],
+    ['Webcam 1080p', 69, 'Black clip-on webcam with a privacy shutter', 'lens,clip,shutter,cable'],
+    ['Smart bulb kit', 45, 'Three colour smart bulbs with a small white hub', 'bulb,hub,base,cable'],
+    ['Drone mini', 399, 'Foldable grey quadcopter with a gimbal camera', 'propeller,arm,gimbal,battery'],
+    ['Studio microphone', 119, 'Black cardioid USB microphone on a desk stand', 'grille,stand,dial,cable'],
+    ['Fitness tracker', 79, 'Slim black band tracker with a narrow OLED display', 'display,band,clasp,sensor'],
+    ['Wireless charger pad', 29, 'Round white charging pad with a soft-touch top', 'pad,cable,LED,base'],
+    ['Soundbar', 229, 'Long black soundbar with a fabric front and remote', 'grille,remote,cable,port'],
+    ['Robot vacuum', 279, 'Round black robot vacuum with a bumper and side brush', 'bumper,side brush,bin,wheel'],
+    ['Instant camera', 99, 'Pastel instant camera with a large flash and print slot', 'lens,flash,print slot,door'],
+    ['OLED monitor 32-inch', 649, 'Thin-bezel 32-inch OLED monitor on a silver stand', 'panel,stand,port,bezel'],
+  ],
+  apparel: [
+    ['Denim jacket', 89, 'Mid-wash denim jacket with copper buttons and chest pockets', 'button,sleeve,collar,pocket'],
+    ['Wool coat', 219, 'Charcoal knee-length wool coat with notch lapels', 'lapel,button,lining,sleeve'],
+    ['Running shoes', 129, 'Grey mesh running shoes with white foam soles', 'sole,lace,heel,upper'],
+    ['Leather boots', 179, 'Brown leather ankle boots with stacked heels', 'heel,zip,sole,toe'],
+    ['Silk scarf', 59, 'Printed silk scarf in navy and gold with hand-rolled edges', 'edge,print,corner,tag'],
+    ['Chino trousers', 69, 'Khaki slim chinos with a button fly', 'waistband,seam,pocket,hem'],
+    ['Cashmere sweater', 149, 'Oatmeal crew-neck cashmere sweater', 'cuff,neckline,seam,hem'],
+    ['Rain shell', 119, 'Packable yellow rain shell with taped seams and a hood', 'zip,hood,seam,cuff'],
+    ['Linen shirt', 59, 'White linen button-down with a relaxed fit', 'collar,button,cuff,seam'],
+    ['Yoga leggings', 79, 'Black high-rise leggings with a hidden waist pocket', 'waistband,seam,pocket,hem'],
+    ['Puffer vest', 99, 'Olive quilted puffer vest with a stand collar', 'zip,quilting,collar,pocket'],
+    ['Canvas sneakers', 55, 'White low-top canvas sneakers with rubber toe caps', 'sole,lace,toe cap,upper'],
+    ['Evening dress', 189, 'Emerald satin midi dress with a cowl neck', 'strap,zip,seam,hem'],
+    ['Baseball cap', 25, 'Navy cotton cap with an embroidered logo', 'brim,strap,logo,crown'],
+    ['Leather belt', 45, 'Black leather belt with a brushed silver buckle', 'buckle,strap,hole,tip'],
+    ['Hoodie', 65, 'Heather grey pullover hoodie with a kangaroo pocket', 'hood,cuff,pocket,drawstring'],
+    ['Swim trunks', 39, 'Blue patterned swim trunks with a mesh lining', 'waistband,lining,pocket,hem'],
+    ['Trench coat', 249, 'Stone cotton trench coat with a belt and epaulettes', 'belt,button,lining,collar'],
+    ['Merino socks pack', 29, 'Three pairs of merino socks in neutral tones', 'heel,toe,cuff,seam'],
+    ['Sunglasses', 109, 'Tortoiseshell acetate sunglasses with green lenses', 'lens,hinge,arm,bridge'],
+  ],
+  home: [
+    ['Ceramic mug', 24, 'White ceramic mug, 350 ml, blue band near the rim', 'rim,handle,base,glaze'],
+    ['Chef knife', 89, '8-inch stainless chef knife with a walnut handle', 'blade,handle,tip,bolster'],
+    ['Cast iron pan', 59, '10-inch pre-seasoned cast iron skillet', 'handle,surface,rim,base'],
+    ['Linen duvet cover', 129, 'Queen linen duvet cover in sage with button closure', 'button,seam,corner,hem'],
+    ['Table lamp', 79, 'Brass table lamp with a white fabric shade', 'shade,switch,base,cable'],
+    ['Glass vase', 35, 'Tall clear glass vase with a weighted base', 'rim,body,base,lip'],
+    ['Coffee grinder', 99, 'Burr coffee grinder with a steel hopper', 'hopper,burr,dial,lid'],
+    ['Throw blanket', 69, 'Chunky knit throw in cream', 'edge,knit,tag,corner'],
+    ['Dinner plate set', 89, 'Set of four matte stoneware plates in slate', 'rim,glaze,base,surface'],
+    ['Wall clock', 49, 'Minimal wall clock with an oak frame', 'hand,face,frame,mechanism'],
+    ['French press', 39, 'Glass French press with a steel plunger', 'glass,plunger,lid,handle'],
+    ['Bath towel set', 59, 'Set of two cotton bath towels in grey', 'hem,tag,edge,loop'],
+    ['Storage baskets', 45, 'Set of three woven seagrass baskets', 'handle,weave,rim,base'],
+    ['Desk chair', 249, 'Mesh ergonomic desk chair with adjustable arms', 'arm,wheel,mesh,lever'],
+    ['Air purifier', 179, 'White tower air purifier with a HEPA filter', 'filter,grille,panel,button'],
+    ['Blender', 119, 'High-speed blender with a 1.5 L jar', 'jar,blade,lid,base'],
+    ['Candle trio', 34, 'Three soy candles in amber jars', 'jar,wick,lid,label'],
+    ['Picture frames', 29, 'Set of three black frames with glass fronts', 'glass,corner,stand,back'],
+    ['Kettle', 69, 'Matte black electric kettle with a gooseneck spout', 'spout,lid,base,handle'],
+    ['Rug 5x7', 199, 'Low-pile wool rug with a geometric pattern', 'edge,fringe,corner,pile'],
+  ],
+  beauty: [
+    ['Vitamin C serum', 39, '30 ml amber dropper bottle of vitamin C serum', 'dropper,bottle,label,cap'],
+    ['Hair dryer', 149, 'Matte pink ionic hair dryer with two attachments', 'nozzle,cable,switch,filter'],
+    ['Perfume 50ml', 95, 'Square glass perfume bottle with a gold cap', 'cap,bottle,pump,label'],
+    ['Lipstick set', 45, 'Three lipsticks in nude to berry shades', 'bullet,cap,tube,base'],
+    ['Face moisturiser', 32, '50 ml white jar of daily moisturiser', 'jar,lid,seal,label'],
+    ['Makeup brush set', 59, 'Ten brushes with wooden handles in a roll case', 'bristle,ferrule,handle,case'],
+    ['Straightening iron', 89, 'Ceramic flat iron with a digital temperature display', 'plate,display,cable,hinge'],
+    ['Eyeshadow palette', 49, 'Twelve-shade neutral eyeshadow palette with a mirror', 'pan,mirror,lid,hinge'],
+    ['Electric toothbrush', 79, 'White sonic toothbrush with a travel case', 'brush head,button,base,case'],
+    ['Shampoo duo', 28, 'Shampoo and conditioner in matching green bottles', 'bottle,cap,pump,label'],
+    ['Nail kit', 35, 'Manicure kit with clippers and files in a zip case', 'clipper,file,zip,case'],
+    ['Sunscreen SPF50', 22, '100 ml tube of mineral sunscreen', 'tube,cap,seal,label'],
+    ['Body lotion', 26, '250 ml pump bottle of shea body lotion', 'pump,bottle,label,cap'],
+    ['Facial roller', 29, 'Rose quartz facial roller with a brass frame', 'stone,frame,handle,pin'],
+    ['Beard trimmer', 69, 'Cordless beard trimmer with five guards', 'blade,guard,button,charging port'],
+    ['Sheet mask pack', 19, 'Pack of ten hydrating sheet masks', 'sachet,mask,seal,box'],
+    ['Curling wand', 79, 'Tapered ceramic curling wand with a heat glove', 'barrel,glove,cable,button'],
+    ['Cleansing balm', 34, '100 ml tub of cleansing balm with a spatula', 'tub,lid,spatula,seal'],
+    ['Hair oil', 30, '50 ml glass bottle of argan hair oil', 'bottle,dropper,cap,label'],
+    ['LED mirror', 59, 'Round vanity mirror with a dimmable LED ring', 'glass,LED ring,stand,button'],
+  ],
+  'sporting goods': [
+    ['Yoga mat', 49, '6 mm non-slip yoga mat in teal with a strap', 'surface,edge,strap,corner'],
+    ['Road bike helmet', 119, 'White vented road helmet with a dial fit', 'shell,strap,dial,pad'],
+    ['Adjustable dumbbells', 299, 'Pair of dial-adjustable dumbbells up to 24 kg', 'dial,plate,handle,tray'],
+    ['Tennis racket', 159, 'Graphite tennis racket strung in white', 'frame,string,grip,throat'],
+    ['Hiking backpack', 139, '40 L hiking backpack in orange with a rain cover', 'zip,strap,buckle,frame'],
+    ['Camping tent', 229, 'Two-person dome tent with a green fly', 'pole,fly,zip,stake'],
+    ['Football', 35, 'Size 5 match football in white and black', 'panel,valve,stitching,bladder'],
+    ['Running vest', 59, 'Hydration running vest with two soft flasks', 'flask,strap,pocket,zip'],
+    ['Climbing shoes', 129, 'Downturned climbing shoes with velcro closures', 'rand,velcro,sole,toe'],
+    ['Resistance bands', 29, 'Set of five latex resistance bands', 'band,handle,clip,strap'],
+    ['Kettlebell 16kg', 69, 'Cast iron kettlebell with a powder coat', 'handle,base,coat,body'],
+    ['Swim goggles', 25, 'Anti-fog swim goggles with blue lenses', 'lens,strap,nose bridge,seal'],
+    ['Basketball', 39, 'Composite leather basketball, size 7', 'panel,valve,grip,seam'],
+    ['Ski gloves', 79, 'Waterproof insulated ski gloves in black', 'cuff,palm,finger,seam'],
+    ['Foam roller', 34, 'High-density foam roller with a grid surface', 'surface,core,end,edge'],
+    ['Trekking poles', 89, 'Carbon trekking poles with cork grips', 'grip,lock,tip,strap'],
+    ['Jump rope', 19, 'Speed jump rope with ball-bearing handles', 'handle,cable,bearing,cap'],
+    ['Cycling shorts', 69, 'Padded black cycling bib shorts', 'pad,strap,seam,gripper'],
+    ['Golf balls', 45, 'Dozen urethane golf balls', 'cover,dimple,logo,box'],
+    ['Paddle board', 499, 'Inflatable paddle board with pump and paddle', 'valve,fin,deck pad,paddle'],
+  ],
+  toys: [
+    ['Building blocks set', 79, '1000-piece building block set in a storage tub', 'brick,plate,instructions,tub'],
+    ['Plush bear', 29, 'Brown plush bear with a red bow', 'seam,eye,bow,stuffing'],
+    ['RC car', 89, 'Remote-control off-road car with a rechargeable battery', 'wheel,remote,battery,antenna'],
+    ['Puzzle 1000pc', 25, '1000-piece landscape jigsaw puzzle', 'piece,box,image,corner'],
+    ['Dollhouse', 149, 'Three-storey wooden dollhouse with furniture', 'wall,roof,furniture,stair'],
+    ['Science kit', 49, 'Chemistry experiment kit for ages 10 and up', 'vial,manual,tray,goggles'],
+    ['Board game', 39, 'Strategy board game for two to five players', 'board,card,token,box'],
+    ['Wooden train set', 69, 'Wooden railway set with a bridge and three engines', 'track,engine,bridge,car'],
+    ['Art easel', 59, 'Double-sided art easel with a chalkboard', 'leg,board,tray,clip'],
+    ['Kids scooter', 79, 'Three-wheel kids scooter with light-up wheels', 'wheel,deck,handle,brake'],
+    ['Action figure set', 35, 'Set of four poseable action figures', 'joint,arm,accessory,base'],
+    ['Play kitchen', 129, 'Wooden play kitchen with a sink and oven', 'door,knob,sink,shelf'],
+    ['Drawing tablet', 45, 'LCD drawing tablet with a stylus', 'screen,stylus,button,frame'],
+    ['Marble run', 55, 'Clear marble run with 80 pieces', 'track,funnel,marble,base'],
+    ['Robot kit', 99, 'Programmable robot kit with sensors', 'motor,sensor,board,wheel'],
+    ['Water blaster', 25, 'Pump-action water blaster with a 1 L tank', 'tank,pump,nozzle,trigger'],
+    ['Magnetic tiles', 69, '60 magnetic building tiles in bright colours', 'tile,magnet,edge,box'],
+    ['Kite', 29, 'Delta kite with a 30 m line', 'spar,sail,line,tail'],
+    ['Musical keyboard', 59, '37-key kids keyboard with a microphone', 'key,speaker,mic,button'],
+    ['Card game', 15, 'Fast family card game with 112 cards', 'card,box,rule sheet,tin'],
+  ],
+};
+
+export const CATALOG: readonly CatalogItem[] = CATEGORIES.flatMap((category, ci) =>
+  RAW[category].map(([name, dollars, description, parts], i) => ({
+    sku: ci * 100 + i + 1,
+    name,
+    category,
+    priceCents: dollars * 100,
+    description,
+    parts: parts.split(','),
+  })),
+);
+
+const BY_SKU = new Map(CATALOG.map((c) => [c.sku, c]));
+export const catalogItem = (sku: number): CatalogItem | undefined => BY_SKU.get(sku);
+export const itemsIn = (category: string): CatalogItem[] => CATALOG.filter((c) => c.category === category);
+export const regionById = (id: number): Region | undefined => REGIONS[id - 1];
+export const businessDef = (id: number): BusinessDef | undefined => BUSINESSES[id - 1];
+
+/** The headphones the showcase agent buys from B-019 and claims on at B-002. */
+export const SHOWCASE_SKU = 1;

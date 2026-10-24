@@ -1,29 +1,19 @@
-import { ScheduleAt, SyncResponse, Router } from 'spacetimedb/server';
-import { spacetimedb, nightly } from './schema';
-import { upsertConfig } from './settings';
-import { DEFAULT_POLICY } from './types';
-
-// SpacetimeDB reads reducers from this entry file's exports, so every area
-// re-exports here. Add a new reducer file, then add a line below.
-export * from './desk';
-export * from './claims';
-export * from './vouch';
-export * from './agents';
-export * from './settings';
+// SpacetimeDB reads reducers, views and procedures from this entry file's
+// exports, and refuses anything else (a helper function exported here breaks
+// publishing). So re-export by name: add a reducer in its area's file, then
+// add its name below.
+import { spacetimedb } from './schema';
 
 export default spacetimedb;
-
-// Starts the 24-hour schedule and seeds defaults on first publish.
-export const onInit = spacetimedb.init((ctx) => {
-  ctx.db.nightly.insert({ scheduledId: 0n, scheduledAt: ScheduleAt.interval(24n * 60n * 60n * 1_000_000n) });
-  upsertConfig(ctx, 'creao_enabled', 'true');
-  ctx.db.merchantPolicy.insert({ merchantId: 'threadline', policyJson: JSON.stringify(DEFAULT_POLICY), updatedAt: ctx.timestamp });
-});
-
-// The worker subscribes to `config` and starts a Reconciler run when this key moves.
-export const runNightly = spacetimedb.reducer({ onSchedule: nightly }, { scheduledMessage: nightly.rowType }, (ctx) => {
-  upsertConfig(ctx, 'nightly_tick', String(ctx.timestamp.microsSinceUnixEpoch));
-});
-
-const health = spacetimedb.httpHandler((_ctx, _req) => new SyncResponse('ok', { status: 200 }));
-export const routes = spacetimedb.httpRouter(new Router().get('/health', health));
+export { init, seedWorld, tick } from './economy';
+export {
+  bootstrapWorker, bootstrapPoster, setSeatCodes, takeBusinessSeat, switchBusiness, setControl, setSim, ping, recordBench,
+} from './control';
+export { joinAsShopper, buy, fastForward, requestRefund, showcaseAct } from './consumer';
+export { attachVideo, setClaimStatus, recordRun, runStep, finishRun, recordEvidence, openInvestigation } from './claims';
+export { propose, decide, post } from './desk';
+export { flagPattern, setPatternStatus, confirmPattern } from './patterns';
+export { setIssuerKey, issueCredential, revokeCredential, requestVerification, recordVerification } from './credentials';
+export { enqueueLab, enqueueLabTrigger, startLabJob, appendLabEvent, finishLabJob, reviewCandidate, markPromoted } from './lab';
+export { my_agent } from './views';
+export { exportTruth } from './truth';

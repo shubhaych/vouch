@@ -1,0 +1,76 @@
+
+Running 2 tests using 1 worker
+
+[1/2] qa/personas.spec.ts:127:1 › P6 controller: credential verify, tamper and revoke in the five-step check
+  1) qa/personas.spec.ts:127:1 › P6 controller: credential verify, tamper and revoke in the five-step check 
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByTestId('cred-result')
+    Expected pattern: /step 4/i
+    Received string:  "Failed at step 3 (tampered presentation)"
+    Timeout: 30000ms
+
+    Call log:
+      - Expect "toContainText" getByTestId('cred-result') with timeout 30000ms
+      - waiting for getByTestId('cred-result')
+        57 × locator resolved to <li data-testid="cred-result" class="mt-1 text-sm font-semibold text-fraud">Failed at step 3 (tampered presentation)</li>
+           - unexpected value "Failed at step 3 (tampered presentation)"
+
+
+      135 |   await expect(page.getByTestId('cred-result')).toContainText(/pass|verified/i, { timeout: 30_000 });
+      136 |   await page.getByTestId('cred-tamper').click();
+    > 137 |   await expect(page.getByTestId('cred-result')).toContainText(/step 4/i, { timeout: 30_000 });
+          |                                                 ^
+      138 |   await shot(page, 'P6-tamper');
+      139 |   await page.getByTestId('cred-revoke').click();
+      140 |   await page.getByTestId('cred-verify').click();
+        at /home/user/vouch/qa/personas.spec.ts:137:49
+
+    Error Context: test-results/qa-personas-P6-controller--a94f9-voke-in-the-five-step-check/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/qa-personas-P6-controller--a94f9-voke-in-the-five-step-check/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/qa-personas-P6-controller--a94f9-voke-in-the-five-step-check/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[2/2] qa/personas.spec.ts:146:1 › P7 judge on the globe: layers, agent, graph click-through, replay, observatory, region
+  2) qa/personas.spec.ts:146:1 › P7 judge on the globe: layers, agent, graph click-through, replay, observatory, region 
+
+    Test timeout of 300000ms exceeded.
+
+    Error: locator.click: Test timeout of 300000ms exceeded.
+    Call log:
+      - waiting for getByTestId('mode-observatory')
+        - locator resolved to <button role="tab" aria-selected="false" data-testid="mode-observatory" class="rounded-md px-3 py-1.5 text-sm font-semibold capitalize transition text-ink-soft-dark hover:text-ink-dark">observatory</button>
+      - attempting click action
+        - waiting for element to be visible, enabled and stable
+
+
+      178 |   await shot(page, 'P7-replay');
+      179 |
+    > 180 |   await page.getByTestId('mode-observatory').click();
+          |                                              ^
+      181 |   for (const m of ['shopping', 'refunds', 'losses', 'honest_declines', 'fraud', 'credit', 'business']) {
+      182 |     await page.getByTestId(`metric-${m}`).click();
+      183 |     await page.waitForTimeout(600);
+        at /home/user/vouch/qa/personas.spec.ts:180:46
+
+    Error Context: test-results/qa-personas-P7-judge-on-th-bb31e-h-replay-observatory-region/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/qa-personas-P7-judge-on-th-bb31e-h-replay-observatory-region/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/qa-personas-P7-judge-on-th-bb31e-h-replay-observatory-region/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  2 failed
+    qa/personas.spec.ts:127:1 › P6 controller: credential verify, tamper and revoke in the five-step check 
+    qa/personas.spec.ts:146:1 › P7 judge on the globe: layers, agent, graph click-through, replay, observatory, region 

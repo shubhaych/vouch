@@ -1,0 +1,27 @@
+{
+  "live": {
+    "busyMs": 9825,
+    "count": 19,
+    "max": 1122
+  },
+  "replayList": {
+    "busyMs": 7965,
+    "count": 16,
+    "max": 1356
+  },
+  "replayOpen": {
+    "busyMs": 8989,
+    "count": 15,
+    "max": 877
+  },
+  "replayPlaying": {
+    "busyMs": 6062,
+    "count": 11,
+    "max": 943
+  },
+  "observatory": {
+    "busyMs": 4747,
+    "count": 4,
+    "max": 2893
+  }
+}

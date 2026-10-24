@@ -1,61 +1,65 @@
 # Architecture
 
 ```
- browser (web/)  ──subscribe──┐
-                              ▼
-                      SpacetimeDB module (module/)  ◄──reducers/subscribe──  worker/ (Desk Lead)
-                      tables, reducers, schedule                              │  CREAO API Trigger + webhook
-                      segregation of duties                                   │  CRS, Nessie, risk model (ml/)
+ phone /claim ──upload──► worker (Node 22, :8787) ──reducers──► SpacetimeDB module (the only database)
+ browser pages ◄──────────── subscriptions ─────────────────────  tables, reducers, scheduled tick
+                              worker ◄── subscriptions ──────────  (sim runs inside the module)
+                              worker ──► CREAO (3 saved agents)    worker ──► Droid SDK (lab, laptop)
 ```
 
-One database, one live bus. The browser reads through subscriptions and writes through reducers. Anything slow or secret runs in the worker, which holds the `capi_` keys. Agents never touch the database: they return one JSON object, the worker validates it and writes through a reducer.
+- **The SpacetimeDB module (`module/`)** holds every row. It runs the simulation as a scheduled reducer, and its reducers enforce who may do what.
+- **The browser** reads only through subscriptions and writes only through reducers.
+- **The worker** does the slow or secret work. It calls CREAO, runs the video pipeline, the detectors, the ledger poster, the credential issuer and verifier, the Droid lab and the showcase loop, then writes results back through worker-only reducers. Keys (`capi_`/`cr_sk_`, `FACTORY_API_KEY`, issuer private keys) never leave it.
+- **Agents never touch the database.** They return one JSON object; the worker validates it and calls a reducer.
+
+## Repo map
+
+| Path | What |
+| --- | --- |
+| `module/src/schema.ts` | All 31 tables. Public tables hold no ground truth; `agent_truth`, `seat_code`, `shopper_link`, `refund_intent` are private. |
+| `module/src/sim.ts` | The engine: seeding, one step per agent, day end (deliveries, fast decisions, investigations, ring bursts), credit. Pure over `SimDb` (`simdb.ts`), so the same code runs in the module, in tests (`memdb.ts`) and in the evaluator. |
+| `module/src/{world,text,score,rng}.ts` | Regions, businesses and catalog; claim text; the credit score and bands; the deterministic RNG. Pure, shared with web and worker as `@vouch/module/*`. |
+| `module/src/economy.ts` | `init`, `seedWorld`, `tick` (only the database itself may call `tick`). |
+| `module/src/consumer.ts` | The real shopper: `joinAsShopper`, `buy`, `fastForward`, `requestRefund`. |
+| `module/src/claims.ts`, `desk.ts`, `patterns.ts` | Claim lifecycle, the decision desk (segregation of duties), fraud patterns. |
+| `module/src/credentials.ts`, `lab.ts`, `control.ts` | Credential registry and verification requests, the Droid lab queue, seats, controls, the sim speed, pings and bench results. |
+| `worker/src/server.ts` | Fastify routes (`/health`, `/upload/:claimId`, `/media/...` signed, `/creao/webhook`, `/showcase/run`) and service start-up. |
+| `worker/src/orchestrator.ts`, `creao.ts`, `fixtures.ts` | The Desk Lead: claim flow (Evidence Analyst → Investigator → `propose`), the pattern flow (Pattern Analyst → `confirmPattern`), the CREAO adapter, fixture answers. |
+| `worker/src/video.ts` | ffprobe, frame selection, dHash, reuse search, blank frames, signed media URLs, `attachVideo`. |
+| `worker/src/detectors.ts`, `mirror.ts`, `history.ts` | Runs `detectors/live/*` every 5 simulated days on an indexed mirror of the client cache. |
+| `worker/src/poster.ts`, `credentials.ts`, `lab.ts`, `showcase.ts` | Ledger poster (second identity), Ed25519 issuer and verifier, the Droid lab runner and its permission fence, the A-00421 showcase loop. |
+| `detectors/` | `live/` detectors, `candidates/` (Droid's only writable folder), `test.ts`, `eval.ts` (fresh worlds, ground truth), `LAB.md`. |
+| `web/app/*` | Pages: `/`, `/world`, `/shop`, `/claim/[id]`, `/business`, `/lab`, `/system`. `web/lib/routes.ts` is the nav. |
+| `web/lib/stdb/*` | Provider, hooks (`useConn`, `useTableVersion`, `useRowsThrottled`, `useCall`), latency. |
+| `web/components/*` | One folder per page, plus `ui/` (badges, numbers, nav) and `background/` (Constructa's HeroCanvas, recoloured). |
+| `scripts/` | Publish, generate, demo reset, env check, hello scripts, bench, claim flow, rule and badge checks. |
+| `e2e/`, `qa/` | Playwright smoke tests; the QA loop's checklist, personas and videos. |
+
+## Roles (`role` table, enforced by `requireRole`)
+
+| Role | Who | May |
+| --- | --- | --- |
+| `worker` | The worker's identity (first `bootstrapWorker`) | Write claims' evidence, runs, proposals, patterns, lab events, verifications |
+| `poster` | A second worker identity | Post a balanced journal entry for a decided refund, and nothing else |
+| `business` | A person with `DEMO_BUSINESS_CODE`, bound to one business (B-002 or B-019) | Decide that business's refunds (not their own proposals), flip the kill switch, open an investigation, issue/revoke its credentials |
+| `controller` | A person with `DEMO_CONTROLLER_CODE` | Decide above $500, all controls, promote or reject lab candidates, reseed |
+| shopper | Any browser identity after `joinAsShopper` (linked through the private `shopper_link`; `my_agent` view) | Buy, fast-forward, request a refund for their own agent |
+
+The proposer cannot decide, the decider cannot post, and an entry that does not balance is refused (`module/src/desk.ts`).
 
 ## Where things go
 
 | I want to... | Do this |
 | --- | --- |
-| Add a page | Create `web/app/<name>/page.tsx`, add it to `web/lib/routes.ts`. `npm run check:rules` fails if a nav link has no page. |
-| Show live data | Use a hook from `web/lib/data/hooks.tsx`. Handle `disconnected`, `loading` and `ready` (`EmptyState` for the first two). Badge every number with `ProvenanceBadge`. |
-| Add a table | Define it in `module/src/schema.ts` and add it to the `schema({...})` call. Public tables hold ids, hashes, tiers and reason codes only; PII and image bytes are private. |
-| Add a reducer | Put it in the matching file (`claims.ts`, `vouch.ts`, `desk.ts`, ...), or a new file re-exported from `module/src/index.ts`. Gate it with `requireRole`. |
-| Change a lane rule | Edit `module/src/policy.ts` and its tests. It is a pure function: no model output ever picks a lane. |
-| Add an agent seat | Add the seat to `Seat` in `module/src/types.ts`, a case in `worker/src/route.ts`, env vars in `.env.example` (`CREAO_<SEAT>_APP_ID`, `CREAO_<SEAT>_KEY`), and a row in `docs/CREAO.md`. |
+| Add a table | Define it in `module/src/schema.ts` and add it to `schema({...})`. Keep ground truth and codes private. Then `npm run stdb:publish && npm run stdb:generate`. |
+| Add a reducer | Put it in its area's file, gate it with `requireRole`, then add its name to the explicit exports in `module/src/index.ts` (exporting anything else breaks publishing). |
+| Change the simulation | Edit `module/src/sim.ts`; keep it deterministic (only `Rng`, never `Math.random`). `npm test -w module` checks determinism, credit causes and region totals. |
+| Add a page | `web/app/<name>/page.tsx` plus a line in `web/lib/routes.ts`. Badge every number (`<Badge kind="live"/>` or `<Stat>`). `npx tsx scripts/check-badges.ts` and `npm run check:rules` check this. |
+| Add a detector | `detectors/live/<id>.ts` exporting `detector: Detector` (`{ id, version, run(history) }`, types in `detectors/types.ts`). Behaviour features only. From `detectors/`, run `npx tsx test.ts` and `npx tsx eval.ts --live`. |
+| Add an agent seat | Add it to `Seat` and `AGENT_NAMES` in `worker/src/creao.ts` and `env.ts`, add a fixture in `worker/fixtures/`, a flow in `orchestrator.ts`, a card in `web/components/business/org-chart.tsx`, and a row in `docs/CREAO.md`. |
 
-Shared pure code (`types.ts`, `handshake.ts`, `policy.ts`) must not import `spacetimedb`: web and worker import it as `@vouch/module/types`, `@vouch/module/policy`, `@vouch/module/handshake`.
+## SpacetimeDB lessons (2.13.0)
 
-## Roles (segregation of duties, `module/src/desk.ts`)
-
-| Role | Who | May |
-| --- | --- | --- |
-| `controller` | A person (first caller of `claimController`) | Grant roles, flip the kill switch, edit the policy, approve above materiality |
-| `router` | The worker's Desk Lead | Write lanes, Vouch Records, incidents and run rows |
-| `proposer` | A CREAO seat's identity | Propose decisions only |
-| `approver` | A person or the controller | Approve or reject a proposal that is not their own |
-| `poster` | The ledger poster | Post a balanced entry for an approved decision |
-
-One identity holds one role. The `router` role is an addition to the guide's four.
-
-## Connecting SpacetimeDB (the hour-3 gate)
-
-Unverified: the `spacetime` CLI was not available when the module was written, so publishing has never been tried. The module type-checks against `spacetimedb@2.13.0`.
-
-1. Install the CLI from the SpacetimeDB quickstart; `spacetime start` for a local server.
-2. `npm run stdb:publish`, then `npm run stdb:generate`. Both scripts carry flags that must be confirmed against the 2.x docs.
-3. Mount `SpacetimeDBProvider` in `web/app/providers.tsx` and replace hook bodies in `web/lib/data/hooks.tsx`.
-4. In the worker, connect with `DbConnection.builder()`, replace `createMemoryHub()` in `worker/src/hub.ts` with a reducer-backed Hub, and subscribe to `claim`, `vouch_record` and `config`.
-5. Call `claimController` once from a browser identity, then `grantRole` for the worker (`router`) and each seat.
-6. Pass: one table public, a live row visible in two tabs and in the worker. Fail: port the plain tables to Convex and remove the SpacetimeDB claims from the README.
-
-## Things to verify when the module is first published
-
-- The reducer files re-exported from `index.ts` register (SpacetimeDB reads exports from the entry file).
-- `import { Timestamp } from 'spacetimedb'` bundles inside the module (used in `vouch.ts`); otherwise compute the expiry another way.
-- Helpers typed as `{ db: any }` (`roleOf`, `requireRole`, `loadPolicy`) work as written.
-- The ledger is a table only: nothing appends or hash-chains yet (needs a hashing approach inside the module, or have the worker compute and pass hashes).
-- `merchant_policy.policyJson` is parsed with `JSON.parse` in `claims.ts`; confirm that is fine inside reducers.
-
-## Known gaps in the backbone
-
-- No auth: the web app has no signed-in shopper; `VouchRecordView` uses an empty subject id.
-- `desk.ts` keeps `MATERIALITY_CENTS` as a constant; the merchant policy value is not read there yet.
-- The risk dial has no math behind it yet (`riskDialLossPer1000Cents` is stored, nothing derives caps from it).
+- The entry file may export only reducers, views and procedures. Row type names must be unique across tables and views.
+- The client cache's `find()` scanned every row in our test, so the worker keeps its own Maps (`worker/src/mirror.ts`).
+- The browser subscribes only to what a screen needs. `/world` re-renders on a throttle (agents every 1.5 s, the feed every 400 ms).

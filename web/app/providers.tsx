@@ -1,7 +1,14 @@
 "use client";
 
-// Client providers live here. Mount SpacetimeDBProvider (from "spacetimedb/react")
-// around {children} once module_bindings exist; see lib/data/hooks.tsx.
-export function Providers({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+import type { ReactNode } from "react";
+import { StdbProvider } from "@/lib/stdb/provider";
+import { Toaster } from "@/components/ui/toast";
+
+export function Providers({ children }: { children: ReactNode }) {
+  return (
+    <StdbProvider>
+      {children}
+      <Toaster />
+    </StdbProvider>
+  );
 }

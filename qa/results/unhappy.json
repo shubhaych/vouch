@@ -1,0 +1,17 @@
+{
+  "ranAt": "2026-10-24T13:20:47.587Z",
+  "results": [
+    {
+      "id": "KILL-MID-RUN",
+      "expected": "claim goes offline; no proposal",
+      "actual": "run seen=true; claim recommended; proposal accept",
+      "match": false
+    },
+    {
+      "id": "WORKER-RESTART",
+      "expected": "a claim left investigating by a crash is resumed after the worker comes back",
+      "actual": "C-44 after restart: status recommended; proposal more_evidence",
+      "match": true
+    }
+  ]
+}

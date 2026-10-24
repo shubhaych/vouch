@@ -1,0 +1,12 @@
+{
+  "_fixture": "hand-written from Appendix A (not a recorded run)",
+  "pattern_id": "{{pattern_id}}",
+  "verdict": "confirm",
+  "confidence": 0.74,
+  "narrative": "{{agent_count}} agents filed near-identical defect claims within {{hours}} hours across {{businesses}} businesses and several products, on accounts with high refund ratios. A defective batch would show the same product from one store and long-standing buyers; neither holds here.",
+  "innocent_explanation_considered": "Checked for a defective batch: the claims span several products and stores, so a shared defect does not explain the identical wording.",
+  "agents": "{{roles}}",
+  "evidence_used": ["timing", "claim_text_similarity", "refund_ratio"],
+  "signals_not_used": "Shared region, business or product alone was not treated as evidence.",
+  "suggested_detector_change": ""
+}
