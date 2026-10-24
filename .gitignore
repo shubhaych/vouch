@@ -1,0 +1,21 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.DS_Store
+*.tsbuildinfo
+
+# Next.js
+web/.next/
+web/next-env.d.ts
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# ML artifacts (retrain with ml/train.py)
+ml/model.pkl
+
+# Threadline generated output is reproducible from fixed seeds
+world/out_hard/

@@ -1,0 +1,36 @@
+{
+  "name": "vouch",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Vouch Refunds: refund good customers faster, let an AI check the rest.",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "web",
+    "module",
+    "worker"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w web",
+    "dev:worker": "npm run dev -w worker",
+    "build": "npm run build -w web",
+    "lint": "npm run lint -w web",
+    "typecheck": "npm run typecheck --workspaces && tsc -p .",
+    "test": "npm test -w module -w worker",
+    "check": "npm run typecheck && npm run lint && npm test && npm run check:rules",
+    "stdb:publish": "bash scripts/stdb-publish.sh",
+    "stdb:generate": "bash scripts/stdb-generate.sh",
+    "seed": "tsx scripts/seed.ts",
+    "demo:reset": "tsx scripts/demo-reset.ts",
+    "hello:crs": "tsx scripts/hello-crs.ts",
+    "hello:creao": "tsx scripts/hello-creao.ts",
+    "hello:nessie": "tsx scripts/hello-nessie.ts",
+    "check:rules": "tsx scripts/check-rules.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "tsx": "^4",
+    "typescript": "^5"
+  }
+}

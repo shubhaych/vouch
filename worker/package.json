@@ -1,0 +1,17 @@
+{
+  "name": "@vouch/worker",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Desk Lead: slow and secret work (CREAO agent calls, risk model, CRS, Nessie). Subscribes to SpacetimeDB and writes back through reducers.",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc -p .",
+    "test": "tsx --test src/*.test.ts"
+  },
+  "dependencies": {
+    "@vouch/module": "*",
+    "spacetimedb": "2.13.0"
+  }
+}

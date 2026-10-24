@@ -1,0 +1,19 @@
+{
+  "name": "@vouch/module",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "SpacetimeDB module plus the pure policy code (handshake, decide) shared with web and worker.",
+  "exports": {
+    "./handshake": "./src/handshake.ts",
+    "./policy": "./src/policy.ts",
+    "./types": "./src/types.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "test": "tsx --test src/*.test.ts"
+  },
+  "dependencies": {
+    "spacetimedb": "2.13.0"
+  }
+}

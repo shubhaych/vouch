@@ -1,0 +1,3 @@
+Vouch: trust sets the speed of money.
+Start with AGENT_BRIEF.md, then AWARDS.md, then README.md. Code map: docs/ARCHITECTURE.md.
+Do not trust claims without checking the file named beside them.

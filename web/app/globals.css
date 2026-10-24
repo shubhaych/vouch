@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+/* One accent color. Everything else is neutral. Light only: judges read dark text on light cards. */
+:root {
+  --background: #f7f6f2;
+  --surface: #ffffff;
+  --foreground: #161614;
+  --muted: #5a5a54;
+  --line: #e2e0d8;
+  --accent: #0b5d4b;
+  --accent-soft: #e3f0ec;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html {
+  font-size: 18px; /* no tiny type: readable from two feet away */
+  color-scheme: light;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
