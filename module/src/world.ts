@@ -157,6 +157,7 @@ const RAW: Record<Category, Row[]> = {
     ['Soundbar', 229, 'Long black soundbar with a fabric front and remote', 'grille,remote,cable,port'],
     ['Robot vacuum', 279, 'Round black robot vacuum with a bumper and side brush', 'bumper,side brush,bin,wheel'],
     ['Instant camera', 99, 'Pastel instant camera with a large flash and print slot', 'lens,flash,print slot,door'],
+    ['OLED monitor 32-inch', 649, 'Thin-bezel 32-inch OLED monitor on a silver stand', 'panel,stand,port,bezel'],
   ],
   apparel: [
     ['Denim jacket', 89, 'Mid-wash denim jacket with copper buttons and chest pockets', 'button,sleeve,collar,pocket'],

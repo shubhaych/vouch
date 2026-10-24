@@ -9,7 +9,7 @@ import type { SimDb } from './simdb';
 // The economy lives here: the world is seeded by a reducer and stepped by a
 // scheduled reducer, so the simulation's logic sits next to its data.
 
-export const init = spacetimedb.init((ctx) => {
+export function initImpl(ctx: Ctx) {
   ctx.db.simRun.insert({
     id: 1, seed: 0n, day: 0, cursor: 0, agentsPerTick: DEFAULT_AGENTS_PER_TICK, tickMicros: DEFAULT_TICK_MICROS, running: false,
     rngState: 1n, population: 0, seeded: false, maxDay: DEFAULT_MAX_DAY, eventSeq: 0n, startDay: 0, rings: 0,
@@ -22,7 +22,9 @@ export const init = spacetimedb.init((ctx) => {
     ticksObserved: 0n, rowCounts: '{}',
   });
   scheduleTick(ctx, DEFAULT_TICK_MICROS);
-});
+}
+
+export const init = spacetimedb.init((ctx) => initImpl(ctx));
 
 const RESET_TABLES = [
   'agent', 'agentTruth', 'shopperLink', 'business', 'purchase', 'refundIntent', 'refund', 'creditEvent', 'eventFeed', 'regionStat',
