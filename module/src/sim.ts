@@ -582,10 +582,9 @@ function ringBurst(w: World, ringId: number, members: number[]) {
     const shop = w.rng.pick([...shops]);
     const item = w.rng.pick(skus);
     const p = recordPurchase(w, id, shop, item.sku, 'sim', deliverIn);
-    w.db.refundIntent.insert({
-      purchaseId: p.id, claimDay: p.deliverDay + w.rng.int(0, 1), reasonCode: 'defective',
-      reasonText: ringClaimText(ringId, item, part, w.rng), falseClaim: true,
-    });
+    // Most members paste the ring's script; some write their own words, which text similarity cannot catch.
+    const text = w.rng.chance(0.15) ? falseDefectText(item, w.rng) : ringClaimText(ringId, item, part, w.rng);
+    w.db.refundIntent.insert({ purchaseId: p.id, claimDay: p.deliverDay + w.rng.int(0, 1), reasonCode: 'defective', reasonText: text, falseClaim: true });
   }
 }
 

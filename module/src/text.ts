@@ -1,57 +1,66 @@
 // Claim text for simulated refunds, and the similarity measure the
-// coordinated-claim detector uses. Honest claims come from a wide pool with
-// item details; ring claims come from one template per ring with synonyms
-// swapped, so they are similar but not identical.
+// coordinated-claim detector uses. Real people write differently, so honest
+// claims are composed from independent fragments with item details; a ring
+// shares one script and swaps a word or two, so its claims are similar but
+// not identical. That difference is what the detector has to find.
 import type { Rng } from './rng';
 import type { CatalogItem } from './world';
 
 export const REASONS = ['defective', 'wrong_size', 'not_as_described', 'damaged_in_shipping', 'missing_parts', 'changed_mind'] as const;
 export type ReasonCode = (typeof REASONS)[number];
 
-const HONEST: Record<ReasonCode, string[]> = {
+const OPENINGS = ['', '', 'Hi,', 'Hello.', 'Not happy with this one.', 'Bit disappointed, to be honest.', 'Hoping you can help.', 'Quick one about my order.', 'Writing about a recent purchase.', 'Hey there.'];
+
+const SYMPTOMS: Record<ReasonCode, string[]> = {
   defective: [
-    'The {part} stopped working on day {n}. I have only used it a handful of times.',
-    'Out of the box the {part} was faulty, it never worked properly.',
-    'After {n} days the {part} began failing intermittently, sometimes it works and sometimes not.',
-    'My {item} has a fault with the {part}; I tried resetting it and following the manual.',
-    'The {part} on my {item} broke during normal use in the first week.',
-    'There is a manufacturing defect on the {part}, see the video I recorded.',
+    'the {part} stopped working on day {n}',
+    'out of the box the {part} was faulty and never worked properly',
+    'after {n} days the {part} started failing on and off',
+    'my {item} has a fault with the {part} even after a reset',
+    'the {part} broke during normal use in the first week',
+    'there is a manufacturing defect on the {part}',
+    'the {part} makes a grinding noise and then cuts out',
+    'the {part} gets hot and the {item} switches itself off',
+    'I noticed the {part} was loose after {n} uses',
   ],
   wrong_size: [
-    'I ordered my usual size but this runs about one size small.',
-    'The fit is much larger than the size chart says, I need to exchange it.',
-    'Sizing is off compared to the listing, it does not fit at all.',
-    'Too tight across the shoulders even though I followed the guide.',
+    'it runs about one size small compared to the chart',
+    'the fit is much larger than the size guide says',
+    'sizing is off compared to the listing and it does not fit',
+    'it is too tight across the shoulders even though I followed the guide',
+    'the length is a good {n} cm shorter than listed',
   ],
   not_as_described: [
-    'The colour is quite different from the photos on the listing.',
-    'The listing said {detail} but what arrived does not match that.',
-    'Material feels nothing like the description, it looks cheaper in person.',
-    'The {part} is not the one shown in the product photos.',
+    'the colour is quite different from the photos',
+    'the listing said {detail} but what arrived does not match that',
+    'the material feels nothing like the description',
+    'the {part} is not the one shown in the product photos',
+    'it is noticeably smaller than it looks in the listing',
   ],
   damaged_in_shipping: [
-    'The box arrived crushed and the {part} was dented inside.',
-    'Package was soaked and the {item} inside is scratched.',
-    'Courier dropped it, the {part} has a crack from the impact in transit.',
+    'the box arrived crushed and the {part} was dented inside',
+    'the package was soaked and the {item} inside is scratched',
+    'the courier must have dropped it because the {part} has a crack',
+    'the outer carton was torn open and the {part} is bent',
   ],
   missing_parts: [
-    'The {part} was missing from the box.',
-    'Arrived without the {part}, everything else was there.',
-    'Only part of the set came, the {part} is not included.',
+    'the {part} was missing from the box',
+    'it arrived without the {part}, everything else was there',
+    'only part of the set came and the {part} is not included',
   ],
   changed_mind: [
-    'I no longer need it, it is unused and in the original packaging.',
-    'Bought it as a gift and they already had one.',
-    'Found I do not use it, would like to return it unopened.',
+    'I no longer need it and it is unused in the original packaging',
+    'I bought it as a gift and they already had one',
+    'I found I do not use it and would like to return it unopened',
   ],
 };
 
-// Ring templates: a base sentence with slots, each slot a synonym set.
-const RING_TEMPLATES: string[][][] = [
-  [['The'], ['{item}'], ['stopped working', 'quit working', 'died'], ['after'], ['two', '2'], ['days,'], ['the'], ['{part}'], ['is'], ['cracked', 'broken', 'split'], ['and it'], ['will not', "won't"], ['turn on', 'power on', 'charge'], ['anymore.']],
-  [['Received'], ['the'], ['{item}'], ['and the'], ['{part}'], ['was'], ['defective', 'faulty'], ['right away,', 'immediately,'], ['it'], ['does not', "doesn't"], ['work', 'function'], ['at all.', 'whatsoever.'], ['Please refund.', 'Requesting a refund.']],
-  [['My'], ['{item}'], ['is'], ['defective', 'faulty', 'broken'], ['-'], ['the'], ['{part}'], ['fails', 'malfunctions'], ['every time', 'constantly'], ['I use it.', 'I try to use it.'], ['Not', 'Definitely not'], ['as advertised.']],
-];
+const CONTEXT = ['', '', '', 'I followed the instructions carefully.', 'It was a birthday present.', 'I have only used it a couple of times.', 'I tried a different outlet and cable.',
+  'My partner noticed it first.', 'I have bought from you before without issues.', 'Photos are in the video.', 'It was packed well, so I do not think it was the courier.', 'I kept all the packaging.'];
+
+const REQUESTS = ['', 'Can I get a refund?', 'Please advise.', 'I would like my money back.', 'Happy to send more photos.', 'An exchange is fine too.', 'Please refund to my card.', 'Thanks for sorting this.'];
+
+const cap = (s: string) => (s ? s[0]!.toUpperCase() + s.slice(1) : s);
 
 const fill = (s: string, item: CatalogItem, rng: Rng) =>
   s
@@ -60,24 +69,33 @@ const fill = (s: string, item: CatalogItem, rng: Rng) =>
     .replaceAll('{n}', String(rng.int(2, 12)))
     .replaceAll('{detail}', item.description.split(' with ')[0]!.toLowerCase());
 
+/** An individual's claim: four independent fragments, so two honest claims rarely read alike. */
 export function honestClaimText(reason: ReasonCode, item: CatalogItem, rng: Rng): string {
-  return fill(rng.pick(HONEST[reason]), item, rng);
+  const parts = [rng.pick(OPENINGS), `${cap(fill(rng.pick(SYMPTOMS[reason]), item, rng))}.`, rng.pick(CONTEXT), rng.pick(REQUESTS)];
+  return parts.filter(Boolean).join(' ');
 }
 
-/** One template per ring, members swap synonyms. The part is fixed per ring burst. */
-export function ringClaimText(ringId: number, item: CatalogItem, part: string, rng: Rng): string {
-  const tpl = RING_TEMPLATES[ringId % RING_TEMPLATES.length]!;
-  return tpl
-    .map((choices) => rng.pick(choices))
-    .join(' ')
-    .replaceAll('{item}', item.name.toLowerCase())
-    .replaceAll('{part}', part)
-    .replace(/ ,/g, ',');
-}
-
-/** A false "defective" claim from an opportunist or serial returner: plausible, short, generic. */
+/** A false "defective" claim from an opportunist or serial returner: written by one person, so it reads like any other claim. */
 export function falseDefectText(item: CatalogItem, rng: Rng): string {
-  return fill(rng.pick(HONEST.defective), item, rng);
+  return honestClaimText('defective', item, rng);
+}
+
+// Ring scripts: one long message per ring, with a few words swapped per member.
+const RING_SCRIPTS: string[][][] = [
+  [['Hello,', 'Hi,'], ['I received my order on time but the'], ['{part}'], ['was'], ['cracked', 'broken'], ['when I opened the box and the device will not power on at all.'],
+    ['Please process a full refund to my original payment method'], ['as soon as possible.', 'quickly.']],
+  [['Item arrived defective.'], ['The'], ['{part}'], ['does not work', 'is not working'], ['and I have tried charging it overnight and resetting it twice with no change.'],
+    ['I want a refund, not a replacement,', 'I want a full refund, not a replacement,'], ['thank you.']],
+  [['Unfortunately the product is faulty.'], ['The'], ['{part}'], ['stopped responding', 'stopped working'], ['on the first day and the unit keeps restarting by itself every few minutes.'],
+    ['Requesting a refund to my card', 'Please refund to my card'], ['today.', 'please.']],
+  [['Very disappointed with this purchase.'], ['Out of the box the'], ['{part}'], ['was damaged', 'was dead'], ['and the device makes a clicking sound when switched on.'],
+    ['I would like my money returned in full', 'I need my money returned in full'], ['right away.']],
+];
+
+/** One script per ring; the part is fixed per burst; members swap a word or two. Item names are left out, as a script would. */
+export function ringClaimText(ringId: number, _item: CatalogItem, part: string, rng: Rng): string {
+  const script = RING_SCRIPTS[ringId % RING_SCRIPTS.length]!;
+  return script.map((choices) => rng.pick(choices)).join(' ').replaceAll('{part}', part);
 }
 
 /** Character trigram Jaccard similarity, the coordinated detector's text signal. */

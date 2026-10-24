@@ -4,6 +4,7 @@ import { HISTORY_DAYS, SHOWCASE_AGENT_ID, seedWorld, step } from './sim';
 import { START_SCORE } from './score';
 import type { SimDb } from './simdb';
 import { REGIONS, BUSINESSES } from './world';
+import { trigramSimilarity } from './text';
 
 const grow = (seed: bigint, population: number, days: number) => {
   const db = createMemDb();
@@ -110,8 +111,24 @@ describe('the economy after 60 days', () => {
     for (const r of db.refund.iter()) if (r.source === 'sim') expect(r.status).not.toBe('declined');
   });
 
-  it('ring members file near-identical claims inside 48 hours', () => {
-    const byText = [...db.refund.iter()].filter((r) => /stopped working after|defective right away|is (defective|faulty|broken) - the/.test(r.reasonText));
-    expect(byText.length).toBeGreaterThan(10);
+  it('ring members file near-identical claims inside 48 hours; honest claims do not read alike', () => {
+    const kind = new Map([...db.agentTruth.iter()].map((t) => [t.agentId, t]));
+    const refunds = [...db.refund.iter()];
+    const ring = refunds.filter((r) => kind.get(r.agentId)?.kind === 'ring' && db.refundIntent.purchaseId.find(r.purchaseId)?.falseClaim);
+    let pairs = 0;
+    let similar = 0;
+    for (let i = 0; i < ring.length; i++) for (let j = i + 1; j < ring.length; j++) {
+      const a = ring[i]!, b = ring[j]!;
+      if (kind.get(a.agentId)!.ringId !== kind.get(b.agentId)!.ringId || Math.abs(a.day - b.day) > 1) continue;
+      pairs++;
+      if (trigramSimilarity(a.reasonText, b.reasonText) > 0.8) similar++;
+    }
+    expect(pairs).toBeGreaterThan(50);
+    expect(similar / pairs).toBeGreaterThan(0.6);
+    const honest = refunds.filter((r) => kind.get(r.agentId)?.kind === 'honest').slice(0, 150);
+    let hp = 0;
+    let hs = 0;
+    for (let i = 0; i < honest.length; i++) for (let j = i + 1; j < honest.length; j++) { hp++; if (trigramSimilarity(honest[i]!.reasonText, honest[j]!.reasonText) > 0.8) hs++; }
+    expect(hs / hp).toBeLessThan(0.01);
   });
 });
