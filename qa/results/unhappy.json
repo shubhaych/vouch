@@ -1,5 +1,5 @@
 {
-  "ranAt": "2026-10-24T13:09:08.928Z",
+  "ranAt": "2026-10-24T13:20:47.587Z",
   "results": [
     {
       "id": "KILL-MID-RUN",
@@ -10,8 +10,8 @@
     {
       "id": "WORKER-RESTART",
       "expected": "a claim left investigating by a crash is resumed after the worker comes back",
-      "actual": "C-40 after restart: status investigating; proposal none after 45 s",
-      "match": false
+      "actual": "C-44 after restart: status recommended; proposal more_evidence",
+      "match": true
     }
   ]
 }

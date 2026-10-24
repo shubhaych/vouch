@@ -86,9 +86,11 @@ function LabInner() {
 
 function AskDroid({ onAsk }: { onAsk: (i: number) => void }) {
   return (
-    <details className="glass relative p-2" data-testid="ask-droid">
+    // z-30 on the panel itself: .glass has a backdrop filter, which makes its own stacking context,
+    // so without it the job grid below paints over the open menu (QA-007).
+    <details className="glass relative z-30 p-2" data-testid="ask-droid">
       <summary className="btn btn--glow btn--sm list-none">Ask Droid</summary>
-      <ol className="absolute right-0 z-20 mt-2 w-[26rem] space-y-1 rounded-xl border border-line-dark bg-bg-dark-elevated p-2 shadow-xl">
+      <ol className="absolute left-0 mt-2 w-[min(26rem,calc(100vw-2rem))] sm:left-auto sm:right-0 space-y-1 rounded-xl border border-line-dark bg-bg-dark-elevated p-2 shadow-xl">
         {PRESETS.map((p, i) => (
           <li key={i}><button className="w-full rounded-lg px-2 py-1.5 text-left text-sm hover:bg-white/5" onClick={() => onAsk(i)} data-testid={`preset-${i}`}>{p}</button></li>
         ))}

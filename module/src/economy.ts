@@ -2,7 +2,7 @@ import { SenderError, t } from 'spacetimedb/server';
 import { simTick, spacetimedb } from './schema';
 import { asSenderError, requireRole, setControlValue, type Ctx } from './ctx';
 import { scheduleTick } from './control';
-import { enqueueLabJob } from './lab';
+import { enqueueLabJob, startLabRun } from './lab';
 import { DEFAULT_AGENTS_PER_TICK, DEFAULT_MAX_DAY, DEFAULT_TICK_MICROS, seedWorld as seedEngine, step } from './sim';
 import type { SimDb } from './simdb';
 
@@ -47,6 +47,7 @@ export function seedWorldImpl(ctx: Ctx, seed: bigint, population: number, force:
     seed, population, agentsPerTick: run?.agentsPerTick || DEFAULT_AGENTS_PER_TICK, tickMicros: run?.tickMicros || DEFAULT_TICK_MICROS,
     maxDay: run?.maxDay || DEFAULT_MAX_DAY,
   }));
+  startLabRun(ctx);
   scheduleTick(ctx, seeded.tickMicros);
 }
 

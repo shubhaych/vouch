@@ -96,7 +96,7 @@ export function SystemView() {
         <div className="glass p-3"><Stat label="Time to first sync" value={firstSync === null ? null : Math.round(firstSync)} prov="live" format={(n) => `${Math.round(n)} ms`} sub="10,000 agents, page mount → applied" /></div>
       </section>
 
-      <section className="grid gap-3 lg:grid-cols-2">
+      <section className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <div className="glass p-4">
           <div className="panel-title mb-2">Events per second (last 90 s) <Badge kind="live" /></div>
           <div className="h-44">
@@ -124,7 +124,7 @@ export function SystemView() {
         </div>
       </section>
 
-      <section className="grid gap-3 lg:grid-cols-[1fr_1.4fr]">
+      <section className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1.4fr]">
         <div className="glass p-4">
           <div className="panel-title mb-2">Row counts per table <Badge kind="live" /></div>
           <table className="w-full font-mono text-sm" data-testid="row-counts">
@@ -141,6 +141,8 @@ export function SystemView() {
             <span className="panel-title">Benchmark: fresh databases, 30 simulated days each</span>
             <button className="btn btn--ghost-dark btn--xs" onClick={runBench} data-testid="bench-run">Run benchmark</button>
           </div>
+          {/* the machine string is long; on a phone the table scrolls inside its panel, not the page (QA-009) */}
+          <div className="overflow-x-auto">
           <table className="w-full text-sm" data-testid="bench-table">
             <thead className="text-left text-xs text-ink-soft-dark"><tr><th className="py-1">Agents</th><th>Days</th><th>Steps / s</th><th>Days / min</th><th>Machine</th><th>Ran</th></tr></thead>
             <tbody className="font-mono">
@@ -150,6 +152,7 @@ export function SystemView() {
               {bench.length === 0 ? <tr><td colSpan={6} className="py-3 font-sans text-xs text-ink-soft-dark">No benchmark has been run against this database yet. A million agents is only shown if it was actually run.</td></tr> : null}
             </tbody>
           </table>
+          </div>
           {bench.length ? <p className="mt-2 text-xs text-ink-soft-dark"><Badge kind="live" /> measured by scripts/bench.ts and written to bench_result.</p> : null}
         </div>
       </section>

@@ -7,6 +7,7 @@ import { buyFor, fastForwardFor, joinImpl, requestRefundFor } from './consumer';
 import { decideImpl, postImpl, proposeImpl } from './desk';
 import { confirmPatternImpl, flagPatternImpl } from './patterns';
 import { openInvestigationImpl } from './claims';
+import { LAB_CAP_PER_RUN, enqueueLabJob } from './lab';
 import type { Ctx } from './ctx';
 
 const worker = who('worker');
@@ -164,6 +165,25 @@ describe('patterns and the Droid Lab triggers (T3.7, T4.1)', () => {
     for (let i = 0; i < 31; i++) k.as(worker, (ctx) => tickImpl(ctx));
     const triggers = [...k.db.labJob.iter()].map((j) => j.trigger).sort();
     expect(triggers).toEqual(['agent', 'event', 'schedule']);
+  });
+
+  it('QA-005 one schedule job per simulation run; every job counts toward the cap; a reseed starts a new run', () => {
+    const k = world();
+    const schedule = () => [...k.db.labJob.iter()].filter((j) => j.trigger === 'schedule').length;
+    for (let i = 0; i < 200; i++) k.as(worker, (ctx) => tickImpl(ctx));
+    expect(schedule()).toBe(1);
+    // A job that ran without Droid (replay mode, failed) still uses the run's budget.
+    const finish = () => k.as(worker, (ctx) => { for (const j of [...ctx.db.labJob.iter()]) if (j.status === 'queued') ctx.db.labJob.id.update({ ...j, status: 'failed', mode: 'replay' }); });
+    finish();
+    const ids: (number | null)[] = [];
+    for (let i = 0; i < LAB_CAP_PER_RUN; i++) { ids.push(k.as(worker, (ctx) => enqueueLabJob(ctx, 'user', `goal ${i}`, 'coordinated'))); finish(); }
+    expect(ids.filter((x) => x !== null)).toHaveLength(LAB_CAP_PER_RUN - 1);
+    expect(ids.at(-1)).toBeNull();
+    // demo-reset reseeds with the same seed: that is a new run with a fresh budget.
+    k.as(worker, (ctx) => seedWorldImpl(ctx, 11n, 600, true));
+    expect(k.as(worker, (ctx) => enqueueLabJob(ctx, 'user', 'after reset', 'coordinated'))).not.toBeNull();
+    for (let i = 0; i < 31; i++) k.as(worker, (ctx) => tickImpl(ctx));
+    expect(schedule()).toBe(2);
   });
 
   it('a judge can open a simulated refund for investigation, which takes it off the fast path', () => {

@@ -26,6 +26,16 @@ interface EvidenceJson {
   unable_to_verify?: boolean; offline?: boolean; no_video?: boolean; challenge?: { passed?: boolean }; capture_flags?: string[]; [k: string]: unknown;
 }
 
+/**
+ * A claim needs the Desk Lead when its frames are ready. At start-up it also needs
+ * one when a crash left it "investigating" with no proposal (QA-006): live runs take
+ * minutes, so a restart mid-run would otherwise strand it. runClaim reuses an
+ * Evidence Analyst result that was already recorded.
+ */
+export function claimNeedsWork(c: { status: string }, atStartup: boolean): boolean {
+  return c.status === 'frames_ready' || (atStartup && c.status === 'investigating');
+}
+
 export class Orchestrator {
   private busy = new Set<string>();
   private runsToday = 0;
@@ -43,8 +53,8 @@ export class Orchestrator {
     db.claim.onUpdate((_c, _old, row) => this.onClaim(row));
     db.fraudPattern.onInsert((_c, row) => this.onPattern(row));
     db.fraudPattern.onUpdate((_c, _old, row) => this.onPattern(row));
-    // Pick up work that arrived while the worker was down.
-    for (const c of db.claim.iter()) this.onClaim(c);
+    // Pick up work that arrived while the worker was down, and claims a crash left half-investigated.
+    for (const c of db.claim.iter()) this.onClaim(c, true);
     for (const p of db.fraudPattern.iter()) this.onPattern(p);
     log(`orchestrator started (CREAO_MODE=${config.creao.mode}, ${config.creao.dailyRunLimit} runs/day)`);
   }
@@ -61,8 +71,8 @@ export class Orchestrator {
     return true;
   }
 
-  private onClaim(c: Claim) {
-    if (c.status !== 'frames_ready') return;
+  private onClaim(c: Claim, atStartup = false) {
+    if (!claimNeedsWork(c, atStartup)) return;
     if (c.kind === 'showcase' && !this.liveShowcaseClaims.has(c.id)) return;
     const key = `claim:${c.id}`;
     if (this.busy.has(key)) return;

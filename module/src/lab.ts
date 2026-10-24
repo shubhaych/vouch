@@ -18,16 +18,35 @@ export const PRESET_GOALS: { goal: string; detectorId: string }[] = [
   { goal: 'Explain the false-defect detector features more clearly for the Pattern Analyst.', detectorId: 'false_defect' },
 ];
 
+/**
+ * The jobs of the current simulation run: those created since the last (re)seed.
+ * demo-reset reseeds with the same seed, so the seed alone cannot tell runs apart.
+ */
+function runJobs(ctx: Ctx) {
+  const first = ctx.db.counter.key.find('lab_run_first_job')?.value ?? 0n;
+  return [...ctx.db.labJob.iter()].filter((j) => BigInt(j.id) >= first);
+}
+
+/** seedWorld calls this: the next job opens a new run's budget. */
+export function startLabRun(ctx: Ctx) {
+  const next = (ctx.db.counter.key.find('lab_job')?.value ?? 0n) + 1n;
+  const row = ctx.db.counter.key.find('lab_run_first_job');
+  if (row) ctx.db.counter.key.update({ key: 'lab_run_first_job', value: next });
+  else ctx.db.counter.insert({ key: 'lab_run_first_job', value: next });
+}
+
 /** Returns the new job id, or null when capped, duplicated or the lab is off. Never throws: it runs inside the tick. */
 export function enqueueLabJob(ctx: Ctx, trigger: string, goal: string, detectorId: string): number | null {
   if (!controlOn(ctx, 'lab_enabled')) return null;
   const seed = ctx.db.simRun.id.find(1)?.seed ?? 0n;
-  let thisRun = 0;
   for (const j of ctx.db.labJob.iter()) {
-    if (j.seed === seed && j.mode !== 'replay') thisRun++;
     if ((j.status === 'queued' || j.status === 'running') && j.detectorId === detectorId && j.trigger === trigger) return null;
   }
-  if (thisRun >= LAB_CAP_PER_RUN) return null;
+  // Every job counts, including ones that ran without Droid, and the schedule gets one
+  // job per run, so drift reviews cannot use up the budget the demo's triggers need (QA-005).
+  const jobs = runJobs(ctx);
+  if (jobs.length >= LAB_CAP_PER_RUN) return null;
+  if (trigger === 'schedule' && jobs.some((j) => j.trigger === 'schedule')) return null;
   const id = Number(nextCounter(ctx, 'lab_job'));
   ctx.db.labJob.insert({
     id, trigger, goal, detectorId, status: 'queued', seed, mode: 'live', candidateDir: '', summary: '', scoresJson: '',
