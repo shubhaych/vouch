@@ -13,8 +13,8 @@ import { call } from './stdb';
 
 const LIVE_DIR = resolve(REPO_ROOT, 'detectors/live');
 const EVERY_DAYS = 5;
-/** Single-agent detectors can flag hundreds of agents; flag the strongest few per run so the review budget means something. */
-const MAX_NEW_PER_SINGLE_AGENT_DETECTOR = 3;
+/** Single-agent detectors can flag hundreds of agents; each run groups its strongest new agents into one pattern. */
+const MAX_AGENTS_PER_GROUPED_PATTERN = 8;
 
 export async function loadLiveDetectors(): Promise<Detector[]> {
   const out: Detector[] = [];
@@ -36,6 +36,23 @@ export function historyFromConn(conn: DbConnection, day: number): History {
 }
 
 const severity = (c: Candidate) => Number(c.features.refund_ratio ?? c.features.defect_claims ?? c.agentIds.length) || 0;
+
+/** One pattern per run for a single-agent detector: the agents it flagged this time, with averaged features. The Pattern Analyst rules on each agent. */
+function group(cands: Candidate[]): Candidate[] {
+  if (cands.length <= 1) return cands;
+  const features: Record<string, number | string> = { agents: cands.length };
+  for (const k of Object.keys(cands[0]!.features)) {
+    const nums = cands.map((c) => Number(c.features[k])).filter((x) => Number.isFinite(x));
+    if (nums.length === cands.length) features[k] = Math.round((nums.reduce((s, x) => s + x, 0) / nums.length) * 100) / 100;
+  }
+  return [{
+    kind: cands[0]!.kind,
+    agentIds: cands.flatMap((c) => c.agentIds),
+    businessIds: [...new Set(cands.flatMap((c) => c.businessIds))].sort((a, b) => a - b),
+    events: cands.flatMap((c) => c.events.slice(0, 6)),
+    features,
+  }];
+}
 
 export class DetectorRunner {
   private lastRunDay = -1;
@@ -74,7 +91,7 @@ export class DetectorRunner {
       const covered = new Set<number>();
       for (const p of this.conn.db.fraudPattern.iter()) if (p.detectorId === d.id && p.status !== 'dismissed') for (const a of p.agentIds) covered.add(a);
       cands = cands.filter((c) => c.agentIds.some((a) => !covered.has(a)));
-      if (d.id !== 'coordinated') cands = cands.sort((a, b) => severity(b) - severity(a)).slice(0, MAX_NEW_PER_SINGLE_AGENT_DETECTOR);
+      if (d.id !== 'coordinated') cands = group(cands.sort((a, b) => severity(b) - severity(a)).slice(0, MAX_AGENTS_PER_GROUPED_PATTERN));
       for (const c of cands) {
         await this.flag(d, c);
         flagged++;

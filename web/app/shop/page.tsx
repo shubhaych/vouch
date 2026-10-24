@@ -1,3 +1,8 @@
-export default function Page() {
-  return <main className="app-dark section text-ink-dark">Coming next.</main>;
+import type { Metadata } from "next";
+import { ShopView } from "@/components/shop/shop-view";
+
+export const metadata: Metadata = { title: "Shop" };
+
+export default function ShopPage() {
+  return <ShopView />;
 }

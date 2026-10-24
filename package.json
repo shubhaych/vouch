@@ -32,6 +32,7 @@
     "eval": "tsx detectors/eval.ts"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/node": "^22",
     "tsx": "^4",
     "typescript": "^5"

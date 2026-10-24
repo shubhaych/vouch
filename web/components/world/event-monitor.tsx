@@ -48,9 +48,14 @@ export function Sparkline({ values, color = "#22d3ee", w = 120, h = 28 }: { valu
   );
 }
 
-export function EventMonitor({ events, onAgent, onPattern }: { events: FeedEvent[]; onAgent: (id: number) => void; onPattern: (id: number) => void }) {
+type Tab = "all" | "refunds" | "people";
+const REFUND_KINDS = new Set(["refund", "refund_accepted", "refund_declined"]);
+
+export function EventMonitor({ events, people, onAgent, onPattern }: { events: FeedEvent[]; people: FeedEvent[]; onAgent: (id: number) => void; onPattern: (id: number) => void }) {
   const [paused, setPaused] = useState<FeedEvent[] | null>(null);
-  const shown = useMemo(() => (paused ?? events).slice(0, 60), [paused, events]);
+  const [tab, setTab] = useState<Tab>("all");
+  const source = tab === "people" ? people : tab === "refunds" ? events.filter((e) => REFUND_KINDS.has(e.kind)) : events;
+  const shown = useMemo(() => (paused ?? source).slice(0, 60), [paused, source]);
   const rate = useEventRate(events);
   const latency = useLatency();
   // Hundreds of purchases a second would turn every line cyan; flash only the events a person acts on.
@@ -62,6 +67,12 @@ export function EventMonitor({ events, onAgent, onPattern }: { events: FeedEvent
         <div className="flex items-center gap-2">
           <span className="panel-title">Live event monitor</span>
           <Badge kind="live" />
+          <div className="ml-2 flex gap-1" role="tablist" aria-label="Filter events">
+            {([["all", "All"], ["refunds", "Refunds"], ["people", "People & patterns"]] as [Tab, string][]).map(([t, label]) => (
+              <button key={t} role="tab" aria-selected={tab === t} onClick={() => { setTab(t); setPaused(null); }} data-testid={`monitor-tab-${t}`}
+                className={`rounded px-2 py-0.5 text-[0.7rem] font-semibold ${tab === t ? "bg-white/10 text-ink-dark" : "text-ink-soft-dark hover:text-ink-dark"}`}>{label}</button>
+            ))}
+          </div>
           {paused ? <span className="chip chip--review">paused</span> : null}
         </div>
         <div className="flex items-center gap-4 text-xs text-ink-soft-dark">
@@ -76,7 +87,7 @@ export function EventMonitor({ events, onAgent, onPattern }: { events: FeedEvent
       </div>
       <ol
         className="scroll-thin min-h-0 flex-1 overflow-y-auto px-2 py-1 font-mono text-[0.72rem] leading-5"
-        onMouseEnter={() => setPaused(events)}
+        onMouseEnter={() => setPaused(source)}
         onMouseLeave={() => setPaused(null)}
       >
         {shown.length === 0 ? <li className="px-1 py-2 text-ink-soft-dark">Waiting for the first event…</li> : null}

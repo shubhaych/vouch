@@ -21,7 +21,7 @@ export const LIVE_AGENT_BASE = 900_000;
 export const DEFAULT_POPULATION = 10_000;
 export const DEFAULT_AGENTS_PER_TICK = 1_000;
 export const DEFAULT_TICK_MICROS = 200_000n;
-export const DEFAULT_MAX_DAY = 720;
+export const DEFAULT_MAX_DAY = 1500;
 const RING_BURST_PERIOD = 60;
 export const AGENT_JITTER_DEG = 3;
 const ELECTRONICS_BUSINESSES = BUSINESSES.filter((b) => b.category === 'electronics').map((b) => b.id);

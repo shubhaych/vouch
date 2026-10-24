@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useConn, useRowsThrottled, useTableVersion } from "@/lib/stdb/hooks";
 
 export type Band = "red" | "amber" | "neutral" | "green";
@@ -75,11 +75,41 @@ export function useAgents(): AgentsState {
 
 export interface FeedEvent { seq: bigint; day: number; kind: string; agentId: number; businessId: number; amount: number; refId: bigint; line: string }
 
-/** The 512-row live event ring, newest first, re-read at most every 400 ms. */
-export function useFeed(): { events: FeedEvent[]; ready: boolean } {
+/** Events a person acts on. The 512-row ring turns over in seconds at full speed, so the client keeps these. */
+export const PEOPLE_KINDS = new Set(["join", "claim", "decision", "pattern", "refund_declined", "system", "delivery"]);
+
+/** The 512-row live event ring, newest first, re-read at most every 400 ms, plus the person-level events seen so far. */
+export function useFeed(): { events: FeedEvent[]; people: FeedEvent[]; ready: boolean } {
+  const conn = useConn();
   const { rows, ready } = useRowsThrottled<FeedEvent>("eventFeed", "SELECT * FROM event_feed", 400);
+  const kept = useRef(new Map<string, FeedEvent>());
+  const [peopleVersion, setPeopleVersion] = useState(0);
+  // Row callbacks see every event even when rendering is slow, so person-level events are never missed.
+  useEffect(() => {
+    if (!conn) return;
+    const keep = (row: FeedEvent) => {
+      if (!PEOPLE_KINDS.has(row.kind)) return;
+      kept.current.set(row.seq.toString(), row);
+      if (kept.current.size > 400) kept.current = new Map([...kept.current.entries()].sort((a, b) => (BigInt(a[0]) < BigInt(b[0]) ? 1 : -1)).slice(0, 200));
+      setPeopleVersion((v) => v + 1);
+    };
+    const onInsert = (_c: unknown, row: FeedEvent) => keep(row);
+    const onUpdate = (_c: unknown, _old: FeedEvent, row: FeedEvent) => keep(row);
+    conn.db.eventFeed.onInsert(onInsert as never);
+    conn.db.eventFeed.onUpdate(onUpdate as never);
+    return () => {
+      conn.db.eventFeed.removeOnInsert(onInsert as never);
+      conn.db.eventFeed.removeOnUpdate(onUpdate as never);
+    };
+  }, [conn]);
   const events = useMemo(() => [...rows].sort((a, b) => (a.seq < b.seq ? 1 : a.seq > b.seq ? -1 : 0)), [rows]);
-  return { events, ready };
+  const people = useMemo(() => {
+    for (const e of events) if (PEOPLE_KINDS.has(e.kind)) kept.current.set(e.seq.toString(), e);
+    return [...kept.current.values()].sort((a, b) => (a.seq < b.seq ? 1 : -1)).slice(0, 200);
+    // peopleVersion is the signal that kept.current changed
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events, peopleVersion]);
+  return { events, people, ready };
 }
 
 export interface Arc { id: string; startLat: number; startLng: number; endLat: number; endLng: number; color: string | string[]; dash: number; stroke: number; kind: string }

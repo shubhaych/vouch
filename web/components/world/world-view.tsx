@@ -38,7 +38,7 @@ function WorldInner() {
   const params = useSearchParams();
   const router = useRouter();
   const agents = useAgents();
-  const { events } = useFeed();
+  const { events, people } = useFeed();
   const { rows: businessRows } = useRowsThrottled<Business>("business", "SELECT * FROM business", 1000);
   const { rows: regions } = useRowsThrottled<RegionStat>("regionStat", "SELECT * FROM region_stat", 1000);
   const [patterns] = useTable(tables.fraudPattern);
@@ -219,7 +219,7 @@ function WorldInner() {
 
       {/* Bottom: live event monitor */}
       <div className="absolute inset-x-3 bottom-3 z-10 h-[12.5rem]">
-        <EventMonitor events={events} onAgent={(id) => { if (mode !== "live") switchMode("live"); selectAgent(id); }} onPattern={openPattern} />
+        <EventMonitor events={events} people={people} onAgent={(id) => { if (mode !== "live") switchMode("live"); selectAgent(id); }} onPattern={openPattern} />
       </div>
 
       {/* Counters and the honesty line */}

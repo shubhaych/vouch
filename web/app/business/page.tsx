@@ -1,3 +1,8 @@
-export default function Page() {
-  return <main className="app-dark section text-ink-dark">Coming next.</main>;
+import type { Metadata } from "next";
+import { BusinessView } from "@/components/business/business-view";
+
+export const metadata: Metadata = { title: "Business" };
+
+export default function BusinessPage() {
+  return <BusinessView />;
 }
