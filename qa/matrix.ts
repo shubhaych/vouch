@@ -7,6 +7,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { DbConnection } from '../worker/module_bindings/index';
+import { tokenFile } from '../worker/src/stdb';
 import { loadEnv } from '../scripts/_env';
 
 loadEnv();
@@ -245,7 +246,7 @@ if (want('P6')) {
   await outcome(s.conn, claim.id, refund.id, u.t0);
   let workerErr = 'worker token not found';
   try {
-    const token = readFileSync('worker/.keys/stdb-worker-token', 'utf8').trim();
+    const token = readFileSync(tokenFile('worker'), 'utf8').trim();
     const w = await open(token);
     workerErr = await w.reducers.decide({ refundId: refund.id, action: 'accept', amount: refund.amount, note: 'QA: proposer tries to decide' }).then(() => 'DECIDED (should fail)', errText);
     w.disconnect();
