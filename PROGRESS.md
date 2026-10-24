@@ -16,8 +16,7 @@ Environment for this session: local SpacetimeDB 2.13.0 standalone on `ws://local
 - [x] T0.4 The scheduled tick fires: `sim_run.day` advances on its own. (`spacetime sql vouch "SELECT day, cursor FROM sim_run" -s dev3011`: day 120 → 149 in ~60 s; metrics.last_tick_micros 203424 at 5 ticks/s with 10,000 agents)
 - [ ] T0.5 `hello-creao.ts` starts one run per saved agent and gets a result (human-run; response saved as a fixture). Code done; adapter tested on both API paths against a stand-in server (`worker/test/creao.test.ts`).
   - UNVERIFIED-LIVE: CREAO: `CREAO_MODE=live npx tsx scripts/hello-creao.ts --record`
-- [ ] T0.6 `hello-droid.ts` streams one message from a Droid session on the laptop (human-run). Code done; type-checks against `@factory/droid-sdk` 0.10.0.
-  - UNVERIFIED-LIVE: Factory: `npx tsx scripts/hello-droid.ts`
+- [x] T0.6 `hello-droid.ts` streams one message from a Droid session on the laptop (human-run). Code done; type-checks against `@factory/droid-sdk` 0.10.0. (Run on the laptop, 2026-10-24: "A fraud detector is a system that identifies suspicious activity that may indicate fraud." / `[result] success=true`.)
 
 ## Gate G1 The economy
 - [x] T1.1 `seedWorld(seed=11, population=10000)` creates 10,000 agents, 60 businesses, 40 regions; seeding twice without force is refused. (module tests "creates 10,000 agents…", "T1.1 refuses to reseed without force")
