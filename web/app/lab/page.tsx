@@ -1,3 +1,8 @@
-export default function Page() {
-  return <main className="app-dark section text-ink-dark">Coming next.</main>;
+import type { Metadata } from "next";
+import { LabView } from "@/components/lab/lab-view";
+
+export const metadata: Metadata = { title: "Detector Lab" };
+
+export default function LabPage() {
+  return <LabView />;
 }
