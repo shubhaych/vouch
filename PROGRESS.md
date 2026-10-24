@@ -81,5 +81,6 @@ Environment for this session: local SpacetimeDB 2.13.0 standalone on `ws://local
 - 12:34 Bench on the cloud VM (Xeon 2.10 GHz × 4): 176k / 197k / 189k agent-steps/s at 10k / 50k / 100k agents, stored in `bench_result`.
 - 12:44 `demo-reset` used a 720-day cap, so the sim stopped and the T1.5 e2e failed; it now uses `DEFAULT_MAX_DAY` (1,500). e2e 4/4 green.
 - 13:10 Loop 2 (fixture mode): QA_REPORT.md with 12 issues (1 P0, 6 P1 incl. QA-008 raised from P2, 2 P2, 3 P3).
+- 14:15 Loop 3 rerun: matrix 13/13; e2e smoke 4/4; regressions pass. It found QA-013 (stale credential in the stepper; renewal re-issued behind a revocation) and QA-014 (/world layer rebuilds saturating the main thread). Both were fixed (QA-014 partly; the rest is software WebGL, measure on the laptop). The demo uses `npm run build && npm run start`.
 - 13:33 Loop 3: all P0/P1/P2 fixed with a regression test each (module 21, worker 23 unit tests; e2e/regressions/QA-007..009); short Loop 2 rerun from demo-reset.
 - 12:52 Docs written: README, docs/{VERIFIED, REAL_VS_SIMULATED, LIVE_CHECKLIST, SETUP, ARCHITECTURE, CREAO, HYPHENATE}.md, .env.example with Appendix B names. Next: Loop 2.
