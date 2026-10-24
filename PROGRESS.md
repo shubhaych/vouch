@@ -1,5 +1,5 @@
 # Vouch World progress
-Loop: 1 Build done, Loop 2 next | Gate: G5/G6 | Sim day: live on /system | Last green e2e: 2026-10-24 12:46 UTC (`npx playwright test e2e/`, 4/4)
+Loop: 3 Fix (Loop 2 report in QA_REPORT.md) | Gate: G6 | Sim day: live on /system | Last green e2e: 2026-10-24 12:46 UTC (`npx playwright test e2e/`, 4/4)
 
 Environment for this session: local SpacetimeDB 2.13.0 standalone on `ws://localhost:3011` (installed in the cloud session, `spacetime start`), not Maincloud. "Live" below means against that running server. CREAO runs in fixture mode. Every live-only step is listed in `docs/LIVE_CHECKLIST.md`.
 
@@ -32,7 +32,7 @@ Environment for this session: local SpacetimeDB 2.13.0 standalone on `ws://local
 ## Gate G2 One live claim, end to end
 - [x] T2.1 `/shop`: a fresh visitor gets an agent, buys an item, fast-forwards, requests a refund; the QR opens `/claim/[id]`. (e2e "T2.1/T2.8" passed in the browser)
   - UNVERIFIED-LIVE: phone: scan the QR on `/shop` with a phone via the tunnel (`NEXT_PUBLIC_WORKER_URL`)
-- [ ] T2.2 Upload rejects a wrong nonce, a stale claim, and a video under 4 seconds. (short and corrupt videos answer 422; wrong nonce 403 and stale 410 are in `worker/src/video.ts` but are checked in Loop 2)
+- [x] T2.2 Upload rejects a wrong nonce, a stale claim, and a video under 4 seconds. (`qa/matrix.ts`: NONCE 403, V14 410 after 11 minutes, V12 422 "That video is 2.1 seconds…", V13 422)
 - [x] T2.3 The worker extracts 8 to 10 frames including the first and last second, stores hashes, calls `attachVideo`. (`npx tsx scripts/claim-flow.ts`: "9 frames, 8.0 s 640x480")
 - [x] T2.4 Frame reuse: uploading the same video for a second claim shows "Matches frames from claim ...". (claim-flow twice; `worker/test/video.test.ts` matches a re-encoded copy)
 - [x] T2.5 The orchestrator runs Evidence Analyst then Investigator; `/business` shows both runs progressing, then findings with boxes and a recommendation with cited reasons. (fixture mode, labelled Fixture; worker log "C-14: Investigator recommends accept $249.00 (fixture)")
@@ -44,14 +44,14 @@ Environment for this session: local SpacetimeDB 2.13.0 standalone on `ws://local
 
 ## Gate G3 Vouch World features
 - [x] T3.1 Clicking an agent opens its panel with tiles, chips, credit progression and timeline. (e2e T1.5/T1.6 opens `agent-panel`)
-- [ ] T3.2 Clicking a graph point opens the exact purchase or refund that caused it. (built: `CauseCard` in `agent-panel.tsx`; checked in Loop 2)
+- [x] T3.2 Clicking a graph point opens the exact purchase or refund that caused it. (`qa/personas.spec.ts` P7: credit dot → `cause-card`; `qa/shots/P7-cause-card.png`)
 - [x] T3.3 The three detectors run every 5 simulated days and write patterns with `pattern_event` rows and `why` lines. (worker log "detectors on day 130: … 3 new patterns"; 284 patterns and 23,898 pattern_event rows by day 720)
 - [x] T3.4 Shuffling regions does not change `coordinated` output (worker test; also `detectors/test.ts`).
 - [x] T3.5 The evaluator prints precision, recall and honest-agents-flagged per detector on a fresh seed. (`npx tsx detectors/eval.ts --live --seed 23`: coordinated 100.0% precision, 100.0% ring recall, 0/2,469 honest flagged)
-- [ ] T3.6 Replay: clicking a pattern fits the camera, dims the rest, and the scrubber plays purchases, deliveries, refunds and the detection moment in sync with the list. (built: `replay.tsx`; checked in Loop 2)
+- [x] T3.6 Replay: clicking a pattern fits the camera, dims the rest, and the scrubber plays purchases, deliveries, refunds and the detection moment in sync with the list. (P7: pattern → replay panel, scrubber, play, event list; `qa/shots/P7-replay.png`)
 - [x] T3.7 The Pattern Analyst reviews a flagged pattern once; Confirmed applies −120 to each core agent; Dismissed applies nothing. (module test "confirm applies -120 to core agents only…"; fixture mode reviews at most 12 per run)
   - UNVERIFIED-LIVE: CREAO: the next new pattern with `CREAO_MODE=live` gets one Pattern Analyst run
-- [ ] T3.8 Observatory: each of the seven metrics re-colours the globe; clicking a region opens its panel; numbers match `region_stat`. (built: `observatory.tsx`; checked in Loop 2)
+- [x] T3.8 Observatory: each of the seven metrics re-colours the globe; clicking a region opens its panel; numbers match `region_stat`. (`e2e/regressions/QA-008.spec.ts`: seven switches in 1.2–4.9 s headless, region panel opens; the panel reads `region_stat` rows directly)
 - [x] T3.9 Losses and honest-customer declines are computed against ground truth inside reducers and never expose an agent's kind to the client. (`agent_truth` is private; `settleRefund` updates `region_stat.lossCents` / `honestDeclines` in the module)
 
 ## Gate G4 Factory Detector Lab
@@ -80,4 +80,6 @@ Environment for this session: local SpacetimeDB 2.13.0 standalone on `ws://local
 - 11:05 Pivoted the scaffold to Vouch World: removed Threadline/ml/seed/CRS/Nessie, rewrote AGENTS.md. Module (31 tables, engine in sim.ts) published to a local SpacetimeDB 2.13 in the session; tick runs at 5/s with 10,000 agents.
 - 12:34 Bench on the cloud VM (Xeon 2.10 GHz × 4): 176k / 197k / 189k agent-steps/s at 10k / 50k / 100k agents, stored in `bench_result`.
 - 12:44 `demo-reset` used a 720-day cap, so the sim stopped and the T1.5 e2e failed; it now uses `DEFAULT_MAX_DAY` (1,500). e2e 4/4 green.
+- 13:10 Loop 2 (fixture mode): QA_REPORT.md with 12 issues (1 P0, 6 P1 incl. QA-008 raised from P2, 2 P2, 3 P3).
+- 13:33 Loop 3: all P0/P1/P2 fixed with a regression test each (module 21, worker 23 unit tests; e2e/regressions/QA-007..009); short Loop 2 rerun from demo-reset.
 - 12:52 Docs written: README, docs/{VERIFIED, REAL_VS_SIMULATED, LIVE_CHECKLIST, SETUP, ARCHITECTURE, CREAO, HYPHENATE}.md, .env.example with Appendix B names. Next: Loop 2.

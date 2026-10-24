@@ -22,8 +22,9 @@ export function Tween({ value, format = (n) => Math.round(n).toLocaleString("en-
 export function Stat({ label, value, prov, format, sub, testId }: { label: string; value: number | null; prov: Prov; format?: (n: number) => string; sub?: string; testId?: string }) {
   return (
     <div className="min-w-0" data-testid={testId}>
-      <div className="flex items-center gap-1.5 text-[0.68rem] font-semibold uppercase tracking-wider opacity-70">
-        <span className="truncate">{label}</span>
+      {/* labels wrap instead of truncating: "INVESTIGAT…" on a phone hid what the number was (QA-011) */}
+      <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.68rem] font-semibold uppercase leading-tight tracking-wider opacity-70">
+        <span>{label}</span>
         <Badge kind={prov} />
       </div>
       <div className="mt-1 text-2xl font-bold tracking-tight">

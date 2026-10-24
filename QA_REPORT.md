@@ -67,6 +67,11 @@ The step list is in [qa/checklist.md](qa/checklist.md).
 - Actual: "Failed at step 3" (expired: VC-3876 issued day 123, expires day 303, the sim is past day 800). The showcase claim C-35 has `credential.verified=false, failed_step=3`, so there is no citation.
 - Evidence: `spacetime sql vouch "SELECT * FROM credential" -s dev3011`; `qa/results-personas.log` (P6).
 - Suspected area (do not fix): `worker/src/credentials.ts` `VALIDITY_DAYS = 180`; `worker/src/showcase.ts` re-issues only when no un-revoked credential exists, and ignores expiry.
+- **Loop 3: FIXED** in `c829054`.
+  - Business A now renews A-00421's credential 30 days before it expires (checked every 10 simulated days), and the showcase calls `ensureFresh` before each run.
+  - While verifying, a second cause showed up: each showcase run adds a refund to A-00421's record. After the second run the ratio is 4/40 = 0.10, so a renewed credential said "medium" and failed Business B's policy at step 5. The low band is now < 15%, a realistic retail return rate.
+  - Regression: `worker/test/credentials.test.ts` ("QA-002 …", two tests).
+  - Scenario: after the restart, VC-28c9 was issued at day 1050 (valid to 1230). The Loop 3 rerun is below.
 
 ### QA-001 [P1] Every refused reducer call reaches the user as "The instance encountered a fatal error."
 - Persona: P5, P6, V15
@@ -75,6 +80,10 @@ The step list is in [qa/checklist.md](qa/checklist.md).
 - Actual: "takeBusinessSeat: The instance encountered a fatal error." The module log shows `PANIC: decide src/desk.ts:64: Uncaught Error: Investigator offline: request more evidence`.
 - Evidence: `spacetime logs vouch -s dev3011 | grep PANIC`; `qa/shots/P5-wrong-code.png`.
 - Suspected area (do not fix): `module/src/*.ts` throw plain `Error`. SpacetimeDB 2.13 treats only `SenderError` (from `spacetimedb/server`) as a graceful, user-facing failure.
+- **Loop 3: FIXED** in `c829054`.
+  - Every refusal in a reducer file now throws `SenderError`. Engine refusals (sim.ts stays free of spacetimedb imports) are converted by `asSenderError` in `module/src/ctx.ts`.
+  - Regression: `module/src/reducers.test.ts` "QA-001 …".
+  - Scenario: V15's accept now answers "Investigator offline: request more evidence"; P6 answers "requires role: business or controller".
 
 ### QA-003 [P1] A slideshow of one still image is recommended for a full refund (V10)
 - Persona: P4
@@ -87,6 +96,12 @@ The step list is in [qa/checklist.md](qa/checklist.md).
   - A moving clip (`S01`): 16.
 - Evidence: `qa/results/matrix-fixture.json` (V10).
 - Suspected area (do not fix): `worker/src/video.ts` has no "little motion" check; `worker/src/fixtures.ts` only reacts to blank frames, reuse and recapture.
+- **Loop 3: FIXED** in `299bda3`.
+  - New deterministic checks `frame_motion` (median dHash change between consecutive non-blank frames) and `still_image` (≤ 3). Both are sent to both agents.
+  - The fixture Investigator answers more evidence ("The video barely changes from frame to frame…"), never decline, and `/business` shows a "Little motion" chip.
+  - The V02/V08/V09 stand-ins moved to a moving clip, and `claim-flow.ts` now records a fresh moving clip.
+  - Regression: `worker/test/video.test.ts` "QA-003 …" and the still-image rule in `worker/test/creao.test.ts`.
+  - Scenario: V10 → more_evidence; V02 → accept.
 
 ### QA-004 [P1] A repeat claimer's recommendation says their refund history is "in line with typical shoppers"
 - Persona: P3
@@ -97,6 +112,11 @@ The step list is in [qa/checklist.md](qa/checklist.md).
 - Actual: accept, conf 0.78. The reason `history:refund_ratio_90d` reads "The customer's refund history is in line with typical shoppers." This is false: 6 refund requests on 10 purchases.
 - Evidence: `qa/results/matrix-fixture.json` (P3).
 - Suspected area (do not fix): `worker/fixtures/refund_investigator.accept.json` uses a fixed history sentence; `worker/src/fixtures.ts` ignores `history`.
+- **Loop 3: FIXED** in `63818af`.
+  - The history reason now states the shopper's numbers, e.g. "Refunds were requested on 6 of the last 10 purchases (60% in 90 days), well above typical shoppers; weighed as context, not proof…".
+  - A ratio ≥ 40% with 3 or more requests lowers confidence to 0.55. The action stays accept when the video is consistent, so never an automatic decline.
+  - Regression: `worker/test/creao.test.ts` "QA-004 …".
+  - Scenario: P3 rerun as above.
 
 ### QA-005 [P1] Scheduled lab jobs fill `/lab`, and with a Droid key they would use up the 6-job cap within minutes of a reset
 - Persona: P8
@@ -109,6 +129,11 @@ The step list is in [qa/checklist.md](qa/checklist.md).
   - With a key, the first 6 schedule jobs would take the whole cap about 6 minutes after a reset. The demo's user or event job would then be refused ("this run already used its 6 jobs"), after spending credits on drift reviews.
 - Evidence: `qa/results-personas.log`; `module/src/economy.ts` lines 78–84; `module/src/lab.ts` `enqueueLabJob`.
 - Suspected area (do not fix): the schedule trigger frequency and the cap counting in `module/src/lab.ts`.
+- **Loop 3: FIXED** in `a4cafad`.
+  - A run is now counted from the last (re)seed, using a `lab_run_first_job` counter. The seed alone could not tell demo resets apart, so the old cap would have carried over between demos.
+  - Every job counts toward the 6, whatever its mode.
+  - The schedule may queue only one job per run.
+  - Regression: `module/src/reducers.test.ts` "QA-005 …".
 
 ### QA-006 [P1] A claim being investigated when the worker restarts is never resumed
 - Persona: P5 (unhappy path)
@@ -118,6 +143,10 @@ The step list is in [qa/checklist.md](qa/checklist.md).
 - Evidence: `qa/results/unhappy.json`.
 - Suspected area (do not fix): `worker/src/orchestrator.ts` `onClaim` only starts claims in `frames_ready`.
 - Note: the kill switch flipped mid-run could not be tested in fixture mode, because the whole flow completes in under a second. By reading the code, the switch is checked before each run and before the proposal.
+- **Loop 3: FIXED** in `a4cafad`.
+  - The start-up scan now also resumes claims left `investigating` (`claimNeedsWork`). `runClaim` reuses an Evidence Analyst result that was already recorded.
+  - Regression: `worker/test/orchestrator.test.ts` "QA-006 …".
+  - Scenario: `qa/unhappy.ts` → "C-44 after restart: status recommended".
 
 ### QA-007 [P1] On `/lab`, the "Ask Droid" preset menu opens underneath the scorecard panel, so no preset can be clicked
 - Persona: P8
@@ -126,14 +155,22 @@ The step list is in [qa/checklist.md](qa/checklist.md).
 - Actual: the click never lands. Playwright reports `<div class="panel-title mb-2">Scorecard on a fresh world</div> … intercepts pointer events` for 120 s.
 - Evidence: `qa/results-personas-2.log` (P8).
 - Suspected area (do not fix): `web/components/lab/lab-view.tsx` `AskDroid`. The `z-20` dropdown sits inside a `.glass` panel, which makes its own stacking context, so the later grid paints above it.
+- **Loop 3: FIXED** in `a4cafad`.
+  - The `<details>` panel gets `z-30`, so it stacks above the job grid.
+  - Regression: `e2e/regressions/QA-007.spec.ts` (trial click on a preset at 1440 and 390 px).
 
-### QA-008 [P2] Switching Observatory metrics stalls the page in the headless browser
+### QA-008 [P1] Switching Observatory metrics stalls the page in the headless browser
 - Persona: P7
 - Steps: `/world` → Observatory → click "Refund requests" after "Shopping activity".
 - Expected: the globe recolours within a second or two.
 - Actual: the click waited 60 s and timed out. Timing per metric is in `qa/results/observatory-timing.json`.
 - Evidence: `test-results/qa-personas-P7-…/trace.zip`, `qa/results-observatory.log`.
 - Suspected area (do not fix): `web/components/world/observatory.tsx` / `globe.tsx`, which rebuild hexbin geometry for every metric. Headless Chromium renders WebGL in software, so this may be much faster on the demo laptop. It still needs checking there.
+- **Severity raised to P1.** `qa/observatory.spec.ts` measured 12 to 77 s per metric switch, with long tasks filling the whole time. The page's main thread was saturated, not just slow to draw.
+- **Loop 3: FIXED** in `2499704`.
+  - Root cause: the inline `hexAltitude`/`hexTopColor` accessors changed on every render, and the globe re-renders every 400 ms for the feed, so react-globe.gl rebuilt every hex mesh, with a 600 ms transition.
+  - Fix: stable accessors, `hexBinMerge` with no transition, and re-binning only on a metric switch or every 10 s. Merged hexes cannot be clicked, so a globe click picks the region.
+  - Regression: `e2e/regressions/QA-008.spec.ts`. It now takes 1.2–4.9 s per switch, headless, and the region panel opens.
 
 ### QA-009 [P2] `/system` scrolls sideways at 390 px
 - Persona: P8, quality bar
@@ -142,14 +179,24 @@ The step list is in [qa/checklist.md](qa/checklist.md).
 - Actual: `scrollWidth` 533.
 - Evidence: `qa/shots/W390-system.png`.
 - Suspected area (do not fix): `web/components/system/system-view.tsx`, the bench and row-count tables (long machine string, no `overflow-x-auto`).
+- **Loop 3: FIXED** in `a4cafad`.
+  - `grid-cols-1` on the mobile grids, and the bench table scrolls inside its panel.
+  - Regression: `e2e/regressions/QA-009.spec.ts`.
 
 ### QA-010 [P3] The showcase's credential reason says "10 or more purchases" while the credential discloses "25 or more"
 - Suspected area: `worker/src/showcase.ts` `replayInvestigators` hard-codes the sentence.
+- **Loop 3: FIXED** in `63818af`: the reason now repeats the disclosed claims.
 
 ### QA-011 [P3] Truncated labels at 390 px
 - The home counter "INVESTIGAT…", and the `/system` tiles "ROWS (COUNTE…" and "AGENT-STEPS / …".
 - Evidence: `qa/shots/P1-home-390.png`, `qa/shots/W390-system.png`.
+- **Loop 3: FIXED** in the Loop 3 rerun commit.
+  - `Stat` labels wrap instead of truncating.
+  - Checked by the 390 px persona screenshots (`qa/shots/P1-home-390.png`, `qa/shots/W390-system.png`).
 
 ### QA-012 [P3] The "Ask Droid" preset menu is 26 rem wide
 - It overflows a 390 px screen when open.
 - Suspected area: `web/components/lab/lab-view.tsx` `AskDroid` (same component as QA-007).
+- **Loop 3: FIXED** in `a4cafad`.
+  - The menu is `min(26rem, 100vw − 2rem)` wide and left-aligned on phones.
+  - Regression: `e2e/regressions/QA-007.spec.ts`.

@@ -103,7 +103,7 @@ These numbers are measured on a simulated economy we designed. They show the met
 | The 10,000 agents, their businesses, purchases and refunds | Simulated by our engine, deterministic from a seed |
 | Agent regions on the globe | Simulated positions; no real locations |
 | The shopper's purchase and payment | Simulated payment; the claim and the video are real |
-| Video frames, hashes, freshness, blank-frame and reuse checks | Live (ffmpeg and dHash in the worker) |
+| Video frames, hashes, freshness, blank-frame, little-motion and reuse checks | Live (ffmpeg and dHash in the worker) |
 | CREAO findings, recommendations and pattern reviews | Fixture in this build (`CREAO_MODE=fixture`); live runs wait for the agents (see the checklist) |
 | Detector scores | Measured on fresh simulated worlds against the simulation's ground truth |
 | Droid jobs | Not run here (no Droid in the cloud session); the fence and the pipeline are unit tested |
