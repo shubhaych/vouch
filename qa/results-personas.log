@@ -80,3 +80,117 @@ Running 7 tests using 1 worker
 
 
 [5/7] qa/personas.spec.ts:143:1 › P7 judge on the globe: layers, agent, graph click-through, replay, observatory, region
+  3) qa/personas.spec.ts:143:1 › P7 judge on the globe: layers, agent, graph click-through, replay, observatory, region 
+
+    Test timeout of 300000ms exceeded.
+
+    Error: locator.click: Test timeout of 300000ms exceeded.
+    Call log:
+      - waiting for getByTestId('metric-refunds')
+        - locator resolved to <button data-testid="metric-refunds" class="rounded-md px-2.5 py-1.5 text-xs font-semibold transition text-ink-soft-dark hover:text-ink-dark">Refund requests</button>
+
+
+      175 |
+      176 |   await page.getByTestId('mode-observatory').click();
+    > 177 |   for (const m of ['shopping', 'refunds', 'losses', 'honest_declines', 'fraud', 'credit', 'business']) {
+          |                                           ^
+      178 |     await page.getByTestId(`metric-${m}`).click();
+      179 |     await page.waitForTimeout(600);
+      180 |   }
+        at /home/user/vouch/qa/personas.spec.ts:177:43
+
+    Error Context: test-results/qa-personas-P7-judge-on-th-bb31e-h-replay-observatory-region/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/qa-personas-P7-judge-on-th-bb31e-h-replay-observatory-region/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/qa-personas-P7-judge-on-th-bb31e-h-replay-observatory-region/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[6/7] qa/personas.spec.ts:197:1 › P8 engineer: /lab user trigger and stream, /system bench
+  4) qa/personas.spec.ts:197:1 › P8 engineer: /lab user trigger and stream, /system bench ──────────
+
+    Test timeout of 120000ms exceeded.
+
+    Error: locator.click: Test timeout of 120000ms exceeded.
+    Call log:
+      - waiting for getByTestId('preset-0')
+        - locator resolved to <button data-testid="preset-0" class="w-full rounded-lg px-2 py-1.5 text-left text-sm hover:bg-white/5">Reduce honest agents flagged by the coordinated-c…</button>
+      - attempting click action
+        2 × waiting for element to be visible, enabled and stable
+          - element is not visible
+        - retrying click action
+        - waiting 20ms
+        2 × waiting for element to be visible, enabled and stable
+          - element is not visible
+        - retrying click action
+          - waiting 100ms
+        223 × waiting for element to be visible, enabled and stable
+            - element is not visible
+          - retrying click action
+            - waiting 500ms
+
+
+      201 |   await page.goto('/lab');
+      202 |   await expect(page.getByTestId('lab-queue')).toBeVisible({ timeout: 30_000 });
+    > 203 |   await page.getByTestId('ask-droid').scrollIntoViewIfNeeded();
+          |                                      ^
+      204 |   await page.getByTestId('preset-0').click();
+      205 |   await expect(page.getByTestId('toaster')).toBeVisible({ timeout: 10_000 });
+      206 |   const toast = await page.getByTestId('toaster').innerText();
+        at /home/user/vouch/qa/personas.spec.ts:203:38
+
+    Error Context: test-results/qa-personas-P8-engineer-la-62eb3-ger-and-stream-system-bench/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/qa-personas-P8-engineer-la-62eb3-ger-and-stream-system-bench/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/qa-personas-P8-engineer-la-62eb3-ger-and-stream-system-bench/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[7/7] qa/personas.spec.ts:222:1 › Every page at 390 px has no horizontal scroll
+  5) qa/personas.spec.ts:222:1 › Every page at 390 px has no horizontal scroll ─────────────────────
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 3
+
+    - Array []
+    + Array [
+    +   "/system: scrollWidth 533 > 390",
+    + ]
+
+      231 |     if (r !== 'ok') bad.push(`${path}: ${r}`);
+      232 |     await shot(page, `W390${path === '/' ? '-home' : path.replace('/', '-')}`);
+    > 233 |   }
+          |    ^
+      234 |   expect(bad).toEqual([]);
+      235 | });
+      236 |
+        at /home/user/vouch/qa/personas.spec.ts:233:15
+
+    Error Context: test-results/qa-personas-Every-page-at-390-px-has-no-horizontal-scroll/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/qa-personas-Every-page-at-390-px-has-no-horizontal-scroll/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/qa-personas-Every-page-at-390-px-has-no-horizontal-scroll/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  5 failed
+    qa/personas.spec.ts:92:1 › P5 business: wrong seat code, queue, frames and checks, more evidence, kill switch 
+    qa/personas.spec.ts:126:1 › P6 controller: credential verify, tamper and revoke in the five-step check 
+    qa/personas.spec.ts:143:1 › P7 judge on the globe: layers, agent, graph click-through, replay, observatory, region 
+    qa/personas.spec.ts:197:1 › P8 engineer: /lab user trigger and stream, /system bench ───────────
+    qa/personas.spec.ts:222:1 › Every page at 390 px has no horizontal scroll ──────────────────────
+  2 passed (10.4m)

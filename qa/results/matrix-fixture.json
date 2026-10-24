@@ -1,0 +1,752 @@
+{
+  "ranAt": "2026-10-24T13:06:23.040Z",
+  "mode": "fixture",
+  "rows": [
+    {
+      "id": "NONCE",
+      "persona": "P4",
+      "video": "S07 with a wrong nonce",
+      "expected": "Rejected (403) with a clear message",
+      "actual": "403: This upload link is not valid for that claim (wrong nonce).",
+      "match": true,
+      "details": {
+        "ok": false,
+        "error": "This upload link is not valid for that claim (wrong nonce)."
+      }
+    },
+    {
+      "id": "V02",
+      "persona": "P1",
+      "video": "G01-testsrc (generated stand-in)",
+      "expected": "Accept or smaller amount; never decline",
+      "actual": "upload 200; accept $249.00 original_payment conf 0.78 after 3.6s; business accepted; credit 600 → 612; journal entry #9",
+      "match": true,
+      "details": {
+        "upload": {
+          "ok": true,
+          "frames": 9,
+          "checks": {
+            "fresh": true,
+            "uploaded_after_s": 0,
+            "duration_s": 12,
+            "width": 1280,
+            "height": 720,
+            "duration_ok": true,
+            "resolution_ok": true,
+            "frame_reuse": [],
+            "frame_times": [
+              0.5,
+              1.2,
+              2.4,
+              3.6,
+              4.8,
+              6,
+              7.2,
+              8.4,
+              11.5
+            ],
+            "blank_frames": 0,
+            "within_window": true,
+            "reason_allowed": true,
+            "over_video_threshold": true,
+            "policy_line": "30-day window; video required over $100"
+          }
+        },
+        "checks": {
+          "fresh": true,
+          "uploaded_after_s": 0,
+          "duration_s": 12,
+          "width": 1280,
+          "height": 720,
+          "duration_ok": true,
+          "resolution_ok": true,
+          "frame_reuse": [],
+          "frame_times": [
+            0.5,
+            1.2,
+            2.4,
+            3.6,
+            4.8,
+            6,
+            7.2,
+            8.4,
+            11.5
+          ],
+          "blank_frames": 0,
+          "within_window": true,
+          "reason_allowed": true,
+          "over_video_threshold": true,
+          "policy_line": "30-day window; video required over $100"
+        },
+        "evidenceFlags": {
+          "unable_to_verify": false,
+          "capture_flags": [],
+          "challenge": {
+            "expected": 4,
+            "seen": 4,
+            "passed": true
+          },
+          "provenance": "fixture",
+          "summary": "The item matches the order and the claimed crack is visible in frames 3 and 4. The finger challenge was passed at the end of the video."
+        },
+        "recommendation": {
+          "action": "accept",
+          "amount": 24900,
+          "method": "original_payment",
+          "confidence": 0.78,
+          "status": "proposed",
+          "reasons": [
+            "frame:3: The claimed defect is visible in two frames and matches the claim.",
+            "policy:window: The claim was filed inside the return window.",
+            "history:refund_ratio_90d: The customer's refund history is in line with typical shoppers."
+          ]
+        },
+        "offline": false,
+        "runsStarted": 2,
+        "secondsToRec": 3.6
+      }
+    },
+    {
+      "id": "V08",
+      "persona": "P4",
+      "video": "V08-reuse-copy.mp4",
+      "expected": "Frame reuse flag naming C-24; never accept",
+      "actual": "reuse [{\"frame\":0,\"matches_claim\":\"C-24\",\"matches_frame\":0,\"distance\":0}]; more_evidence",
+      "match": true,
+      "details": {
+        "upload": {
+          "ok": true,
+          "frames": 9,
+          "checks": {
+            "fresh": true,
+            "uploaded_after_s": 0,
+            "duration_s": 12,
+            "width": 1280,
+            "height": 720,
+            "duration_ok": true,
+            "resolution_ok": true,
+            "frame_reuse": [
+              {
+                "frame": 0,
+                "matches_claim": "C-24",
+                "matches_frame": 0,
+                "distance": 0
+              }
+            ],
+            "frame_times": [
+              0.5,
+              1.2,
+              2.4,
+              3.6,
+              4.8,
+              6,
+              7.2,
+              8.4,
+              11.5
+            ],
+            "blank_frames": 0,
+            "within_window": true,
+            "reason_allowed": true,
+            "over_video_threshold": true,
+            "policy_line": "30-day window; video required over $100"
+          }
+        },
+        "checks": {
+          "fresh": true,
+          "uploaded_after_s": 0,
+          "duration_s": 12,
+          "width": 1280,
+          "height": 720,
+          "duration_ok": true,
+          "resolution_ok": true,
+          "frame_reuse": [
+            {
+              "frame": 0,
+              "matches_claim": "C-24",
+              "matches_frame": 0,
+              "distance": 0
+            }
+          ],
+          "frame_times": [
+            0.5,
+            1.2,
+            2.4,
+            3.6,
+            4.8,
+            6,
+            7.2,
+            8.4,
+            11.5
+          ],
+          "blank_frames": 0,
+          "within_window": true,
+          "reason_allowed": true,
+          "over_video_threshold": true,
+          "policy_line": "30-day window; video required over $100"
+        },
+        "evidenceFlags": {
+          "unable_to_verify": false,
+          "capture_flags": [],
+          "challenge": {
+            "expected": 4,
+            "seen": 4,
+            "passed": true
+          },
+          "provenance": "fixture",
+          "summary": "The item matches the order and the claimed crack is visible in frames 3 and 4. The finger challenge was passed at the end of the video."
+        },
+        "recommendation": {
+          "action": "more_evidence",
+          "amount": 0,
+          "method": "none",
+          "confidence": 0.55,
+          "status": "proposed",
+          "reasons": [
+            "check:frame_reuse: Frames match frames from another claim."
+          ]
+        },
+        "offline": false,
+        "runsStarted": 2,
+        "secondsToRec": 4.1
+      }
+    },
+    {
+      "id": "V09",
+      "persona": "P4",
+      "video": "V09-reencoded.mp4",
+      "expected": "Frame reuse flag naming C-24; never accept",
+      "actual": "reuse [{\"frame\":0,\"matches_claim\":\"C-24\",\"matches_frame\":0,\"distance\":0},{\"frame\":0,\"matches_claim\":\"C-25\",\"matches_frame\":0,\"distance\":0}]; more_evidence",
+      "match": true,
+      "details": {
+        "upload": {
+          "ok": true,
+          "frames": 9,
+          "checks": {
+            "fresh": true,
+            "uploaded_after_s": 0,
+            "duration_s": 12,
+            "width": 854,
+            "height": 480,
+            "duration_ok": true,
+            "resolution_ok": true,
+            "frame_reuse": [
+              {
+                "frame": 0,
+                "matches_claim": "C-24",
+                "matches_frame": 0,
+                "distance": 0
+              },
+              {
+                "frame": 0,
+                "matches_claim": "C-25",
+                "matches_frame": 0,
+                "distance": 0
+              }
+            ],
+            "frame_times": [
+              0.5,
+              1.2,
+              2.4,
+              3.6,
+              4.8,
+              6,
+              7.2,
+              8.4,
+              11.5
+            ],
+            "blank_frames": 0,
+            "within_window": true,
+            "reason_allowed": true,
+            "over_video_threshold": true,
+            "policy_line": "30-day window; video required over $100"
+          }
+        },
+        "checks": {
+          "fresh": true,
+          "uploaded_after_s": 0,
+          "duration_s": 12,
+          "width": 854,
+          "height": 480,
+          "duration_ok": true,
+          "resolution_ok": true,
+          "frame_reuse": [
+            {
+              "frame": 0,
+              "matches_claim": "C-24",
+              "matches_frame": 0,
+              "distance": 0
+            },
+            {
+              "frame": 0,
+              "matches_claim": "C-25",
+              "matches_frame": 0,
+              "distance": 0
+            }
+          ],
+          "frame_times": [
+            0.5,
+            1.2,
+            2.4,
+            3.6,
+            4.8,
+            6,
+            7.2,
+            8.4,
+            11.5
+          ],
+          "blank_frames": 0,
+          "within_window": true,
+          "reason_allowed": true,
+          "over_video_threshold": true,
+          "policy_line": "30-day window; video required over $100"
+        },
+        "evidenceFlags": {
+          "unable_to_verify": false,
+          "capture_flags": [],
+          "challenge": {
+            "expected": 4,
+            "seen": 4,
+            "passed": true
+          },
+          "provenance": "fixture",
+          "summary": "The item matches the order and the claimed crack is visible in frames 3 and 4. The finger challenge was passed at the end of the video."
+        },
+        "recommendation": {
+          "action": "more_evidence",
+          "amount": 0,
+          "method": "none",
+          "confidence": 0.55,
+          "status": "proposed",
+          "reasons": [
+            "check:frame_reuse: Frames match frames from another claim."
+          ]
+        },
+        "offline": false,
+        "runsStarted": 2,
+        "secondsToRec": 2.5
+      }
+    },
+    {
+      "id": "V10",
+      "persona": "P4",
+      "video": "V10-slideshow.mp4",
+      "expected": "Reuse against listing images, or more evidence",
+      "actual": "upload 200; checks blank_frames=0; EA unable_to_verify=false; accept $249.00",
+      "match": false,
+      "details": {
+        "upload": {
+          "ok": true,
+          "frames": 9,
+          "checks": {
+            "fresh": true,
+            "uploaded_after_s": 0,
+            "duration_s": 8,
+            "width": 1280,
+            "height": 720,
+            "duration_ok": true,
+            "resolution_ok": true,
+            "frame_reuse": [],
+            "frame_times": [
+              0.5,
+              0.8,
+              1.6,
+              2.4,
+              3.2,
+              4,
+              4.8,
+              5.6,
+              7.5
+            ],
+            "blank_frames": 0,
+            "within_window": true,
+            "reason_allowed": true,
+            "over_video_threshold": true,
+            "policy_line": "30-day window; video required over $100"
+          }
+        },
+        "checks": {
+          "fresh": true,
+          "uploaded_after_s": 0,
+          "duration_s": 8,
+          "width": 1280,
+          "height": 720,
+          "duration_ok": true,
+          "resolution_ok": true,
+          "frame_reuse": [],
+          "frame_times": [
+            0.5,
+            0.8,
+            1.6,
+            2.4,
+            3.2,
+            4,
+            4.8,
+            5.6,
+            7.5
+          ],
+          "blank_frames": 0,
+          "within_window": true,
+          "reason_allowed": true,
+          "over_video_threshold": true,
+          "policy_line": "30-day window; video required over $100"
+        },
+        "evidenceFlags": {
+          "unable_to_verify": false,
+          "capture_flags": [],
+          "challenge": {
+            "expected": 4,
+            "seen": 4,
+            "passed": true
+          },
+          "provenance": "fixture",
+          "summary": "The item matches the order and the claimed crack is visible in frames 3 and 4. The finger challenge was passed at the end of the video."
+        },
+        "recommendation": {
+          "action": "accept",
+          "amount": 24900,
+          "method": "original_payment",
+          "confidence": 0.78,
+          "status": "proposed",
+          "reasons": [
+            "frame:3: The claimed defect is visible in two frames and matches the claim.",
+            "policy:window: The claim was filed inside the return window.",
+            "history:refund_ratio_90d: The customer's refund history is in line with typical shoppers."
+          ]
+        },
+        "offline": false,
+        "runsStarted": 2,
+        "secondsToRec": 2.8
+      }
+    },
+    {
+      "id": "V11",
+      "persona": "P1",
+      "video": "V11-black.mp4",
+      "expected": "Unable to verify; more evidence (never decline)",
+      "actual": "upload 200; checks blank_frames=9; EA unable_to_verify=true; more_evidence $0.00",
+      "match": true,
+      "details": {
+        "upload": {
+          "ok": true,
+          "frames": 9,
+          "checks": {
+            "fresh": true,
+            "uploaded_after_s": 0,
+            "duration_s": 8,
+            "width": 1280,
+            "height": 720,
+            "duration_ok": true,
+            "resolution_ok": true,
+            "frame_reuse": [],
+            "frame_times": [
+              0.5,
+              0.8,
+              1.6,
+              2.4,
+              3.2,
+              4,
+              4.8,
+              5.6,
+              7.5
+            ],
+            "blank_frames": 9,
+            "within_window": true,
+            "reason_allowed": true,
+            "over_video_threshold": true,
+            "policy_line": "30-day window; video required over $100"
+          }
+        },
+        "checks": {
+          "fresh": true,
+          "uploaded_after_s": 0,
+          "duration_s": 8,
+          "width": 1280,
+          "height": 720,
+          "duration_ok": true,
+          "resolution_ok": true,
+          "frame_reuse": [],
+          "frame_times": [
+            0.5,
+            0.8,
+            1.6,
+            2.4,
+            3.2,
+            4,
+            4.8,
+            5.6,
+            7.5
+          ],
+          "blank_frames": 9,
+          "within_window": true,
+          "reason_allowed": true,
+          "over_video_threshold": true,
+          "policy_line": "30-day window; video required over $100"
+        },
+        "evidenceFlags": {
+          "unable_to_verify": true,
+          "capture_flags": [
+            "item_not_fully_shown",
+            "low_quality"
+          ],
+          "challenge": {
+            "expected": 1,
+            "seen": null,
+            "passed": false
+          },
+          "provenance": "fixture",
+          "summary": "The frames are too dark, short or partial to describe the item or the claimed defect. A new video showing the whole item in good light would settle it."
+        },
+        "recommendation": {
+          "action": "more_evidence",
+          "amount": 0,
+          "method": "none",
+          "confidence": 0.55,
+          "status": "proposed",
+          "reasons": [
+            "check:unable_to_verify: The frames are not clear enough to verify the claim."
+          ]
+        },
+        "offline": false,
+        "runsStarted": 2,
+        "secondsToRec": 3.7
+      }
+    },
+    {
+      "id": "V12",
+      "persona": "P1",
+      "video": "V12-short.mp4",
+      "expected": "Rejected at upload with a clear message, no crash",
+      "actual": "422: That video is 2.1 seconds. Please record at least 4 seconds, ending with the finger challenge.; worker healthy=true",
+      "match": true,
+      "details": {
+        "ok": false,
+        "error": "That video is 2.1 seconds. Please record at least 4 seconds, ending with the finger challenge."
+      }
+    },
+    {
+      "id": "V13",
+      "persona": "P1",
+      "video": "V13-corrupt.mp4",
+      "expected": "Rejected at upload with a clear message, no crash",
+      "actual": "422: We could not read that video. Please record it again in the app.; worker healthy=true",
+      "match": true,
+      "details": {
+        "ok": false,
+        "error": "We could not read that video. Please record it again in the app."
+      }
+    },
+    {
+      "id": "V15",
+      "persona": "P2→fresh shopper",
+      "video": "S03-fresh (stand-in)",
+      "expected": "\"Investigator offline\"; no run; business can only request more evidence",
+      "actual": "offline=true; runs=0; accept → The instance encountered a fatal error.; more_evidence → ok",
+      "match": true,
+      "details": {
+        "checks": {
+          "fresh": true,
+          "uploaded_after_s": 0,
+          "duration_s": 11,
+          "width": 480,
+          "height": 360,
+          "duration_ok": true,
+          "resolution_ok": false,
+          "frame_reuse": [],
+          "frame_times": [
+            0.5,
+            1.1,
+            2.2,
+            3.3,
+            4.4,
+            5.5,
+            6.6,
+            7.7,
+            10.5
+          ],
+          "blank_frames": 0,
+          "within_window": true,
+          "reason_allowed": true,
+          "over_video_threshold": true,
+          "policy_line": "30-day window; video required over $100"
+        },
+        "offline": true,
+        "runsStarted": 0
+      }
+    },
+    {
+      "id": "V16",
+      "persona": "P2→fresh shopper",
+      "video": "S04-fresh (stand-in)",
+      "expected": "Recommendation goes to the controller",
+      "actual": "amount $649.00; accept; business accept → refund awaiting_controller; controller accept → ok, refund accepted; journal #10",
+      "match": false,
+      "details": {
+        "checks": {
+          "fresh": true,
+          "uploaded_after_s": 0,
+          "duration_s": 11,
+          "width": 480,
+          "height": 360,
+          "duration_ok": true,
+          "resolution_ok": false,
+          "frame_reuse": [],
+          "frame_times": [
+            0.5,
+            1.1,
+            2.2,
+            3.3,
+            4.4,
+            5.5,
+            6.6,
+            7.7,
+            10.5
+          ],
+          "blank_frames": 0,
+          "within_window": true,
+          "reason_allowed": true,
+          "over_video_threshold": true,
+          "policy_line": "30-day window; video required over $100"
+        },
+        "evidenceFlags": {
+          "unable_to_verify": false,
+          "capture_flags": [],
+          "challenge": {
+            "expected": 1,
+            "seen": 1,
+            "passed": true
+          },
+          "provenance": "fixture",
+          "summary": "The item matches the order and the claimed crack is visible in frames 3 and 4. The finger challenge was passed at the end of the video."
+        },
+        "recommendation": {
+          "action": "accept",
+          "amount": 64900,
+          "method": "original_payment",
+          "confidence": 0.78,
+          "status": "proposed",
+          "reasons": [
+            "frame:3: The claimed defect is visible in two frames and matches the claim.",
+            "policy:window: The claim was filed inside the return window.",
+            "history:refund_ratio_90d: The customer's refund history is in line with typical shoppers."
+          ]
+        },
+        "offline": false,
+        "runsStarted": 2,
+        "secondsToRec": 2.5
+      }
+    },
+    {
+      "id": "P6",
+      "persona": "P6",
+      "video": "S06-fresh",
+      "expected": "The proposer identity and a shopper cannot decide",
+      "actual": "worker → The instance encountered a fatal error.; shopper → The instance encountered a fatal error.",
+      "match": true,
+      "details": {}
+    },
+    {
+      "id": "P3",
+      "persona": "P3",
+      "video": "S05-fresh",
+      "expected": "More scrutiny; never an automatic decline",
+      "actual": "upload 200; accept $249.00; reasons: frame:3: The claimed defect is visible in two frames and matches the claim. | policy:window: The claim was filed inside the return window. | history:refund_ratio_90d: The customer's refund history is ",
+      "match": true,
+      "details": {
+        "upload": {
+          "ok": true,
+          "frames": 9,
+          "checks": {
+            "fresh": true,
+            "uploaded_after_s": 52,
+            "duration_s": 11,
+            "width": 480,
+            "height": 360,
+            "duration_ok": true,
+            "resolution_ok": false,
+            "frame_reuse": [],
+            "frame_times": [
+              0.5,
+              1.1,
+              2.2,
+              3.3,
+              4.4,
+              5.5,
+              6.6,
+              7.7,
+              10.5
+            ],
+            "blank_frames": 0,
+            "within_window": true,
+            "reason_allowed": true,
+            "over_video_threshold": true,
+            "policy_line": "30-day window; video required over $100"
+          }
+        },
+        "checks": {
+          "fresh": true,
+          "uploaded_after_s": 52,
+          "duration_s": 11,
+          "width": 480,
+          "height": 360,
+          "duration_ok": true,
+          "resolution_ok": false,
+          "frame_reuse": [],
+          "frame_times": [
+            0.5,
+            1.1,
+            2.2,
+            3.3,
+            4.4,
+            5.5,
+            6.6,
+            7.7,
+            10.5
+          ],
+          "blank_frames": 0,
+          "within_window": true,
+          "reason_allowed": true,
+          "over_video_threshold": true,
+          "policy_line": "30-day window; video required over $100"
+        },
+        "evidenceFlags": {
+          "unable_to_verify": false,
+          "capture_flags": [],
+          "challenge": {
+            "expected": 5,
+            "seen": 5,
+            "passed": true
+          },
+          "provenance": "fixture",
+          "summary": "The item matches the order and the claimed crack is visible in frames 3 and 4. The finger challenge was passed at the end of the video."
+        },
+        "recommendation": {
+          "action": "accept",
+          "amount": 24900,
+          "method": "original_payment",
+          "confidence": 0.78,
+          "status": "proposed",
+          "reasons": [
+            "frame:3: The claimed defect is visible in two frames and matches the claim.",
+            "policy:window: The claim was filed inside the return window.",
+            "history:refund_ratio_90d: The customer's refund history is in line with typical shoppers."
+          ]
+        },
+        "offline": false,
+        "runsStarted": 2,
+        "secondsToRec": 3.1
+      }
+    },
+    {
+      "id": "V14",
+      "persona": "P1",
+      "video": "S08-fresh, 11 minutes after the claim",
+      "expected": "Rejected as stale",
+      "actual": "410: This claim link expired (more than 10 minutes old). Open the claim again to get a fresh challenge.",
+      "match": true,
+      "details": {
+        "ok": false,
+        "error": "This claim link expired (more than 10 minutes old). Open the claim again to get a fresh challenge."
+      }
+    }
+  ]
+}

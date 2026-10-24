@@ -200,7 +200,7 @@ test('P8 engineer: /lab user trigger and stream, /system bench', async ({ page }
   const errors = watchErrors(page);
   await page.goto('/lab');
   await expect(page.getByTestId('lab-queue')).toBeVisible({ timeout: 30_000 });
-  await page.getByTestId('ask-droid').scrollIntoViewIfNeeded();
+  await page.getByTestId('ask-droid').locator('summary').click();
   await page.getByTestId('preset-0').click();
   await expect(page.getByTestId('toaster')).toBeVisible({ timeout: 10_000 });
   const toast = await page.getByTestId('toaster').innerText();

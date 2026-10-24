@@ -64,7 +64,9 @@ await biz.reducers.takeBusinessSeat({ code: businessCode });
   const { claim, refund } = await newClaim(conn);
   const status = upload(claim.id, claim.nonce, freshClip());
   const run = await wait(() => [...conn.db.agentRun.iter()].find((r) => r.caseRef === `C-${claim.id}`), 30_000);
+  const flipAt = new Date().toISOString().slice(11, 23);
   await biz.reducers.setControl({ key: 'creao_enabled', value: 'false' });
+  console.log(`C-${claim.id}: run ${run?.seat} seen; switch off sent at ${flipAt}`);
   await status;
   const final = await wait(() => {
     const c = [...conn.db.claim.iter()].find((x) => x.id === claim.id);
@@ -75,17 +77,25 @@ await biz.reducers.takeBusinessSeat({ code: businessCode });
   results.push({ id: 'KILL-MID-RUN', expected: 'claim goes offline; no proposal', actual: `run seen=${!!run}; claim ${final?.status ?? '?'}; proposal ${final?.decision ?? 'none'}`, match: final?.status === 'offline' && !final.decision });
 }
 
-// 2. Worker restarted while the claim is investigating.
-{
+// 2. Worker restarted while the claim is investigating. Fixture runs finish in
+// under a second, so a restart cannot land mid-run by timing. Instead: stop the
+// worker, put a claim in the exact state a crash mid-run leaves (status
+// "investigating", no proposal) with the worker's own identity, start the worker.
+if (!process.argv.includes('--kill-only')) {
+  execFileSync('bash', ['-c', 'fuser -k 8787/tcp || true']);
+  await sleep(1500);
   const { claim, refund } = await newClaim(conn);
-  const status = upload(claim.id, claim.nonce, freshClip());
-  const investigating = await wait(() => [...conn.db.claim.iter()].find((x) => x.id === claim.id && x.status === 'investigating'), 30_000);
+  const token = readFileSync('worker/.keys/stdb-worker-token', 'utf8').trim();
+  const w = await new Promise<DbConnection>((res, rej) => {
+    DbConnection.builder().withUri(uri).withDatabaseName(dbName).withToken(token).onConnect((c) => res(c)).onConnectError((_c, e) => rej(e)).build();
+  });
+  await w.reducers.setClaimStatus({ claimId: claim.id, status: 'investigating' });
+  w.disconnect();
   execFileSync('bash', ['scripts/worker-restart.sh']);
-  await status.catch(() => 0);
   for (let i = 0; i < 60; i++) { if (await fetch(`${worker}/health`).then((r) => r.ok).catch(() => false)) break; await sleep(1000); }
-  const d = await wait(() => [...conn.db.decision.iter()].find((x) => x.refundId === refund.id), 60_000);
+  const d = await wait(() => [...conn.db.decision.iter()].find((x) => x.refundId === refund.id), 45_000);
   const c = [...conn.db.claim.iter()].find((x) => x.id === claim.id);
-  results.push({ id: 'WORKER-RESTART', expected: 'the claim completes after the worker comes back', actual: `caught investigating=${!!investigating}; after restart: claim ${c?.status}; proposal ${d?.action ?? 'none after 60 s'}`, match: !!d });
+  results.push({ id: 'WORKER-RESTART', expected: 'a claim left investigating by a crash is resumed after the worker comes back', actual: `C-${claim.id} after restart: status ${c?.status}; proposal ${d?.action ?? 'none after 45 s'}`, match: !!d });
 }
 
 mkdirSync('qa/results', { recursive: true });

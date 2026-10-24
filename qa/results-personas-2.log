@@ -1,0 +1,98 @@
+
+Running 2 tests using 1 worker
+
+[1/2] qa/personas.spec.ts:92:1 › P5 business: wrong seat code, queue, frames and checks, more evidence, kill switch
+  1) qa/personas.spec.ts:92:1 › P5 business: wrong seat code, queue, frames and checks, more evidence, kill switch 
+
+    Error: a wrong code should say so in plain words
+
+    expect(locator).toContainText(expected) failed
+
+    Locator: getByTestId('toaster')
+    Expected pattern: /wrong seat code/i
+    Received string:  "takeBusinessSeat: The instance encountered a fatal error."
+    Timeout: 3000ms
+
+    Call log:
+      - a wrong code should say so in plain words getByTestId('toaster') with timeout 3000ms
+      - waiting for getByTestId('toaster')
+        10 × locator resolved to <div data-testid="toaster" class="pointer-events-none fixed bottom-4 right-4 z-[100] flex w-[min(26rem,calc(100vw-2rem))] flex-col gap-2">…</div>
+           - unexpected value "takeBusinessSeat: The instance encountered a fatal error."
+
+
+      101 |     await expect(toast).not.toBeEmpty({ timeout: 10_000 });
+      102 |     await shot(page, 'P5-wrong-code');
+    > 103 |     await expect.soft(toast, 'a wrong code should say so in plain words').toContainText(/wrong seat code/i, { timeout: 3_000 });
+          |                                                                           ^
+      104 |   }
+      105 |   await seat(page, BUSINESS_CODE);
+      106 |   await expect(page.getByTestId('queue')).toBeVisible();
+        at /home/user/vouch/qa/personas.spec.ts:103:75
+
+    Error Context: test-results/qa-personas-P5-business-wr-55d74-s-more-evidence-kill-switch/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/qa-personas-P5-business-wr-55d74-s-more-evidence-kill-switch/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/qa-personas-P5-business-wr-55d74-s-more-evidence-kill-switch/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[2/2] qa/personas.spec.ts:198:1 › P8 engineer: /lab user trigger and stream, /system bench
+  2) qa/personas.spec.ts:198:1 › P8 engineer: /lab user trigger and stream, /system bench ──────────
+
+    Test timeout of 120000ms exceeded.
+
+    Error: locator.click: Test timeout of 120000ms exceeded.
+    Call log:
+      - waiting for getByTestId('preset-0')
+        - locator resolved to <button data-testid="preset-0" class="w-full rounded-lg px-2 py-1.5 text-left text-sm hover:bg-white/5">Reduce honest agents flagged by the coordinated-c…</button>
+      - attempting click action
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - <div class="panel-title mb-2">Scorecard on a fresh world</div> from <div class="grid gap-4 xl:grid-cols-[18rem_1fr_22rem]">…</div> subtree intercepts pointer events
+        - retrying click action
+        - waiting 20ms
+        2 × waiting for element to be visible, enabled and stable
+          - element is visible, enabled and stable
+          - scrolling into view if needed
+          - done scrolling
+          - <div class="panel-title mb-2">Scorecard on a fresh world</div> from <div class="grid gap-4 xl:grid-cols-[18rem_1fr_22rem]">…</div> subtree intercepts pointer events
+        - retrying click action
+          - waiting 100ms
+        200 × waiting for element to be visible, enabled and stable
+            - element is visible, enabled and stable
+            - scrolling into view if needed
+            - done scrolling
+            - <div class="panel-title mb-2">Scorecard on a fresh world</div> from <div class="grid gap-4 xl:grid-cols-[18rem_1fr_22rem]">…</div> subtree intercepts pointer events
+          - retrying click action
+            - waiting 500ms
+
+
+      202 |   await expect(page.getByTestId('lab-queue')).toBeVisible({ timeout: 30_000 });
+      203 |   await page.getByTestId('ask-droid').locator('summary').click();
+    > 204 |   await page.getByTestId('preset-0').click();
+          |                                      ^
+      205 |   await expect(page.getByTestId('toaster')).toBeVisible({ timeout: 10_000 });
+      206 |   const toast = await page.getByTestId('toaster').innerText();
+      207 |   await shot(page, 'P8-lab-after-ask');
+        at /home/user/vouch/qa/personas.spec.ts:204:38
+
+    Error Context: test-results/qa-personas-P8-engineer-la-62eb3-ger-and-stream-system-bench/error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/qa-personas-P8-engineer-la-62eb3-ger-and-stream-system-bench/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/qa-personas-P8-engineer-la-62eb3-ger-and-stream-system-bench/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+  2 failed
+    qa/personas.spec.ts:92:1 › P5 business: wrong seat code, queue, frames and checks, more evidence, kill switch 
+    qa/personas.spec.ts:198:1 › P8 engineer: /lab user trigger and stream, /system bench ───────────

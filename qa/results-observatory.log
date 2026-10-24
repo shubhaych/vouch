@@ -1,0 +1,4 @@
+
+Running 1 test using 1 worker
+
+[1/1] qa/observatory.spec.ts:7:1 › P7b Observatory metric switches: time per click and long tasks
