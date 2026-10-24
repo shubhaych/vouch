@@ -64,7 +64,7 @@ npx tsx scripts/claim-flow.ts qa/videos/S02-fresh.mp4   # or a phone video; prin
 
 ## 4. Phone and screens (T2.1, T1.5, videos)
 
-- **T2.1:** set `NEXT_PUBLIC_WORKER_URL` to the tunnel URL. On `/shop`, buy, fast-forward and request a refund. Scan the QR with a phone; `/claim/<id>` opens and records with the rear camera.
+- **T2.1:** the phone needs HTTPS for the camera and must reach both the web app and the worker. With no account: `brew install cloudflared`, then in two terminals `cloudflared tunnel --url http://localhost:3000` and `cloudflared tunnel --url http://localhost:8787`; each prints an `https://<words>.trycloudflare.com` URL. Start the web app and the worker with `NEXT_PUBLIC_WORKER_URL=<worker tunnel URL>` (the worker reuses it for the proof-clip links). Open `/shop` on the laptop **through the web tunnel URL** (the QR encodes the page's own origin), buy, fast-forward and request a refund. Scan the QR with the phone; `/claim/<id>` opens and records with the rear camera. The database must be reachable from the phone too: Maincloud is, a local server is not.
 - **T1.5:** on the demo laptop, `/world` keeps 45 fps or better. Check with Chrome DevTools, Rendering, Frame rendering stats.
 - **Videos:** record V01–V07, V15 and V16 on a phone into `qa/videos/` (the list is in `qa/checklist.md`). Then rerun the video matrix in live mode and paste the table into QA_REPORT.md.
 
