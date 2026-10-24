@@ -1,0 +1,10 @@
+{
+  "_fixture": "hand-written from the Refund Flow spec (not a recorded run)",
+  "claim_id": "{{claim_id}}",
+  "agrees": true,
+  "businessSummary": "{{summary}}",
+  "concerns": [],
+  "suggestedTierIfDisagree": null,
+  "confidence": 0.8,
+  "customerMessage": "{{customer_message}}"
+}

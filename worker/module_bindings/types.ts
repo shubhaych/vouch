@@ -51,6 +51,43 @@ export const AgentTruth = __t.object("AgentTruth", {
 });
 export type AgentTruth = __Infer<typeof AgentTruth>;
 
+export const AnalysisJob = __t.object("AnalysisJob", {
+  id: __t.u64(),
+  claimId: __t.u64(),
+  status: __t.string(),
+  mode: __t.string(),
+  startedAt: __t.timestamp(),
+  finishedAt: __t.option(__t.timestamp()),
+  costNote: __t.string(),
+  droidSessions: __t.u8(),
+});
+export type AnalysisJob = __Infer<typeof AnalysisJob>;
+
+export const AnalysisStep = __t.object("AnalysisStep", {
+  id: __t.u64(),
+  jobId: __t.u64(),
+  key: __t.string(),
+  status: __t.string(),
+  startedAt: __t.option(__t.timestamp()),
+  finishedAt: __t.option(__t.timestamp()),
+  summary: __t.string(),
+  liveNote: __t.string(),
+});
+export type AnalysisStep = __Infer<typeof AnalysisStep>;
+
+export const Artifact = __t.object("Artifact", {
+  id: __t.u64(),
+  jobId: __t.u64(),
+  kind: __t.string(),
+  path: __t.string(),
+  url: __t.string(),
+  tStart: __t.f64(),
+  tEnd: __t.f64(),
+  label: __t.string(),
+  sha256: __t.string(),
+});
+export type Artifact = __Infer<typeof Artifact>;
+
 export const BenchResult = __t.object("BenchResult", {
   id: __t.u32(),
   agents: __t.u32(),
@@ -93,6 +130,20 @@ export const Claim = __t.object("Claim", {
   createdAt: __t.timestamp(),
 });
 export type Claim = __Infer<typeof Claim>;
+
+export const ClaimScore = __t.object("ClaimScore", {
+  claimId: __t.u64(),
+  jobId: __t.u64(),
+  eSupport: __t.f64(),
+  coverage: __t.f64(),
+  integrity: __t.f64(),
+  pLegit: __t.f64(),
+  anomaly: __t.f64(),
+  excessRefundRatio: __t.f64(),
+  featuresJson: __t.string(),
+  formulaVersion: __t.string(),
+});
+export type ClaimScore = __Infer<typeof ClaimScore>;
 
 export const Control = __t.object("Control", {
   key: __t.string(),
@@ -178,6 +229,22 @@ export const Evidence = __t.object("Evidence", {
   at: __t.timestamp(),
 });
 export type Evidence = __Infer<typeof Evidence>;
+
+export const Finding = __t.object("Finding", {
+  id: __t.u64(),
+  jobId: __t.u64(),
+  kind: __t.string(),
+  spokenClaimId: __t.string(),
+  observation: __t.string(),
+  tStart: __t.f64(),
+  tEnd: __t.f64(),
+  confidence: __t.f64(),
+  artifactIds: __t.array(__t.u64()),
+  method: __t.string(),
+  auditStatus: __t.string(),
+  auditNote: __t.string(),
+});
+export type Finding = __Infer<typeof Finding>;
 
 export const FraudPattern = __t.object("FraudPattern", {
   id: __t.u32(),
@@ -322,6 +389,21 @@ export const Purchase = __t.object("Purchase", {
 });
 export type Purchase = __Infer<typeof Purchase>;
 
+export const Recommendation = __t.object("Recommendation", {
+  claimId: __t.u64(),
+  jobId: __t.u64(),
+  tier: __t.string(),
+  refundNow: __t.u32(),
+  refundOnReturn: __t.u32(),
+  returnRequired: __t.bool(),
+  reasonsJson: __t.string(),
+  creaoReview: __t.string(),
+  creaoRunId: __t.string(),
+  autoDecided: __t.bool(),
+  at: __t.timestamp(),
+});
+export type Recommendation = __Infer<typeof Recommendation>;
+
 export const Refund = __t.object("Refund", {
   id: __t.u64(),
   purchaseId: __t.u64(),
@@ -367,6 +449,18 @@ export const RegionStat = __t.object("RegionStat", {
   scoreHist: __t.array(__t.u32()),
 });
 export type RegionStat = __Infer<typeof RegionStat>;
+
+export const Report = __t.object("Report", {
+  id: __t.u64(),
+  claimId: __t.u64(),
+  jobId: __t.u64(),
+  json: __t.string(),
+  markdownPath: __t.string(),
+  proofReelUrl: __t.string(),
+  auditPassed: __t.bool(),
+  at: __t.timestamp(),
+});
+export type Report = __Infer<typeof Report>;
 
 export const Role = __t.object("Role", {
   who: __t.identity(),

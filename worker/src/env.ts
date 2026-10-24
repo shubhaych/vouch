@@ -25,6 +25,20 @@ export const config = {
   stdbWorkerToken: str('STDB_WORKER_TOKEN') || str('STDB_TOKEN'),
   keysDir: resolve(REPO_ROOT, 'worker/.keys'),
   mediaDir: resolve(REPO_ROOT, 'worker/media'),
+  // The video reviewer: one case folder per claim (git-ignored) and the probe scripts Droid may run read-only.
+  casesDir: resolve(REPO_ROOT, 'worker/cases'),
+  toolsDir: resolve(REPO_ROOT, 'worker/tools'),
+  review: {
+    enabled: str('REVIEW_ENABLED', '1') !== '0',
+    maxDroidSessionsPerHour: Number(str('MAX_DROID_SESSIONS_PER_HOUR', '20')),
+    whisperModel: str('WHISPER_MODEL', 'small'),
+    sessionLimitMs: Number(str('REVIEW_SESSION_LIMIT_MS', String(6 * 60_000))),
+    // The Proof Builder runs as a third Droid session only when asked; by default the worker cuts the clips itself (same output, no credits).
+    droidProof: str('REVIEW_DROID_PROOF', '0') === '1',
+    model: str('REVIEW_DROID_MODEL'),
+  },
+  anthropicKey: str('ANTHROPIC_API_KEY'),
+  crs: { apiKey: str('CRS_API_KEY'), baseUrl: str('CRS_BASE_URL') },
   mediaSecret: str('MEDIA_SIGNING_SECRET'),
   demoBusinessCode: str('DEMO_BUSINESS_CODE', 'vouch-business'),
   demoControllerCode: str('DEMO_CONTROLLER_CODE', 'vouch-controller'),
@@ -39,17 +53,23 @@ export const config = {
       evidence_analyst: str('CREAO_EVIDENCE_ANALYST_AGENT_ID'),
       refund_investigator: str('CREAO_REFUND_INVESTIGATOR_AGENT_ID'),
       pattern_analyst: str('CREAO_PATTERN_ANALYST_AGENT_ID'),
+      refund_reviewer: str('CREAO_REFUND_REVIEWER_AGENT_ID'),
+      customer_liaison: str('CREAO_CUSTOMER_LIAISON_AGENT_ID'),
     },
     // App path only: per-seat app id and key (capi_ keys are scoped to one agent).
     appIds: {
       evidence_analyst: str('CREAO_EVIDENCE_ANALYST_APP_ID'),
       refund_investigator: str('CREAO_REFUND_INVESTIGATOR_APP_ID'),
       pattern_analyst: str('CREAO_PATTERN_ANALYST_APP_ID'),
+      refund_reviewer: str('CREAO_REFUND_REVIEWER_APP_ID'),
+      customer_liaison: str('CREAO_CUSTOMER_LIAISON_APP_ID'),
     },
     appKeys: {
       evidence_analyst: str('CREAO_EVIDENCE_ANALYST_KEY'),
       refund_investigator: str('CREAO_REFUND_INVESTIGATOR_KEY'),
       pattern_analyst: str('CREAO_PATTERN_ANALYST_KEY'),
+      refund_reviewer: str('CREAO_REFUND_REVIEWER_KEY'),
+      customer_liaison: str('CREAO_CUSTOMER_LIAISON_KEY'),
     },
     pollMs: Number(str('CREAO_POLL_MS', '15000')),
   },
@@ -59,6 +79,8 @@ export const config = {
 };
 
 export type Seat = keyof typeof config.creao.agentIds;
-export const SEATS: Seat[] = ['evidence_analyst', 'refund_investigator', 'pattern_analyst'];
+export const SEATS: Seat[] = ['evidence_analyst', 'refund_investigator', 'pattern_analyst', 'refund_reviewer', 'customer_liaison'];
+/** The video reviewer's seats are optional: when the saved agent is missing, the report says "Reviewer offline" and a person decides. */
+export const OPTIONAL_SEATS: Seat[] = ['refund_reviewer', 'customer_liaison'];
 
 export const log = (...xs: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...xs);

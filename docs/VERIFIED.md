@@ -40,7 +40,13 @@ Session: Claude Code cloud container, 2026-10-23/24. SpacetimeDB 2.13.0 standalo
 | --- | --- | --- |
 | Session options, permission callback and tool detail types | Read from the installed package's `.d.ts`; `worker/src/lab.ts` type-checks against them | `npm run typecheck` |
 | The permission callback can cancel creates, edits, patches, shell commands and MCP tools | The decision function `decideTool` is unit tested on each case | `worker/test/lab-fence.test.ts` |
-| A real session streams messages | Not verified (no `droid` CLI or `FACTORY_API_KEY` in the cloud session) | LIVE_CHECKLIST.md, `npx tsx scripts/hello-droid.ts` |
+| A real session streams messages | Yes (laptop, 2026-10-24, droid 0.249.0): `assistant`, `tool_call`, `tool_result` and `result` messages arrive; `session.stream()` can be called again on the same session to continue the conversation (the reviewer's "nudges") | `worker/src/review/session.ts`, `worker/cases/<id>/droid.log` |
+| Droid batches tool calls in a `Script` | Yes. The permission request then has `details.type === 'script'` with `calls: [{ toolName, toolInput, confirmation }]`, one entry per call the harness found that needs confirmation, each with the direct confirmation details (`exec` with `fullCommand`, `mcp_tool` with `serverName`/`toolName`). Read-only scripts never reach the handler. | `worker/src/review/fence.ts` `decideCaseTool` case 'script'; `worker/test/review-fence.test.ts` |
+| Tool surface with `autonomyLevel: Off` | Execute, Glob, Grep, LS, Read, Skill, TodoWrite, ToolSearch (+ Script, WaitForScript). **No Create, Edit or ApplyPatch**: Droid writes files through `Execute` (`cat > work/x <<'EOF'`), which the permission handler sees. | probe session, `.stdb/probe-tools.ts` (not committed) |
+| Tool surface with `autonomyLevel: Low` | Adds `ApplyPatch`, and **file writes do not call the permission handler** at all. The reviewer therefore stays on `Off`. | same probe |
+| `createSdkMcpServer` tools are callable from a session | Yes: `vouch-case___<tool>` appears after Droid's `ToolSearch`; results flow back; the server runs in the worker process and writes rows through reducers | `worker/src/review/case-tools.ts` |
+| `toolExecutionMode: 'direct_only'` | Exists in the protocol schemas but is not an option of `createSession` in SDK 0.10.0 | `node_modules/@factory/droid-sdk/dist/node.d.ts` |
+| "Tool execution cancelled by user" ends Droid's turn | Yes. After a fence cancel the model stops; the reviewer sends a follow-up message in the same session listing what was refused and what is still missing (at most 2) | `worker/src/review/session.ts` |
 
 ## ffmpeg 6.1.1
 

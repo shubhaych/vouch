@@ -9,11 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/components/ui/toast";
 import { useCall } from "@/lib/stdb/hooks";
 import { money, titleCase } from "@/lib/format";
+import { TIER_LABEL, type Tier } from "@vouch/module/review-score";
 import { parse } from "./investigation";
 
 const MATERIALITY = 50_000;
 interface Reason { text: string; cites: string }
 interface InvJson { what_would_change_my_mind?: string; history_considered?: string; message_to_customer?: string; needs_controller?: boolean }
+interface ReviewJson { provenance?: "live" | "fixture" | "offline" }
 
 export function RecommendationCard({ claim, refund, decisions, evidence, seatRole, seatBusiness, onFrame }: {
   claim: Claim; refund: Refund; decisions: readonly Decision[]; evidence: readonly Evidence[]; seatRole: string | null; seatBusiness: number; onFrame: (i: number) => void;
@@ -27,6 +29,9 @@ export function RecommendationCard({ claim, refund, decisions, evidence, seatRol
   const reasons = parse<Reason[]>(proposal?.reasonsJson, []);
   const [entries] = useTable(tables.journalEntry.where((r) => r.decisionId.eq(proposal?.id ?? 0n)), { enabled: !!proposal });
   const [credits] = useTable(tables.creditEvent.where((r) => r.causeTable.eq("refund")).where((r) => r.causeId.eq(refund.id)));
+  const [recs] = useTable(tables.recommendation.where((r) => r.claimId.eq(claim.id)));
+  const rec = recs[0];
+  const review = parse<ReviewJson>(rec?.creaoReview, {});
   const toasted = useRef(new Set<string>());
   const open = ["investigating", "recommended", "awaiting_controller", "more_evidence"].includes(refund.status);
   const offline = claim.status === "offline";
@@ -60,8 +65,9 @@ export function RecommendationCard({ claim, refund, decisions, evidence, seatRol
   return (
     <motion.aside initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="glass space-y-3 p-4" data-testid="recommendation">
       <div className="flex items-center justify-between">
-        <span className="panel-title">Refund Investigator recommends</span>
-        {inv ? <Badge kind={inv.provenance === "fixture" ? "fixture" : inv.provenance === "replay" ? "replay" : "live"} /> : null}
+        <span className="panel-title">{rec ? "Video reviewer recommends" : "Refund Investigator recommends"}</span>
+        {rec ? (review.provenance === "offline" ? <span className="chip chip--review">Reviewer offline</span> : <Badge kind={review.provenance === "fixture" ? "fixture" : "live"} />)
+          : inv ? <Badge kind={inv.provenance === "fixture" ? "fixture" : inv.provenance === "replay" ? "replay" : "live"} /> : null}
       </div>
       {offline && !proposal ? (
         <div className="rounded-lg border border-review/50 bg-review/10 p-3 text-sm" data-testid="offline-note">
@@ -75,6 +81,7 @@ export function RecommendationCard({ claim, refund, decisions, evidence, seatRol
             <span className={`text-2xl font-bold ${proposal.action === "accept" ? "text-honest" : proposal.action === "decline" ? "text-fraud" : "text-review"}`} data-testid="rec-action">{titleCase(proposal.action)}</span>
             <span className="text-right text-sm">{proposal.action === "accept" ? `${money(proposal.amount)} · ${titleCase(proposal.method)}` : ""}</span>
           </div>
+          {rec ? <div className="flex items-center gap-2 text-sm" data-testid="rec-tier"><span className="chip chip--accent font-mono">{rec.tier}</span><span>{TIER_LABEL[rec.tier as Tier] ?? rec.tier}</span></div> : null}
           <div>
             <div className="flex justify-between text-xs text-ink-soft-dark"><span>Confidence</span><span>{Math.round(proposal.confidence * 100)}%</span></div>
             <div className="mt-1 h-1.5 rounded-full bg-white/10"><div className="h-full rounded-full bg-accent" style={{ width: `${Math.round(proposal.confidence * 100)}%` }} /></div>

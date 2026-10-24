@@ -15,5 +15,8 @@ export { propose, decide, post } from './desk';
 export { flagPattern, setPatternStatus, confirmPattern } from './patterns';
 export { setIssuerKey, issueCredential, revokeCredential, requestVerification, recordVerification } from './credentials';
 export { enqueueLab, enqueueLabTrigger, startLabJob, appendLabEvent, finishLabJob, reviewCandidate, markPromoted } from './lab';
+export {
+  startAnalysis, setStep, addArtifact, addFinding, auditFinding, writeReport, writeScore, writeRecommendation, finishAnalysis, autoDecide,
+} from './review';
 export { my_agent } from './views';
 export { exportTruth } from './truth';

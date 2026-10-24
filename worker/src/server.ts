@@ -16,13 +16,21 @@ import { MAX_UPLOAD_BYTES, UploadError, checkSignature, processUpload } from './
 import { LabRunner } from './lab';
 import { Showcase } from './showcase';
 import { mirrorOf } from './mirror';
+import { ReviewRunner } from './review/runner';
 
 const WORKER_QUERIES = [
   'SELECT * FROM sim_run', 'SELECT * FROM metrics', 'SELECT * FROM control', 'SELECT * FROM agent', 'SELECT * FROM business',
   'SELECT * FROM purchase', 'SELECT * FROM refund', 'SELECT * FROM claim', 'SELECT * FROM evidence', 'SELECT * FROM agent_run',
   'SELECT * FROM decision', 'SELECT * FROM fraud_pattern', 'SELECT * FROM pattern_event', 'SELECT * FROM credential',
   'SELECT * FROM verification', 'SELECT * FROM lab_job',
+  'SELECT * FROM analysis_job', 'SELECT * FROM analysis_step', 'SELECT * FROM artifact', 'SELECT * FROM finding', 'SELECT * FROM report',
+  'SELECT * FROM claim_score', 'SELECT * FROM recommendation',
 ];
+
+const CASE_TYPES: Record<string, string> = {
+  mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', wav: 'audio/wav', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+  json: 'application/json', txt: 'text/plain; charset=utf-8', md: 'text/markdown; charset=utf-8', log: 'text/plain; charset=utf-8', py: 'text/plain; charset=utf-8',
+};
 
 async function main() {
   log(`connecting to ${config.stdbUri}/${config.stdbDb}`);
@@ -46,6 +54,14 @@ async function main() {
   const credentials = new Credentials(conn);
   await credentials.start();
   const orchestrator = new Orchestrator(conn, (agentId, refundId, verifier) => credentials.check(agentId, refundId, verifier));
+  // The video reviewer owns every claim with a video; the Desk Lead keeps simulated and video-less claims. REVIEW_ENABLED=0 restores the old path.
+  if (config.review.enabled) {
+    const reviewer = new ReviewRunner(conn, (agentId, refundId, verifier) => credentials.check(agentId, refundId, verifier), {
+      takeCreaoBudget: () => orchestrator.takeBudget(), liveShowcaseClaims: orchestrator.liveShowcaseClaims,
+    });
+    orchestrator.handledByReviewer = (c) => reviewer.handles(c);
+    reviewer.start();
+  }
   orchestrator.start();
   new DetectorRunner(conn).start();
   new Poster(poster.conn).start();
@@ -86,6 +102,20 @@ async function main() {
     const file = resolve(config.mediaDir, req.params.claimId, req.params.file);
     if (!existsSync(file)) return reply.code(404).send({ error: 'not found' });
     const type = file.endsWith('.jpg') ? 'image/jpeg' : file.endsWith('.webm') ? 'video/webm' : file.endsWith('.mov') ? 'video/quicktime' : 'video/mp4';
+    return reply.type(type).header('Cache-Control', 'private, max-age=600').send(createReadStream(file));
+  });
+
+  // Case files (frames, mosaics, proof clips, probe charts, droid.log, report.md) at signed, expiring URLs; nested paths, never outside the case.
+  app.get<{ Params: { claimId: string; '*': string }; Querystring: { exp?: string; sig?: string } }>('/cases/:claimId/*', async (req, reply) => {
+    const rel = req.params['*'] ?? '';
+    const path = `/cases/${req.params.claimId}/${rel}`;
+    if (!/^\d+$/.test(req.params.claimId) || !/^[\w./-]+$/.test(rel) || rel.split('/').some((p) => p === '..' || p === '') || !checkSignature(path, req.query.exp ?? '', req.query.sig ?? '')) {
+      return reply.code(403).send({ error: 'link expired or not signed' });
+    }
+    const root = resolve(config.casesDir, req.params.claimId);
+    const file = resolve(root, rel);
+    if (!file.startsWith(root + '/') || !existsSync(file)) return reply.code(404).send({ error: 'not found' });
+    const type = CASE_TYPES[file.split('.').pop()?.toLowerCase() ?? ''] ?? 'application/octet-stream';
     return reply.type(type).header('Cache-Control', 'private, max-age=600').send(createReadStream(file));
   });
 

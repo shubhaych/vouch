@@ -1,0 +1,8 @@
+{
+  "_fixture": "hand-written from the Refund Flow spec (not a recorded run)",
+  "claim_id": "{{claim_id}}",
+  "customerTitle": "{{title}}",
+  "customerMessage": "{{message}}",
+  "nextSteps": "{{next_steps}}",
+  "evidenceRequest": "{{evidence_request}}"
+}

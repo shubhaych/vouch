@@ -369,9 +369,99 @@ const benchResult = table({ name: 'bench_result', public: true }, {
   ranAt: t.string(),
 });
 
+// ---- the video reviewer (worker-written; see review.ts for who may write what)
+
+const analysisJob = table({ name: 'analysis_job', public: true }, {
+  id: t.u64().primaryKey(), // claim × 100 + attempt, chosen by the worker
+  claimId: t.u64().index(),
+  status: t.string(), // running | done | lanes_only | failed
+  mode: t.string(), // live (Droid ran) | lanes_only (no Droid) | replay
+  startedAt: t.timestamp(),
+  finishedAt: t.option(t.timestamp()),
+  costNote: t.string(),
+  droidSessions: t.u8(),
+});
+
+const analysisStep = table({ name: 'analysis_step', public: true }, {
+  id: t.u64().primaryKey().autoInc(),
+  jobId: t.u64().index(),
+  key: t.string(), // ingest | transcript | frames | integrity | droid_case | proof | audit | score | review | decision
+  status: t.string(), // pending | running | done | failed | skipped
+  startedAt: t.option(t.timestamp()),
+  finishedAt: t.option(t.timestamp()),
+  summary: t.string(),
+  liveNote: t.string(), // the latest line Droid streamed, shown on the phone tracker
+});
+
+const artifact = table({ name: 'artifact', public: true }, {
+  id: t.u64().primaryKey(), // job × 1000 + n
+  jobId: t.u64().index(),
+  kind: t.string(), // frame | mosaic | crop | clip | transcript | measurement | chart | script | video | audio | log
+  path: t.string(), // relative to cases/<claimId>/
+  url: t.string(), // signed, expiring
+  tStart: t.f64(),
+  tEnd: t.f64(),
+  label: t.string(),
+  sha256: t.string(),
+});
+
+const finding = table({ name: 'finding', public: true }, {
+  id: t.u64().primaryKey(), // job × 1000 + n
+  jobId: t.u64().index(),
+  kind: t.string(), // supports | contradicts | neutral | integrity
+  spokenClaimId: t.string(), // the spoken claim (c1, c2…) or '' for integrity
+  observation: t.string(),
+  tStart: t.f64(),
+  tEnd: t.f64(),
+  confidence: t.f64(),
+  artifactIds: t.array(t.u64()),
+  method: t.string(), // looked | probe:luminance | probe:audio | ocr | …
+  auditStatus: t.string(), // pending | passed | rejected
+  auditNote: t.string(),
+});
+
+const report = table({ name: 'report', public: true }, {
+  id: t.u64().primaryKey().autoInc(),
+  claimId: t.u64().index(),
+  jobId: t.u64(),
+  json: t.string(), // Report (module/src/review-types.ts)
+  markdownPath: t.string(),
+  proofReelUrl: t.string(),
+  auditPassed: t.bool(),
+  at: t.timestamp(),
+});
+
+const claimScore = table({ name: 'claim_score', public: true }, {
+  claimId: t.u64().primaryKey(),
+  jobId: t.u64(),
+  eSupport: t.f64(),
+  coverage: t.f64(),
+  integrity: t.f64(),
+  pLegit: t.f64(),
+  anomaly: t.f64(),
+  excessRefundRatio: t.f64(),
+  featuresJson: t.string(),
+  formulaVersion: t.string(),
+});
+
+const recommendation = table({ name: 'recommendation', public: true }, {
+  claimId: t.u64().primaryKey(),
+  jobId: t.u64(),
+  tier: t.string(), // T1..T5
+  refundNow: t.u32(),
+  refundOnReturn: t.u32(),
+  returnRequired: t.bool(),
+  reasonsJson: t.string(),
+  creaoReview: t.string(), // the Refund Reviewer's JSON, or '' when offline
+  creaoRunId: t.string(),
+  autoDecided: t.bool(),
+  at: t.timestamp(),
+});
+
 export const spacetimedb = schema({
   role, seatCode, counter, simRun, simTick, agent, agentTruth, shopperLink, business, purchase, refundIntent, refund,
   creditEvent, eventFeed, regionStat, fraudPattern, patternEvent, claim, evidence, agentRun, control, decision,
   journalEntry, journalLine, credential, verification, labJob, labEvent, metrics, latencyPing, benchResult,
+  analysisJob, analysisStep, artifact, finding, report, claimScore, recommendation,
 });
 export default spacetimedb;

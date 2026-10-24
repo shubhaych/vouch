@@ -11,6 +11,7 @@ import { agentLabel, businessLabel, claimLabel, money, timeAgo, titleCase } from
 import { BUSINESS_A, BUSINESS_B, businessDef } from "@vouch/module/world";
 import { Investigation } from "./investigation";
 import { RecommendationCard } from "./recommendation";
+import { ReportPanel, ReviewingPanel } from "./report-panel";
 import { OrgChart } from "./org-chart";
 
 export function BusinessView() {
@@ -111,10 +112,16 @@ function Selected({ claim, frame, onFrame, seatRole, seatBusiness }: { claim: Cl
   const [purchases] = useTable(tables.purchase.where((r) => r.id.eq(refund?.purchaseId ?? 0n)), { enabled: !!refund });
   const [evidence] = useTable(tables.evidence.where((r) => r.claimId.eq(claim.id)));
   const [decisions] = useTable(tables.decision.where((r) => r.refundId.eq(claim.refundId)));
+  const [reports] = useTable(tables.report.where((r) => r.claimId.eq(claim.id)));
+  const [jobs] = useTable(tables.analysisJob.where((r) => r.claimId.eq(claim.id)));
+  const report = [...reports].sort((a, b) => Number(b.id - a.id))[0];
+  const job = [...jobs].sort((a, b) => Number(b.id - a.id))[0];
   if (!refund) return <div className="skeleton h-96 xl:col-span-2" />;
   return (
     <>
-      <Investigation claim={claim} refund={refund} purchase={purchases[0]} evidence={[...evidence]} frame={frame} onFrame={onFrame} />
+      {report ? <ReportPanel claim={claim} row={report} />
+        : job ? <ReviewingPanel job={job} />
+        : <Investigation claim={claim} refund={refund} purchase={purchases[0]} evidence={[...evidence]} frame={frame} onFrame={onFrame} />}
       <div className="space-y-4">
         <RecommendationCard claim={claim} refund={refund} decisions={decisions} evidence={evidence} seatRole={seatRole} seatBusiness={seatBusiness} onFrame={onFrame} />
       </div>

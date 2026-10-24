@@ -32,8 +32,8 @@ function mediaSecret(): string {
   return secret;
 }
 
-export function signPath(path: string, now = Date.now()): string {
-  const exp = now + URL_TTL_MS;
+export function signPath(path: string, now = Date.now(), ttlMs = URL_TTL_MS): string {
+  const exp = now + ttlMs;
   const sig = createHmac('sha256', mediaSecret()).update(`${path}|${exp}`).digest('hex').slice(0, 32);
   return `${config.publicUrl}${path}?exp=${exp}&sig=${sig}`;
 }

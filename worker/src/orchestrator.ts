@@ -44,6 +44,8 @@ export class Orchestrator {
 
   /** Showcase claims are replayed from stored runs (no credits) unless the showcase runner marks one as live. */
   readonly liveShowcaseClaims = new Set<bigint>();
+  /** When the video reviewer is on, it owns every claim with a video; the Desk Lead keeps the simulated and video-less ones. */
+  handledByReviewer: ((c: Claim) => boolean) | null = null;
 
   constructor(private conn: DbConnection, private checkCredential: CredentialChecker) {}
 
@@ -63,7 +65,8 @@ export class Orchestrator {
     return this.conn.db.control.key.find('creao_enabled')?.value === 'true';
   }
 
-  private takeBudget(): boolean {
+  /** One daily CREAO budget for every seat, shared with the video reviewer. */
+  takeBudget(): boolean {
     const d = new Date().toDateString();
     if (d !== this.today) { this.today = d; this.runsToday = 0; }
     if (config.creao.mode === 'live' && this.runsToday >= config.creao.dailyRunLimit) return false;
@@ -74,6 +77,7 @@ export class Orchestrator {
   private onClaim(c: Claim, atStartup = false) {
     if (!claimNeedsWork(c, atStartup)) return;
     if (c.kind === 'showcase' && !this.liveShowcaseClaims.has(c.id)) return;
+    if (this.handledByReviewer?.(c)) return;
     const key = `claim:${c.id}`;
     if (this.busy.has(key)) return;
     this.busy.add(key);

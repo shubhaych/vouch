@@ -5,11 +5,13 @@ import { useParams } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { useTable } from "spacetimedb/react";
 import { tables } from "@/module_bindings";
+import type { AnalysisStep } from "@/module_bindings/types";
 import { Badge } from "@/components/ui/badge";
 import { Tween } from "@/components/ui/num";
 import { WORKER_URL } from "@/lib/stdb/config";
 import { money, titleCase } from "@/lib/format";
 import { businessDef, catalogItem } from "@vouch/module/world";
+import { STEP_KEYS, STEP_LABEL } from "@vouch/module/review-types";
 
 const MAX_SECONDS = 20;
 
@@ -25,6 +27,9 @@ export function ClaimView() {
   const [runs] = useTable(tables.agentRun.where((r) => r.caseRef.eq(`C-${id}`)));
   const [decisions] = useTable(tables.decision.where((r) => r.refundId.eq(claim?.refundId ?? 0n)), { enabled: !!claim });
   const [credits] = useTable(tables.creditEvent.where((r) => r.causeTable.eq("refund")).where((r) => r.causeId.eq(claim?.refundId ?? 0n)), { enabled: !!claim });
+  const [jobs] = useTable(tables.analysisJob.where((r) => r.claimId.eq(id)));
+  const job = [...jobs].sort((a, b) => Number(b.id - a.id))[0];
+  const [analysisSteps] = useTable(tables.analysisStep.where((r) => r.jobId.eq(job?.id ?? 0n)), { enabled: !!job });
   const item = purchase ? catalogItem(purchase.item) : undefined;
 
   if (!ready) return <Shell><div className="skeleton h-40 w-full" /></Shell>;
@@ -57,15 +62,19 @@ export function ClaimView() {
         <Recorder claimId={claim.id} nonce={claim.nonce} fingers={claim.fingerCount} />
       ) : null}
 
-      <ol className="space-y-2" data-testid="claim-stepper">
-        {steps.map((s, i) => (
-          <motion.li key={s.title} initial={false} animate={{ opacity: s.on || s.active ? 1 : 0.4 }} className="flex items-center gap-3">
-            <span aria-hidden className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${s.on ? "bg-emerald-500 text-white" : s.active ? "animate-pulse bg-cyan-400 text-white" : "bg-slate-200 text-slate-500"}`}>{s.on ? "✓" : i + 1}</span>
-            <span className="text-sm font-medium">{s.title}</span>
-            {s.sub ? <span className="text-xs text-ink-soft">{s.sub}</span> : null}
-          </motion.li>
-        ))}
-      </ol>
+      {job ? (
+        <ReviewerStepper rows={analysisSteps} />
+      ) : (
+        <ol className="space-y-2" data-testid="claim-stepper">
+          {steps.map((s, i) => (
+            <motion.li key={s.title} initial={false} animate={{ opacity: s.on || s.active ? 1 : 0.4 }} className="flex items-center gap-3">
+              <span aria-hidden className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${s.on ? "bg-emerald-500 text-white" : s.active ? "animate-pulse bg-cyan-400 text-white" : "bg-slate-200 text-slate-500"}`}>{s.on ? "✓" : i + 1}</span>
+              <span className="text-sm font-medium">{s.title}</span>
+              {s.sub ? <span className="text-xs text-ink-soft">{s.sub}</span> : null}
+            </motion.li>
+          ))}
+        </ol>
+      )}
 
       <AnimatePresence>
         {decided && refund ? <DecisionCard status={refund.status} amount={refund.amount} method={proposal?.method ?? ""} credit={credits[0]} /> : null}
@@ -81,6 +90,41 @@ function Shell({ children }: { children: React.ReactNode }) {
     <main className="light min-h-screen bg-bg px-4 py-6 text-ink" data-testid="claim">
       <div className="card-light mx-auto max-w-md space-y-5 p-5">{children}</div>
     </main>
+  );
+}
+
+// The phone shows progress only: step label, status and the customer-safe
+// liveNote. Findings, scores and summaries stay on the business side.
+function ReviewerStepper({ rows }: { rows: readonly AnalysisStep[] }) {
+  const byKey = new Map(rows.map((r) => [r.key, r]));
+  const decision = byKey.get("decision");
+  const message = decision && (decision.status === "done" || decision.status === "skipped") && decision.liveNote ? decision.liveNote : null;
+  return (
+    <div className="space-y-3">
+      <ol className="space-y-2" data-testid="claim-stepper">
+        {STEP_KEYS.map((k, i) => {
+          const s = byKey.get(k);
+          const status = s?.status ?? "pending";
+          const done = status === "done";
+          const active = status === "running";
+          const failed = status === "failed";
+          const skipped = status === "skipped";
+          const tag = k === "droid_case" && (failed || skipped) ? "Automated checks only" : failed ? "did not finish" : skipped ? "skipped" : null;
+          return (
+            <motion.li key={k} initial={false} animate={{ opacity: done || active || failed ? 1 : 0.4 }} className="flex items-start gap-3" data-status={status}>
+              <span aria-hidden className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${done ? "bg-emerald-500 text-white" : active ? "animate-pulse bg-cyan-400 text-white" : failed ? "bg-red-400 text-white" : "bg-slate-200 text-slate-500"}`}>{done ? "✓" : failed ? "!" : skipped ? "–" : i + 1}</span>
+              <div className="min-w-0">
+                <div className="text-sm font-medium">{STEP_LABEL[k]}{tag ? <span className="ml-2 text-xs font-normal text-ink-soft">{tag}</span> : null}</div>
+                {s?.liveNote && !(k === "decision" && message) ? <div className="text-xs text-ink-soft">{s.liveNote}</div> : null}
+              </div>
+            </motion.li>
+          );
+        })}
+      </ol>
+      {message ? (
+        <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="rounded-xl bg-cyan-50 p-4 text-sm text-cyan-950" data-testid="claim-message">{message}</motion.div>
+      ) : null}
+    </div>
   );
 }
 
