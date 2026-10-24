@@ -28,3 +28,6 @@ PASS P6: worker → requires role: business or controller; shopper → requires 
 ℹ️ INFO Connecting to SpacetimeDB WS...
 PASS P3: upload 200; accept $249.00; reasons: frame:3: The claimed defect is visible in two frames and matches the claim. | policy:window: The claim was filed inside the return window. | history:refund_ratio_90d: Refunds were requested on 6 of th
 V14: waiting 593 s
+PASS V14: 410: This claim link expired (more than 10 minutes old). Open the claim again to get a fresh challenge.
+
+13/13 as expected → qa/results/matrix-fixture.json

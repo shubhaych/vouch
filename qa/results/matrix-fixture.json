@@ -1,5 +1,5 @@
 {
-  "ranAt": "2026-10-24T13:06:23.040Z",
+  "ranAt": "2026-10-24T13:44:33.728Z",
   "mode": "fixture",
   "rows": [
     {
@@ -17,9 +17,9 @@
     {
       "id": "V02",
       "persona": "P1",
-      "video": "G01-testsrc (generated stand-in)",
+      "video": "S01-fresh (generated moving stand-in)",
       "expected": "Accept or smaller amount; never decline",
-      "actual": "upload 200; accept $249.00 original_payment conf 0.78 after 3.6s; business accepted; credit 600 → 612; journal entry #9",
+      "actual": "upload 200; accept $249.00 original_payment conf 0.78 after 2.8s; business accepted; credit 600 → 612; journal entry #14",
       "match": true,
       "details": {
         "upload": {
@@ -28,24 +28,26 @@
           "checks": {
             "fresh": true,
             "uploaded_after_s": 0,
-            "duration_s": 12,
-            "width": 1280,
-            "height": 720,
+            "duration_s": 11,
+            "width": 480,
+            "height": 360,
             "duration_ok": true,
-            "resolution_ok": true,
+            "resolution_ok": false,
             "frame_reuse": [],
             "frame_times": [
               0.5,
-              1.2,
-              2.4,
-              3.6,
-              4.8,
-              6,
-              7.2,
-              8.4,
-              11.5
+              1.1,
+              2.2,
+              3.3,
+              4.4,
+              5.5,
+              6.6,
+              7.7,
+              10.5
             ],
             "blank_frames": 0,
+            "frame_motion": 16,
+            "still_image": false,
             "within_window": true,
             "reason_allowed": true,
             "over_video_threshold": true,
@@ -55,24 +57,26 @@
         "checks": {
           "fresh": true,
           "uploaded_after_s": 0,
-          "duration_s": 12,
-          "width": 1280,
-          "height": 720,
+          "duration_s": 11,
+          "width": 480,
+          "height": 360,
           "duration_ok": true,
-          "resolution_ok": true,
+          "resolution_ok": false,
           "frame_reuse": [],
           "frame_times": [
             0.5,
-            1.2,
-            2.4,
-            3.6,
-            4.8,
-            6,
-            7.2,
-            8.4,
-            11.5
+            1.1,
+            2.2,
+            3.3,
+            4.4,
+            5.5,
+            6.6,
+            7.7,
+            10.5
           ],
           "blank_frames": 0,
+          "frame_motion": 16,
+          "still_image": false,
           "within_window": true,
           "reason_allowed": true,
           "over_video_threshold": true,
@@ -82,8 +86,8 @@
           "unable_to_verify": false,
           "capture_flags": [],
           "challenge": {
-            "expected": 4,
-            "seen": 4,
+            "expected": 1,
+            "seen": 1,
             "passed": true
           },
           "provenance": "fixture",
@@ -98,20 +102,20 @@
           "reasons": [
             "frame:3: The claimed defect is visible in two frames and matches the claim.",
             "policy:window: The claim was filed inside the return window.",
-            "history:refund_ratio_90d: The customer's refund history is in line with typical shoppers."
+            "history:refund_ratio_90d: Refunds were requested on 1 of the last 1 purchases (100% in 90 days), in line with typical shoppers."
           ]
         },
         "offline": false,
         "runsStarted": 2,
-        "secondsToRec": 3.6
+        "secondsToRec": 2.8
       }
     },
     {
       "id": "V08",
       "persona": "P4",
       "video": "V08-reuse-copy.mp4",
-      "expected": "Frame reuse flag naming C-24; never accept",
-      "actual": "reuse [{\"frame\":0,\"matches_claim\":\"C-24\",\"matches_frame\":0,\"distance\":0}]; more_evidence",
+      "expected": "Frame reuse flag naming C-70; never accept",
+      "actual": "reuse [{\"frame\":0,\"matches_claim\":\"C-70\",\"matches_frame\":0,\"distance\":0}]; more_evidence",
       "match": true,
       "details": {
         "upload": {
@@ -120,31 +124,33 @@
           "checks": {
             "fresh": true,
             "uploaded_after_s": 0,
-            "duration_s": 12,
-            "width": 1280,
-            "height": 720,
+            "duration_s": 11,
+            "width": 480,
+            "height": 360,
             "duration_ok": true,
-            "resolution_ok": true,
+            "resolution_ok": false,
             "frame_reuse": [
               {
                 "frame": 0,
-                "matches_claim": "C-24",
+                "matches_claim": "C-70",
                 "matches_frame": 0,
                 "distance": 0
               }
             ],
             "frame_times": [
               0.5,
-              1.2,
-              2.4,
-              3.6,
-              4.8,
-              6,
-              7.2,
-              8.4,
-              11.5
+              1.1,
+              2.2,
+              3.3,
+              4.4,
+              5.5,
+              6.6,
+              7.7,
+              10.5
             ],
             "blank_frames": 0,
+            "frame_motion": 16,
+            "still_image": false,
             "within_window": true,
             "reason_allowed": true,
             "over_video_threshold": true,
@@ -154,31 +160,33 @@
         "checks": {
           "fresh": true,
           "uploaded_after_s": 0,
-          "duration_s": 12,
-          "width": 1280,
-          "height": 720,
+          "duration_s": 11,
+          "width": 480,
+          "height": 360,
           "duration_ok": true,
-          "resolution_ok": true,
+          "resolution_ok": false,
           "frame_reuse": [
             {
               "frame": 0,
-              "matches_claim": "C-24",
+              "matches_claim": "C-70",
               "matches_frame": 0,
               "distance": 0
             }
           ],
           "frame_times": [
             0.5,
-            1.2,
-            2.4,
-            3.6,
-            4.8,
-            6,
-            7.2,
-            8.4,
-            11.5
+            1.1,
+            2.2,
+            3.3,
+            4.4,
+            5.5,
+            6.6,
+            7.7,
+            10.5
           ],
           "blank_frames": 0,
+          "frame_motion": 16,
+          "still_image": false,
           "within_window": true,
           "reason_allowed": true,
           "over_video_threshold": true,
@@ -188,8 +196,8 @@
           "unable_to_verify": false,
           "capture_flags": [],
           "challenge": {
-            "expected": 4,
-            "seen": 4,
+            "expected": 2,
+            "seen": 2,
             "passed": true
           },
           "provenance": "fixture",
@@ -207,15 +215,15 @@
         },
         "offline": false,
         "runsStarted": 2,
-        "secondsToRec": 4.1
+        "secondsToRec": 2.9
       }
     },
     {
       "id": "V09",
       "persona": "P4",
       "video": "V09-reencoded.mp4",
-      "expected": "Frame reuse flag naming C-24; never accept",
-      "actual": "reuse [{\"frame\":0,\"matches_claim\":\"C-24\",\"matches_frame\":0,\"distance\":0},{\"frame\":0,\"matches_claim\":\"C-25\",\"matches_frame\":0,\"distance\":0}]; more_evidence",
+      "expected": "Frame reuse flag naming C-70; never accept",
+      "actual": "reuse [{\"frame\":4,\"matches_claim\":\"C-70\",\"matches_frame\":4,\"distance\":1},{\"frame\":4,\"matches_claim\":\"C-71\",\"matches_frame\":4,\"distance\":1}]; more_evidence",
       "match": true,
       "details": {
         "upload": {
@@ -224,37 +232,39 @@
           "checks": {
             "fresh": true,
             "uploaded_after_s": 0,
-            "duration_s": 12,
-            "width": 854,
-            "height": 480,
+            "duration_s": 11,
+            "width": 320,
+            "height": 240,
             "duration_ok": true,
-            "resolution_ok": true,
+            "resolution_ok": false,
             "frame_reuse": [
               {
-                "frame": 0,
-                "matches_claim": "C-24",
-                "matches_frame": 0,
-                "distance": 0
+                "frame": 4,
+                "matches_claim": "C-70",
+                "matches_frame": 4,
+                "distance": 1
               },
               {
-                "frame": 0,
-                "matches_claim": "C-25",
-                "matches_frame": 0,
-                "distance": 0
+                "frame": 4,
+                "matches_claim": "C-71",
+                "matches_frame": 4,
+                "distance": 1
               }
             ],
             "frame_times": [
               0.5,
-              1.2,
-              2.4,
-              3.6,
-              4.8,
-              6,
-              7.2,
-              8.4,
-              11.5
+              1.1,
+              2.2,
+              3.3,
+              4.4,
+              5.5,
+              6.6,
+              7.7,
+              10.5
             ],
             "blank_frames": 0,
+            "frame_motion": 15,
+            "still_image": false,
             "within_window": true,
             "reason_allowed": true,
             "over_video_threshold": true,
@@ -264,37 +274,39 @@
         "checks": {
           "fresh": true,
           "uploaded_after_s": 0,
-          "duration_s": 12,
-          "width": 854,
-          "height": 480,
+          "duration_s": 11,
+          "width": 320,
+          "height": 240,
           "duration_ok": true,
-          "resolution_ok": true,
+          "resolution_ok": false,
           "frame_reuse": [
             {
-              "frame": 0,
-              "matches_claim": "C-24",
-              "matches_frame": 0,
-              "distance": 0
+              "frame": 4,
+              "matches_claim": "C-70",
+              "matches_frame": 4,
+              "distance": 1
             },
             {
-              "frame": 0,
-              "matches_claim": "C-25",
-              "matches_frame": 0,
-              "distance": 0
+              "frame": 4,
+              "matches_claim": "C-71",
+              "matches_frame": 4,
+              "distance": 1
             }
           ],
           "frame_times": [
             0.5,
-            1.2,
-            2.4,
-            3.6,
-            4.8,
-            6,
-            7.2,
-            8.4,
-            11.5
+            1.1,
+            2.2,
+            3.3,
+            4.4,
+            5.5,
+            6.6,
+            7.7,
+            10.5
           ],
           "blank_frames": 0,
+          "frame_motion": 15,
+          "still_image": false,
           "within_window": true,
           "reason_allowed": true,
           "over_video_threshold": true,
@@ -304,8 +316,8 @@
           "unable_to_verify": false,
           "capture_flags": [],
           "challenge": {
-            "expected": 4,
-            "seen": 4,
+            "expected": 3,
+            "seen": 3,
             "passed": true
           },
           "provenance": "fixture",
@@ -323,7 +335,7 @@
         },
         "offline": false,
         "runsStarted": 2,
-        "secondsToRec": 2.5
+        "secondsToRec": 2.6
       }
     },
     {
@@ -331,8 +343,8 @@
       "persona": "P4",
       "video": "V10-slideshow.mp4",
       "expected": "Reuse against listing images, or more evidence",
-      "actual": "upload 200; checks blank_frames=0; EA unable_to_verify=false; accept $249.00",
-      "match": false,
+      "actual": "upload 200; checks blank_frames=0; EA unable_to_verify=false; more_evidence $0.00",
+      "match": true,
       "details": {
         "upload": {
           "ok": true,
@@ -358,6 +370,8 @@
               7.5
             ],
             "blank_frames": 0,
+            "frame_motion": 2,
+            "still_image": true,
             "within_window": true,
             "reason_allowed": true,
             "over_video_threshold": true,
@@ -385,6 +399,8 @@
             7.5
           ],
           "blank_frames": 0,
+          "frame_motion": 2,
+          "still_image": true,
           "within_window": true,
           "reason_allowed": true,
           "over_video_threshold": true,
@@ -392,30 +408,30 @@
         },
         "evidenceFlags": {
           "unable_to_verify": false,
-          "capture_flags": [],
+          "capture_flags": [
+            "possible_still_image"
+          ],
           "challenge": {
-            "expected": 4,
-            "seen": 4,
+            "expected": 1,
+            "seen": 1,
             "passed": true
           },
           "provenance": "fixture",
           "summary": "The item matches the order and the claimed crack is visible in frames 3 and 4. The finger challenge was passed at the end of the video."
         },
         "recommendation": {
-          "action": "accept",
-          "amount": 24900,
-          "method": "original_payment",
-          "confidence": 0.78,
+          "action": "more_evidence",
+          "amount": 0,
+          "method": "none",
+          "confidence": 0.55,
           "status": "proposed",
           "reasons": [
-            "frame:3: The claimed defect is visible in two frames and matches the claim.",
-            "policy:window: The claim was filed inside the return window.",
-            "history:refund_ratio_90d: The customer's refund history is in line with typical shoppers."
+            "check:still_image: The video barely changes from frame to frame, as a photo or a slideshow would; a short handheld clip of the item would settle it."
           ]
         },
         "offline": false,
         "runsStarted": 2,
-        "secondsToRec": 2.8
+        "secondsToRec": 7.1
       }
     },
     {
@@ -450,6 +466,8 @@
               7.5
             ],
             "blank_frames": 9,
+            "frame_motion": null,
+            "still_image": false,
             "within_window": true,
             "reason_allowed": true,
             "over_video_threshold": true,
@@ -477,6 +495,8 @@
             7.5
           ],
           "blank_frames": 9,
+          "frame_motion": null,
+          "still_image": false,
           "within_window": true,
           "reason_allowed": true,
           "over_video_threshold": true,
@@ -508,7 +528,7 @@
         },
         "offline": false,
         "runsStarted": 2,
-        "secondsToRec": 3.7
+        "secondsToRec": 5.7
       }
     },
     {
@@ -540,7 +560,7 @@
       "persona": "P2→fresh shopper",
       "video": "S03-fresh (stand-in)",
       "expected": "\"Investigator offline\"; no run; business can only request more evidence",
-      "actual": "offline=true; runs=0; accept → The instance encountered a fatal error.; more_evidence → ok",
+      "actual": "offline=true; runs=0; accept → Investigator offline: request more evidence; more_evidence → ok",
       "match": true,
       "details": {
         "checks": {
@@ -564,6 +584,8 @@
             10.5
           ],
           "blank_frames": 0,
+          "frame_motion": 13,
+          "still_image": false,
           "within_window": true,
           "reason_allowed": true,
           "over_video_threshold": true,
@@ -578,13 +600,13 @@
       "persona": "P2→fresh shopper",
       "video": "S04-fresh (stand-in)",
       "expected": "Recommendation goes to the controller",
-      "actual": "amount $649.00; accept; business accept → refund awaiting_controller; controller accept → ok, refund accepted; journal #10",
-      "match": false,
+      "actual": "amount $649.00; accept; business accept → refund awaiting_controller; controller accept → ok, refund accepted; journal #16",
+      "match": true,
       "details": {
         "checks": {
           "fresh": true,
-          "uploaded_after_s": 0,
-          "duration_s": 11,
+          "uploaded_after_s": 3,
+          "duration_s": 8,
           "width": 480,
           "height": 360,
           "duration_ok": true,
@@ -592,16 +614,18 @@
           "frame_reuse": [],
           "frame_times": [
             0.5,
-            1.1,
-            2.2,
-            3.3,
-            4.4,
-            5.5,
-            6.6,
-            7.7,
-            10.5
+            0.8,
+            1.6,
+            2.4,
+            3.2,
+            4,
+            4.8,
+            5.6,
+            7.5
           ],
           "blank_frames": 0,
+          "frame_motion": 14,
+          "still_image": false,
           "within_window": true,
           "reason_allowed": true,
           "over_video_threshold": true,
@@ -611,8 +635,8 @@
           "unable_to_verify": false,
           "capture_flags": [],
           "challenge": {
-            "expected": 1,
-            "seen": 1,
+            "expected": 2,
+            "seen": 2,
             "passed": true
           },
           "provenance": "fixture",
@@ -627,12 +651,12 @@
           "reasons": [
             "frame:3: The claimed defect is visible in two frames and matches the claim.",
             "policy:window: The claim was filed inside the return window.",
-            "history:refund_ratio_90d: The customer's refund history is in line with typical shoppers."
+            "history:refund_ratio_90d: Refunds were requested on 1 of the last 1 purchases (100% in 90 days), in line with typical shoppers."
           ]
         },
         "offline": false,
         "runsStarted": 2,
-        "secondsToRec": 2.5
+        "secondsToRec": 4.9
       }
     },
     {
@@ -640,7 +664,7 @@
       "persona": "P6",
       "video": "S06-fresh",
       "expected": "The proposer identity and a shopper cannot decide",
-      "actual": "worker → The instance encountered a fatal error.; shopper → The instance encountered a fatal error.",
+      "actual": "worker → requires role: business or controller; shopper → requires role: business or controller",
       "match": true,
       "details": {}
     },
@@ -649,7 +673,7 @@
       "persona": "P3",
       "video": "S05-fresh",
       "expected": "More scrutiny; never an automatic decline",
-      "actual": "upload 200; accept $249.00; reasons: frame:3: The claimed defect is visible in two frames and matches the claim. | policy:window: The claim was filed inside the return window. | history:refund_ratio_90d: The customer's refund history is ",
+      "actual": "upload 200; accept $249.00; reasons: frame:3: The claimed defect is visible in two frames and matches the claim. | policy:window: The claim was filed inside the return window. | history:refund_ratio_90d: Refunds were requested on 6 of th",
       "match": true,
       "details": {
         "upload": {
@@ -657,8 +681,8 @@
           "frames": 9,
           "checks": {
             "fresh": true,
-            "uploaded_after_s": 52,
-            "duration_s": 11,
+            "uploaded_after_s": 63,
+            "duration_s": 8,
             "width": 480,
             "height": 360,
             "duration_ok": true,
@@ -666,16 +690,18 @@
             "frame_reuse": [],
             "frame_times": [
               0.5,
-              1.1,
-              2.2,
-              3.3,
-              4.4,
-              5.5,
-              6.6,
-              7.7,
-              10.5
+              0.8,
+              1.6,
+              2.4,
+              3.2,
+              4,
+              4.8,
+              5.6,
+              7.5
             ],
             "blank_frames": 0,
+            "frame_motion": 13,
+            "still_image": false,
             "within_window": true,
             "reason_allowed": true,
             "over_video_threshold": true,
@@ -684,8 +710,8 @@
         },
         "checks": {
           "fresh": true,
-          "uploaded_after_s": 52,
-          "duration_s": 11,
+          "uploaded_after_s": 63,
+          "duration_s": 8,
           "width": 480,
           "height": 360,
           "duration_ok": true,
@@ -693,16 +719,18 @@
           "frame_reuse": [],
           "frame_times": [
             0.5,
-            1.1,
-            2.2,
-            3.3,
-            4.4,
-            5.5,
-            6.6,
-            7.7,
-            10.5
+            0.8,
+            1.6,
+            2.4,
+            3.2,
+            4,
+            4.8,
+            5.6,
+            7.5
           ],
           "blank_frames": 0,
+          "frame_motion": 13,
+          "still_image": false,
           "within_window": true,
           "reason_allowed": true,
           "over_video_threshold": true,
@@ -712,8 +740,8 @@
           "unable_to_verify": false,
           "capture_flags": [],
           "challenge": {
-            "expected": 5,
-            "seen": 5,
+            "expected": 2,
+            "seen": 2,
             "passed": true
           },
           "provenance": "fixture",
@@ -723,17 +751,17 @@
           "action": "accept",
           "amount": 24900,
           "method": "original_payment",
-          "confidence": 0.78,
+          "confidence": 0.55,
           "status": "proposed",
           "reasons": [
             "frame:3: The claimed defect is visible in two frames and matches the claim.",
             "policy:window: The claim was filed inside the return window.",
-            "history:refund_ratio_90d: The customer's refund history is in line with typical shoppers."
+            "history:refund_ratio_90d: Refunds were requested on 6 of the last 10 purchases (60% in 90 days), well above typical shoppers; weighed as context, not proof, so the video evidence decides and a person should look closely."
           ]
         },
         "offline": false,
         "runsStarted": 2,
-        "secondsToRec": 3.1
+        "secondsToRec": 5.1
       }
     },
     {
