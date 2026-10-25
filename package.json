@@ -32,7 +32,8 @@
     "demo:reset": "tsx scripts/demo-reset.ts",
     "eval": "tsx detectors/eval.ts",
     "desk:book": "node --import tsx worker/src/finance/build-book.ts build",
-    "desk:reconcile": "node --import tsx worker/src/finance/build-book.ts reconcile"
+    "desk:reconcile": "node --import tsx worker/src/finance/build-book.ts reconcile",
+    "creao:check": "node --import tsx worker/src/finance/check-creao.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

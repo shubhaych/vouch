@@ -34,6 +34,7 @@ import FinanceInjectEventReducer from "../finance_inject_event_reducer";
 import FinanceLockPeriodReducer from "../finance_lock_period_reducer";
 import FinanceOpenObligationReducer from "../finance_open_obligation_reducer";
 import FinancePrepareEntryReducer from "../finance_prepare_entry_reducer";
+import FinanceRecordAgentRunReducer from "../finance_record_agent_run_reducer";
 import FinanceRecordCloseReducer from "../finance_record_close_reducer";
 import FinanceRecordGuardianReducer from "../finance_record_guardian_reducer";
 import FinanceRequestEntryReducer from "../finance_request_entry_reducer";
@@ -107,6 +108,7 @@ export type FinanceInjectEventParams = __Infer<typeof FinanceInjectEventReducer>
 export type FinanceLockPeriodParams = __Infer<typeof FinanceLockPeriodReducer>;
 export type FinanceOpenObligationParams = __Infer<typeof FinanceOpenObligationReducer>;
 export type FinancePrepareEntryParams = __Infer<typeof FinancePrepareEntryReducer>;
+export type FinanceRecordAgentRunParams = __Infer<typeof FinanceRecordAgentRunReducer>;
 export type FinanceRecordCloseParams = __Infer<typeof FinanceRecordCloseReducer>;
 export type FinanceRecordGuardianParams = __Infer<typeof FinanceRecordGuardianReducer>;
 export type FinanceRequestEntryParams = __Infer<typeof FinanceRequestEntryReducer>;

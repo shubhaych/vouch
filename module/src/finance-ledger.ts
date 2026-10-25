@@ -266,3 +266,20 @@ export const financeAskController = spacetimedb.reducer({ companyId: t.u16(), ki
     targetRef: a.targetRef, status: 'open', answer: '', reason: '', requestedBy: who.who, decidedBy: undefined, precedentId: prior?.id ?? 0n, at: ctx.timestamp, decidedAt: undefined,
   });
 });
+
+/** Writes a finance-agent run after the asynchronous call finishes; this is separate from the refund path. */
+export const financeRecordAgentRun = spacetimedb.reducer({
+  runId: t.string(), seat: t.string(), companyId: t.u16(), caseRef: t.string(), status: t.string(), mode: t.string(),
+  inputJson: t.string(), outputJson: t.string(), valid: t.bool(), rejectReason: t.string(), runUrl: t.string(), agentId: t.string(), ms: t.u32(),
+}, (ctx, a) => {
+  const who = allowed(ctx, a.companyId, `agent-run:${a.runId}`, 'worker');
+  if (!who) return;
+  if (!['impact_analyst', 'impact_reviewer', 'close_controller', 'advisor', 'guardian'].includes(a.seat)) return audit(ctx, a.companyId, 'ROLE', who, `agent-run:${a.runId}`, 'unknown finance agent seat');
+  if (!['running', 'done', 'rejected', 'failed'].includes(a.status) || !['live', 'mock', 'replay'].includes(a.mode)) return audit(ctx, a.companyId, 'ROLE', who, `agent-run:${a.runId}`, 'invalid run status or mode');
+  const row = {
+    ...a, inputJson: a.inputJson.slice(0, 120_000), outputJson: a.outputJson.slice(0, 120_000), rejectReason: a.rejectReason.slice(0, 2_000),
+    runUrl: a.runUrl.slice(0, 2_000), agentId: a.agentId.slice(0, 200), ms: Math.min(a.ms, 2_147_483_647), at: ctx.timestamp,
+  };
+  if (ctx.db.financeAgentRun.runId.find(a.runId)) ctx.db.financeAgentRun.runId.update(row);
+  else ctx.db.financeAgentRun.insert(row);
+});

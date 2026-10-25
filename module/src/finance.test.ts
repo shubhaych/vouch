@@ -4,10 +4,11 @@ import { seedWorldImpl } from './economy';
 import { takeSeat } from './control';
 import { approveImpl, bookImpl, editEntryImpl, lockPeriodImpl, prepareImpl, requestImpl, type Actor } from './finance-ledger';
 import { accrueImpl, applyReturnImpl, closeLiteImpl, openObligationImpl, reverseImpl } from './finance-obligations';
-import { advanceImpl, seedPortfolioImpl } from './finance-sim';
+import { advanceImpl, financeRecordGuardianImpl, seedPortfolioImpl } from './finance-sim';
 import { scorePortfolioImpl } from './finance-score';
 import { trialBalance, sumBalances } from './finance/ledger';
 import { SIM } from './finance/sim-config';
+import { zeroSignals } from './finance/exposure';
 import type { Ctx } from './ctx';
 
 // The Desk's controls run as real reducers here (the in-process SpacetimeDB
@@ -132,6 +133,44 @@ describe('the 100-company portfolio', () => {
     expect(a.claims).toEqual(b.claims);
     expect(a.truth).toEqual(b.truth);
     expect(a.entries).toBeGreaterThan(0);
+  });
+
+  it('applies a Guardian move only when the code permits it; Pause still waits for a controller', () => {
+    const k = desk();
+    const setSignals = (rung: string, high: boolean) => k.as(worker, (ctx) => {
+      const st = ctx.db.financeCompanyState.companyId.find(COMPANY)!;
+      const signals = zeroSignals();
+      if (high) {
+        signals.refund_share_vs_baseline = 25_000;
+        signals.contradicted_rate = 26_00;
+        signals.ring_concentration = 25_00;
+        signals.leg1_exposure_vs_cash = 11_00;
+      }
+      ctx.db.financeCompanyState.companyId.update({ ...st, rung, signalsJson: JSON.stringify({ now: signals, prev: signals, pausePending: false }) });
+    });
+    const notice = (hours: number) => `Your refund is under review. We will update you within ${hours} hours.`;
+
+    setSignals('normal', true);
+    k.as(worker, (ctx) => financeRecordGuardianImpl(ctx, { companyId: COMPANY, proposedRung: 'watch', reason: 'Code allows Watch.', customerNotice: notice(24), expiresInHours: 24, runId: 'guardian-watch', mode: 'mock' }));
+    k.as(worker, (ctx) => {
+      expect(ctx.db.financeCompanyState.companyId.find(COMPANY)?.rung).toBe('watch');
+      expect(ctx.db.financeExposureProposal.companyId.find(COMPANY)?.accepted).toBe(true);
+    });
+
+    setSignals('hedge', true);
+    k.as(worker, (ctx) => financeRecordGuardianImpl(ctx, { companyId: COMPANY, proposedRung: 'pause', reason: 'Three sustained signals include ring concentration.', customerNotice: notice(72), expiresInHours: 72, runId: 'guardian-pause', mode: 'mock' }));
+    k.as(worker, (ctx) => {
+      expect(ctx.db.financeCompanyState.companyId.find(COMPANY)?.rung).toBe('hedge');
+      expect([...ctx.db.financeQueue.companyId.filter(COMPANY)].some((q) => q.kind === 'pause_confirm' && q.status === 'open')).toBe(true);
+    });
+
+    setSignals('normal', false);
+    k.as(worker, (ctx) => financeRecordGuardianImpl(ctx, { companyId: COMPANY, proposedRung: 'pause', reason: 'unsupported', customerNotice: notice(72), expiresInHours: 72, runId: 'guardian-invalid', mode: 'mock' }));
+    k.as(worker, (ctx) => {
+      expect(ctx.db.financeCompanyState.companyId.find(COMPANY)?.rung).toBe('normal');
+      expect(ctx.db.financeExposureProposal.companyId.find(COMPANY)?.accepted).toBe(false);
+      expect(audits(ctx, 'GUARDIAN_OUT_OF_BOUNDS')).toHaveLength(1);
+    });
   });
 
   it('every paid sim claim books balanced entries, and the scorer writes its rows', () => {

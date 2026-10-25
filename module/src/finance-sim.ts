@@ -324,9 +324,11 @@ export function signalsFor(ctx: Ctx, companyId: number, h: number): Signals {
 function exposureCheck(ctx: Ctx, h: number) {
   for (const c of COMPANIES) {
     const st = ctx.db.financeCompanyState.companyId.find(c.id)!;
-    const saved = JSON.parse(st.signalsJson || '{}') as { now?: Signals; prev?: Signals | null; pausePending?: boolean };
+    const saved = JSON.parse(st.signalsJson || '{}') as { now?: Signals; prev?: Signals | null; pausePending?: boolean; checks?: { hour: number; signals: Signals; evidence_ids: string[] }[] };
     const now = signalsFor(ctx, c.id, h);
     const prev = saved.now ?? undefined;
+    const source = [...ctx.db.financeStatsHourly.simHour.filter(h)].find((row) => row.companyId === c.id);
+    const checks = [...(saved.checks ?? []), { hour: h, signals: now, evidence_ids: source ? [String(source.id)] : [] }].slice(-6);
     const step = codeStep(st.rung as Rung, st.rungSinceHour, h, now, prev);
     let pausePending = !!saved.pausePending && st.rung === 'hedge';
     if (step.pausePending && !pausePending) {
@@ -343,7 +345,7 @@ function exposureCheck(ctx: Ctx, h: number) {
       if (RUNGS.indexOf(step.next) < RUNGS.indexOf('hedge')) pausePending = false;
     }
     ctx.db.financeCompanyState.companyId.update({
-      ...st, rung: step.next, rungSinceHour: step.next !== st.rung ? h : st.rungSinceHour, signalsJson: JSON.stringify({ now, prev: prev ?? null, pausePending }), updatedHour: h,
+      ...st, rung: step.next, rungSinceHour: step.next !== st.rung ? h : st.rungSinceHour, signalsJson: JSON.stringify({ now, prev: prev ?? null, pausePending, checks }), updatedHour: h,
     });
   }
 }
@@ -514,21 +516,45 @@ export const financeConfirmPause = spacetimedb.reducer({ companyId: t.u16(), con
   }
 });
 
-/** The Guardian's (CREAO) proposal, bounded by code: it must name an allowed rung, one step at most. Advisory. */
-export const financeRecordGuardian = spacetimedb.reducer({
-  companyId: t.u16(), proposedRung: t.string(), reason: t.string(), customerNotice: t.string(), expiresInHours: t.u32(), runId: t.string(), mode: t.string(),
-}, (ctx, a) => {
+/** The Guardian's proposal is validated and applied only inside the reducer. */
+export function financeRecordGuardianImpl(ctx: Ctx, a: { companyId: number; proposedRung: string; reason: string; customerNotice: string; expiresInHours: number; runId: string; mode: string }) {
   const who = allow(ctx, `exposure:${a.companyId}`, 'analyst', 'worker');
   if (!who) return;
   const st = ctx.db.financeCompanyState.companyId.find(a.companyId);
   const s = ctx.db.financeSimState.id.find(1);
   if (!st || !s) return;
-  const saved = JSON.parse(st.signalsJson || '{}') as { now?: Signals; prev?: Signals | null };
+  const saved = JSON.parse(st.signalsJson || '{}') as { now?: Signals; prev?: Signals | null; pausePending?: boolean };
   const allowedR = allowedFor(st.rung as Rung, saved.now ?? zeroSignals(), saved.prev ?? undefined);
   const accepted = allowedR.includes(a.proposedRung as Rung);
   if (!accepted) audit(ctx, a.companyId, 'GUARDIAN_OUT_OF_BOUNDS', who, `exposure:${a.companyId}`, `proposed ${a.proposedRung}; allowed: ${allowedR.join(', ')}`);
+  if (accepted) {
+    const expiry = a.proposedRung === 'hedge' || a.proposedRung === 'pause' ? POLICY.exposure.expiryHours[a.proposedRung] : POLICY.exposure.expiryHours.watch;
+    if (a.expiresInHours !== expiry) return audit(ctx, a.companyId, 'GUARDIAN_EXPIRY', who, `exposure:${a.companyId}`, `expiry ${a.expiresInHours} does not match ${a.proposedRung} policy (${expiry} h)`);
+    if (!/under review/i.test(a.customerNotice) || !new RegExp(`\\b(?:within|in)\\s+${a.expiresInHours}\\s+hours?\\b`, 'i').test(a.customerNotice) || /\b(denied|declined|rejected)\b/i.test(a.customerNotice)) {
+      return audit(ctx, a.companyId, 'GUARDIAN_NOTICE', who, `exposure:${a.companyId}`, 'notice must preserve the customer refund and state the configured update time');
+    }
+  }
   const row = { companyId: a.companyId, proposedRung: a.proposedRung, allowedJson: JSON.stringify(allowedR), reason: a.reason.slice(0, 1000), customerNotice: a.customerNotice.slice(0, 1000), expiresInHours: a.expiresInHours, runId: a.runId, mode: a.mode, accepted, simHour: s.simHour };
   if (ctx.db.financeExposureProposal.companyId.find(a.companyId)) ctx.db.financeExposureProposal.companyId.update(row);
   else ctx.db.financeExposureProposal.insert(row);
-});
+  if (!accepted || a.proposedRung === st.rung) return;
+  if (a.proposedRung === 'pause') {
+    if (!saved.pausePending) {
+      ctx.db.financeQueue.insert({
+        id: 0n, companyId: a.companyId, kind: 'pause_confirm', title: `Company ${a.companyId}: confirm the Exposure Guardian's pause proposal`,
+        detailJson: JSON.stringify({ reason: a.reason, customerNotice: a.customerNotice, expiryHours: a.expiresInHours, signals: saved.now ?? zeroSignals(), nobodyDenied: true }),
+        targetRef: `exposure:${a.companyId}`, status: 'open', answer: '', reason: '', requestedBy: who.who, decidedBy: undefined, precedentId: 0n, at: ctx.timestamp, decidedAt: undefined,
+      });
+      ctx.db.financeExposureLog.insert({ id: 0n, companyId: a.companyId, fromRung: st.rung, toRung: 'pause_proposed', by: 'guardian', reason: a.reason.slice(0, 1000), signalsJson: JSON.stringify(saved.now ?? zeroSignals()), simHour: s.simHour, at: ctx.timestamp });
+    }
+    ctx.db.financeCompanyState.companyId.update({ ...st, signalsJson: JSON.stringify({ ...saved, pausePending: true }) });
+    return;
+  }
+  ctx.db.financeCompanyState.companyId.update({ ...st, rung: a.proposedRung, rungSinceHour: s.simHour, signalsJson: JSON.stringify({ ...saved, pausePending: false }) });
+  ctx.db.financeExposureLog.insert({ id: 0n, companyId: a.companyId, fromRung: st.rung, toRung: a.proposedRung, by: 'guardian', reason: a.reason.slice(0, 1000), signalsJson: JSON.stringify(saved.now ?? zeroSignals()), simHour: s.simHour, at: ctx.timestamp });
+}
+
+export const financeRecordGuardian = spacetimedb.reducer({
+  companyId: t.u16(), proposedRung: t.string(), reason: t.string(), customerNotice: t.string(), expiresInHours: t.u32(), runId: t.string(), mode: t.string(),
+}, (ctx, a) => financeRecordGuardianImpl(ctx, a));
 

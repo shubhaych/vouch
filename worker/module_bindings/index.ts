@@ -62,6 +62,7 @@ import FinanceInjectEventReducer from "./finance_inject_event_reducer";
 import FinanceLockPeriodReducer from "./finance_lock_period_reducer";
 import FinanceOpenObligationReducer from "./finance_open_obligation_reducer";
 import FinancePrepareEntryReducer from "./finance_prepare_entry_reducer";
+import FinanceRecordAgentRunReducer from "./finance_record_agent_run_reducer";
 import FinanceRecordCloseReducer from "./finance_record_close_reducer";
 import FinanceRecordGuardianReducer from "./finance_record_guardian_reducer";
 import FinanceRequestEntryReducer from "./finance_request_entry_reducer";
@@ -1007,6 +1008,7 @@ const reducersSchema = __reducers(
   __reducerSchema("finance_lock_period", FinanceLockPeriodReducer),
   __reducerSchema("finance_open_obligation", FinanceOpenObligationReducer),
   __reducerSchema("finance_prepare_entry", FinancePrepareEntryReducer),
+  __reducerSchema("finance_record_agent_run", FinanceRecordAgentRunReducer),
   __reducerSchema("finance_record_close", FinanceRecordCloseReducer),
   __reducerSchema("finance_record_guardian", FinanceRecordGuardianReducer),
   __reducerSchema("finance_request_entry", FinanceRequestEntryReducer),

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTable } from "spacetimedb/react";
 import { tables } from "@/module_bindings";
@@ -13,6 +13,10 @@ import { toast } from "@/components/ui/toast";
 
 const cents = (n: bigint | number) => money(Number(n) / 100);
 const PERIODS = ["2026-09", "2026-08", "2026-07", "2026-06", "2026-05", "2026-04", "2026-03", "2026-02", "2026-01", "2025-12", "2025-11", "2025-10"];
+const FINANCE_SEATS = [
+  ["impact_analyst", "Finance Impact Analyst"], ["impact_reviewer", "Finance Impact Reviewer"],
+  ["close_controller", "Close Controller"], ["advisor", "Forecast and Drivers Advisor"], ["guardian", "Exposure Guardian"],
+] as const;
 
 export function FinanceDesk() {
   const params = useSearchParams();
@@ -30,6 +34,9 @@ export function FinanceDesk() {
   const [queue] = useTable(tables.financeQueue.where((r) => r.companyId.eq(selectedId)));
   const [closes] = useTable(tables.financeClose.where((r) => r.companyId.eq(selectedId)));
   const [bridgeRows] = useTable(tables.financeBridge.where((r) => r.companyId.eq(selectedId)));
+  const [agentRuns] = useTable(tables.financeAgentRun.where((r) => r.companyId.eq(selectedId)));
+  const [agentSetup, setAgentSetup] = useState<Record<string, { configured: boolean; found: boolean; nameMatches: boolean; checked: boolean }> | null>(null);
+  const [claimAnalysis, setClaimAnalysis] = useState("idle");
   const company = companies.find((c) => c.id === selectedId);
   const state = states[0];
   const latest = useMemo(() => [...hours].sort((a, b) => Number(b.simHour - a.simHour))[0], [hours]);
@@ -40,6 +47,37 @@ export function FinanceDesk() {
   const isLivePortfolio = !!simState[0];
   const close = closes.find((c) => c.period === period);
   const bridge = bridgeRows.filter((b) => b.period === period).sort((a, b) => Number(b.id - a.id));
+
+  useEffect(() => {
+    let active = true;
+    fetch(`${WORKER_URL}/finance/creao/status`).then((r) => r.ok ? r.json() : []).then((rows: { seat: string; configured: boolean; found: boolean; nameMatches: boolean; checked: boolean }[]) => {
+      if (active) setAgentSetup(Object.fromEntries(rows.map((r) => [r.seat, { configured: r.configured, found: r.found, nameMatches: r.nameMatches, checked: r.checked }])));
+    }).catch(() => { if (active) setAgentSetup(null); });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!claimRef || selectedId !== 1) return;
+    let active = true;
+    setClaimAnalysis("checking final decision");
+    fetch(`${WORKER_URL}/finance/claim/${encodeURIComponent(claimRef)}/analyze`, { method: "POST" })
+      .then(async (response) => {
+        const body = await response.json() as { status?: string; error?: string };
+        if (!response.ok) throw new Error(body.error || `Analysis request failed (${response.status})`);
+        if (active) setClaimAnalysis(body.status === "already_recorded" ? "already recorded" : "queued after final decision");
+      })
+      .catch((error: Error) => { if (active) setClaimAnalysis(error.message); });
+    return () => { active = false; };
+  }, [claimRef, selectedId]);
+
+  const latestRuns = useMemo(() => {
+    const bySeat = new Map<string, typeof agentRuns[number]>();
+    for (const run of agentRuns) {
+      const previous = bySeat.get(run.seat);
+      if (!previous || run.at.microsSinceUnixEpoch > previous.at.microsSinceUnixEpoch) bySeat.set(run.seat, run);
+    }
+    return bySeat;
+  }, [agentRuns]);
 
   const runClose = async () => {
     setClosing(true);
@@ -79,7 +117,7 @@ export function FinanceDesk() {
         <Link className="text-xs text-accent underline" href="/business">Controller access</Link>
       </div>
 
-      {claimRef ? <div className="glass border border-accent/30 p-3 text-sm" data-testid="desk-claim-context">Finance impact requested for claim <span className="font-mono font-semibold">{claimRef}</span>. The portfolio view below is the company-wide context; claim-level posting details appear once the finance hook records this claim.</div> : null}
+      {claimRef ? <div className="glass border border-accent/30 p-3 text-sm" data-testid="desk-claim-context">Finance impact requested for claim <span className="font-mono font-semibold">{claimRef}</span>. Company-books agents run only after the business decision is final. <span className="ml-1 text-xs text-ink-soft-dark">{claimAnalysis}</span></div> : null}
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric title="Refund sales impact" value={state ? cents(state.refundedCents) : "—"} note="Simulated portfolio total" />
@@ -137,6 +175,27 @@ export function FinanceDesk() {
           <p className="text-xs text-ink-soft-dark">{close.memo}</p>
         </> : <p className="text-sm text-ink-soft-dark">No close snapshot for {period} yet.</p>}
         {bridge.length ? <div className="overflow-x-auto"><table className="w-full min-w-[660px] text-left text-sm"><thead className="text-xs text-ink-soft-dark"><tr><th className="p-2">Variance bridge</th><th className="p-2">Delta</th><th className="p-2">Authority</th><th className="p-2">Explanation</th></tr></thead><tbody>{bridge.map((b) => <tr key={String(b.id)} className="border-t border-line-dark/70"><td className="p-2">{b.cause}</td><td className="p-2 font-mono">{cents(b.cents)}</td><td className="p-2">{b.winner}</td><td className="p-2 text-xs text-ink-soft-dark">{b.why} · {b.explained ? "explained" : "unexplained"}</td></tr>)}</tbody></table><p className="mt-2 text-right text-xs text-ink-soft-dark">Bridge total: {cents(bridge.reduce((sum, b) => sum + b.cents, 0n))}</p></div> : null}
+      </section>
+
+      <section className="glass space-y-3 p-4" data-testid="finance-agent-proof">
+        <div>
+          <p className="panel-title">Finance CREAO agents · proof and run record</p>
+          <p className="mt-1 text-xs text-ink-soft-dark">Finance judgments run after the close snapshot is recorded. They cannot hold up the refund flow or change ledger amounts.</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="text-xs text-ink-soft-dark"><tr><th className="p-2">Seat</th><th className="p-2">Connection</th><th className="p-2">Latest run</th><th className="p-2">Judgment</th><th className="p-2">Record</th></tr></thead>
+            <tbody>{FINANCE_SEATS.map(([seat, name]) => {
+              const run = latestRuns.get(seat);
+              const setup = agentSetup?.[seat];
+              const modeLabel = run?.mode === "live" ? "Live" : run?.mode === "replay" ? "Replay of real run" : run ? "Simulated" : undefined;
+              const output = run?.outputJson ? (() => { try { return JSON.parse(run.outputJson) as Record<string, unknown>; } catch { return undefined; } })() : undefined;
+              const judgment = output ? (typeof output.rationale === "string" ? output.rationale : typeof output.memo === "string" ? output.memo : typeof output.why_period_moved === "string" ? output.why_period_moved : typeof output.reason === "string" ? output.reason : JSON.stringify(output)) : run?.rejectReason || "No run recorded yet";
+              const connection = !setup ? "Worker status unavailable" : !setup.checked ? "Key missing · not checked" : !setup.configured ? "Agent ID missing" : !setup.found ? "ID not found" : !setup.nameMatches ? "Name mismatch" : "Found · name matches";
+              return <tr key={seat} className="border-t border-line-dark/70 align-top"><td className="p-2 font-medium">{name}</td><td className="p-2">{connection}</td><td className="p-2">{modeLabel ?? "—"}{run ? <span className="block text-xs text-ink-soft-dark">{run.caseRef} · {run.status} · {run.ms} ms</span> : null}</td><td className="max-w-[32rem] p-2 text-xs text-ink-soft-dark">{judgment}</td><td className="p-2">{run?.runUrl ? <a className="text-accent underline" href={run.runUrl} target="_blank" rel="noreferrer">Open run</a> : run?.valid ? "Schema valid" : run ? "Output rejected" : "—"}</td></tr>;
+            })}</tbody>
+          </table>
+        </div>
       </section>
 
       <section className="glass overflow-hidden">
