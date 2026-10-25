@@ -63,7 +63,8 @@ export async function buildProof(state: CaseState, meta: VideoMeta, sourceFile: 
     const still = `proof/still_${f.id}.jpg`;
     const mid = (f.tStart + f.tEnd) / 2;
     if (await ff(log, ['-y', '-v', 'error', '-ss', Math.min(dur - 0.05, mid).toFixed(2), '-i', 'video.mp4', '-frames:v', '1', '-vf', 'scale=960:-2', '-q:v', '3', still], dir, `still for finding ${f.id}`)) {
-      await state.addArtifact({ kind: 'frame', path: still, tStart: mid, tEnd: mid, label: `still at ${mid.toFixed(1)} s for finding ${f.id}`, sha256: '' });
+      const rec = await state.addArtifact({ kind: 'frame', path: still, tStart: mid, tEnd: mid, label: `still at ${mid.toFixed(1)} s for finding ${f.id}`, sha256: '' });
+      if (!f.artifactIds.includes(rec.id)) f.artifactIds.push(rec.id);
     }
   }
   let reel: string | null = null;
@@ -95,6 +96,8 @@ export function linkExistingClips(state: CaseState): boolean {
     const clip = [...state.artifacts.values()].find((a) => a.path === `proof/clip_${f.id}.mp4` && existsSync(resolve(state.dir, a.path)));
     if (!clip) { all = false; continue; }
     if (!f.artifactIds.includes(clip.id)) f.artifactIds = [...f.artifactIds, clip.id];
+    const still = [...state.artifacts.values()].find((a) => a.path === `proof/still_${f.id}.jpg`);
+    if (still && !f.artifactIds.includes(still.id)) f.artifactIds.push(still.id);
   }
   return all && state.findings.size > 0;
 }

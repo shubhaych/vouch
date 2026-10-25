@@ -10,6 +10,7 @@ import { call } from '../stdb';
 import { signPath } from '../video';
 import type { NewArtifact } from './ingest';
 import { relCase, rowId, sha256File } from './paths';
+import type { AssessmentDraft } from './assessment';
 
 export interface ArtifactRec { id: bigint; kind: string; path: string; url: string; tStart: number; tEnd: number; label: string; sha256: string }
 export interface FindingRec {
@@ -32,6 +33,7 @@ async function must(what: string, p: Promise<unknown>): Promise<void> {
 export class CaseState {
   readonly artifacts = new Map<bigint, ArtifactRec>();
   readonly findings = new Map<bigint, FindingRec>();
+  assessment?: AssessmentDraft;
   private nArtifact = 0;
   private nFinding = 0;
   readonly logFile: string;

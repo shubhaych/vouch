@@ -7,7 +7,7 @@
 // Every step writes an analysis_step row the phone shows live, every file Droid
 // may cite is an artifact row, and the report is one validated JSON blob. When
 // Droid cannot run the pipeline still finishes as "automated checks only",
-// capped at T3. Nothing here can decline a refund.
+// capped at T3. Rejection recommendations always require a human decision.
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { DbConnection } from '../../module_bindings/index';
@@ -21,6 +21,7 @@ import { mirrorOf } from '../mirror';
 import type { CredentialChecker } from '../orchestrator';
 import { call } from '../stdb';
 import { auditFindings } from './audit';
+import { assessRefund, challengeOf, nextMove } from './assessment';
 import { buildCaseServer, type CaseContext } from './case-tools';
 import { extractClaims } from './claims';
 import { reviewWithCreao } from './creao-review';
@@ -55,9 +56,9 @@ const pct = (x: number) => `${Math.round(x * 100)}%`;
 /** What the phone says when neither the Liaison nor the Reviewer wrote a customer line. */
 export function customerLine(tier: Tier, now: number, later: number): string {
   switch (tier) {
-    case 'T1': return `Thanks for the video. Your refund of ${money(now)} is approved.`;
-    case 'T2': return `Thanks for the video. ${money(now)} is refunded now; ${money(later)} follows when the return is scanned.`;
-    case 'T3': return `Thanks for the video. Your refund of ${money(later)} is paid when the return is scanned.`;
+    case 'T1': return `Thanks for the video. A refund of ${money(now)} is recommended, pending approval.`;
+    case 'T2': return `Thanks for the video. The recommendation is ${money(now)} now and ${money(later)} on return, pending approval.`;
+    case 'T3': return `Thanks for the video. A refund of ${money(later)} on return is recommended, pending approval.`;
     case 'T4': return 'Thanks for the video. One more short clip would settle this: the item and the problem in one continuous take.';
     default: return 'Thanks for the video. A member of the team is reviewing your claim.';
   }
@@ -71,6 +72,7 @@ export interface ReviewRunnerOptions {
 }
 
 class ReviewFailure extends Error {}
+
 
 export class ReviewRunner {
   readonly budget = new DroidBudget(config.review.maxDroidSessionsPerHour);
@@ -124,11 +126,20 @@ export class ReviewRunner {
     return this.conn.db.control.key.find('creao_enabled')?.value === 'true';
   }
 
-  private uploadFile(claimId: bigint): string | null {
+  private uploadFile(claimId: bigint, base: 'video' | 'extra' = 'video'): string | null {
     const dir = resolve(config.mediaDir, String(claimId));
     if (!existsSync(dir)) return null;
-    const f = readdirSync(dir).find((n) => /^video\.[a-z0-9]+$/i.test(n));
+    const f = readdirSync(dir).find((n) => new RegExp(`^${base}\\.[a-z0-9]+$`, 'i').test(n));
     return f ? resolve(dir, f) : null;
+  }
+
+  /** What the customer was asked to film in their extra clip: the evidence lines of the last more-evidence proposal. */
+  private extraRequest(refundId: bigint): string[] {
+    const asked = [...this.conn.db.decision.iter()].filter((d) => d.refundId === refundId && d.action === 'more_evidence').sort((a, b) => Number(b.id - a.id))[0];
+    if (!asked) return [];
+    try {
+      return (JSON.parse(asked.reasonsJson) as { text: string; cites: string }[]).filter((x) => x.cites === 'evidence:requested').map((x) => x.text);
+    } catch { return []; }
   }
 
   private async run(c: Claim) {
@@ -160,8 +171,11 @@ export class ReviewRunner {
     let creaoRuns = 0;
     let current: StepKey = 'ingest';
     const t0 = Date.now();
+    const started = new Map<StepKey, number>();
     const step = async (key: StepKey, status: '' | 'pending' | 'running' | 'done' | 'failed' | 'skipped', summary = '', note = '') => {
       current = key;
+      if (status === 'running') started.set(key, Date.now());
+      if (['done', 'failed', 'skipped'].includes(status) && started.has(key)) state.log(`timing ${key}: ${Date.now() - started.get(key)!} ms`);
       await state.step(key, status, summary, note);
     };
     state.log(`=== ${caseRef} job ${jobId} (attempt ${attempt}, ${droidOk ? 'Droid live' : 'lanes only'})`);
@@ -169,33 +183,36 @@ export class ReviewRunner {
     try {
       const source = this.uploadFile(c.id);
       if (!source) throw new ReviewFailure('the uploaded video is not on this worker');
-      // 1. ingest
-      await step('ingest', 'running', '', 'Receiving your video');
-      const ing = await ingest(dir, source);
+      const checks = JSON.parse(c.checksJson || '{}') as UploadChecks;
+      const extra = (checks.clips ?? 1) >= 2 ? this.uploadFile(c.id, 'extra') : null;
+      if ((checks.clips ?? 1) >= 2 && !extra) throw new ReviewFailure('the extra clip is not on this worker');
+      // 1. ingest (with an extra clip, both clips become one timeline)
+      await step('ingest', 'running', '', extra ? 'Receiving your extra clip' : 'Receiving your video');
+      const ing = await ingest(dir, source, extra ?? undefined);
       state.durationS = ing.meta.durationS;
-      for (const a of ing.artifacts) await state.addArtifact(a);
+      for (let i = 0; i < ing.artifacts.length; i += 4) await Promise.all(ing.artifacts.slice(i, i + 4).map((a) => state.addArtifact(a)));
       limits.push(...ing.limits);
-      await step('ingest', 'done', `${ing.meta.durationS.toFixed(1)} s, ${ing.meta.width}×${ing.meta.height}, ${ing.meta.fps} fps, ${ing.meta.hasAudio ? 'with audio' : 'no audio track'}; sha256 ${ing.sha256.slice(0, 12)}…`);
+      await step('ingest', 'done', `${ing.clips.length > 1 ? `claim video + extra clip (joined at ${ing.clips[1]!.tStart.toFixed(1)} s), ` : ''}${ing.meta.durationS.toFixed(1)} s, ${ing.meta.width}×${ing.meta.height}, ${ing.meta.fps} fps, ${ing.meta.hasAudio ? 'with audio' : 'no audio track'}; sha256 ${ing.sha256.slice(0, 12)}…`);
       await step('frames', 'done', `${ing.uniform.length} frames at 2 fps, ${ing.scenes.length} scene changes, ${ing.mosaics.length} contact sheets`, 'Looking at the footage');
 
       // 2. transcript and integrity lanes, side by side
       await step('transcript', 'running', '', ing.meta.hasAudio ? 'Listening to what you said' : 'No audio track to listen to');
       await step('integrity', 'running', '', 'Checking the recording itself');
-      const checks = JSON.parse(c.checksJson || '{}') as UploadChecks;
       const openedAt = new Date(Number(c.createdAt.microsSinceUnixEpoch / 1000n));
-      const [tr, integ] = await Promise.all([transcribeLane(dir, ing.meta.hasAudio), integrityLane(dir, ing, checks, c.fingerCount, openedAt)]);
+      const extraAt = checks.extra_requested_at ? new Date(checks.extra_requested_at) : undefined;
+      const [tr, integ] = await Promise.all([transcribeLane(dir, ing.meta.hasAudio), integrityLane(dir, ing, checks, c.fingerCount, openedAt, extraAt)]);
       for (const a of tr.artifacts) await state.addArtifact(a);
       for (const a of integ.artifacts) await state.addArtifact(a);
       if (tr.limit && ing.meta.hasAudio) limits.push(tr.limit); // without audio, ingest already recorded the limit
       limits.push(...integ.limits);
-      await step('transcript', tr.transcript?.segments.length ? 'done' : 'skipped', tr.transcript?.segments.length ? `${tr.transcript.words.length} words in ${tr.transcript.segments.length} segments` : tr.limit ?? '');
+      await step('transcript', tr.status === 'failed' ? 'failed' : tr.status === 'done' ? 'done' : 'skipped', tr.transcript?.segments.length ? `${tr.transcript.words.length} words in ${tr.transcript.segments.length} segments` : tr.limit ?? '', tr.limit ?? 'Transcript ready');
       await step('integrity', 'done', integ.doc.notes.length ? integ.doc.notes.join(' ') : 'Nothing flagged by the automated checks (internally consistent, not proof of authenticity).');
 
       // 3. spoken claims
       const item = catalogItem(purchase.item);
       const claimsRes = await extractClaims(
         { transcript: tr.transcript, reasonText: refund.reasonText, reasonCode: refund.reasonCode, itemName: item?.name ?? 'the item', durationS: ing.meta.durationS },
-        droidOk && this.budget.take(), dir,
+        droidOk && config.review.droidClaims && this.budget.take(), dir,
       );
       if (claimsRes.source === 'droid') droidSessions++;
       const claims = claimsRes.claims;
@@ -221,6 +238,7 @@ export class ReviewRunner {
         transcriptNote: tr.transcript?.segments.length ? `transcript.json (word timestamps) and transcript.txt: ${tr.transcript.words.length} words` : tr.limit ?? 'No transcript.',
         integrity: integ.doc,
         ingest: ing,
+        ...(extra ? { extraRequest: this.extraRequest(refund.id) } : {}),
       };
       const caseMd = caseMarkdown(facts);
       writeFileSync(resolve(dir, 'CASE.md'), caseMd);
@@ -238,6 +256,7 @@ export class ReviewRunner {
           const gaps = [
             ...(missing.length ? [`claim${missing.length === 1 ? '' : 's'} ${missing.join(', ')} ${missing.length === 1 ? 'has' : 'have'} no finding yet`] : []),
             ...(fs.some((f) => f.kind === 'integrity' && f.spokenClaimId.startsWith('challenge:')) ? [] : ['the finger challenge has no integrity finding']),
+            ...(state.assessment ? [] : ['recommend_refund has not recorded a recommendation with amount, pro/con evidence, and statement analysis']),
           ];
           return gaps.length ? gaps.join('; ') : null;
         };
@@ -292,7 +311,8 @@ export class ReviewRunner {
         clips = state.findings.size;
         reel = [...state.artifacts.values()].some((a) => a.path === 'proof/reel.mp4') ? 'proof/reel.mp4' : null;
       } else {
-        const proof = await buildProof(state, ing.meta, sourceName(source));
+        // Cut from the normalised timeline when two clips were joined; from the untouched upload otherwise.
+        const proof = await buildProof(state, ing.meta, extra ? 'video.mp4' : sourceName(source));
         clips = proof.clips.length;
         reel = proof.reel;
         limits.push(...proof.limits);
@@ -301,7 +321,10 @@ export class ReviewRunner {
 
       // 7. audit: the Droid auditor's verdicts, then the worker's own checks on top (a rejection by either sticks)
       await step('audit', 'running', '', 'Auditing the report');
-      if (sdk && !lanesOnly && state.findings.size && this.budget.take()) {
+      writeFileSync(resolve(dir, 'audit-input.json'), JSON.stringify({
+        findings: [...state.findings.values()], artifacts: [...state.artifacts.values()].map(({ url: _url, ...a }) => a), claims, assessment: state.assessment,
+      }, (_key, value: unknown) => typeof value === 'bigint' ? String(value) : value, 2));
+      if (sdk && config.review.droidAuditor && !lanesOnly && state.findings.size && this.budget.take()) {
         const server = await buildCaseServer(sdk, 'auditor', { ...ctx, liveNote: (text) => state.step('audit', '', '', text) });
         const unfinished = () => {
           const left = [...state.findings.values()].filter((f) => f.auditStatus === 'pending').map((f) => f.id);
@@ -350,7 +373,8 @@ export class ReviewRunner {
       await step('score', 'done', `P(legit) ${pct(score.legit.pLegit)} (E ${score.support.eSupport.toFixed(2)}, C ${score.support.coverage.toFixed(2)}, I ${score.integrity.toFixed(2)}) → ${tier.tier} ${TIER_LABEL[tier.tier]}`);
 
       // 9. the report, the CREAO Refund Reviewer, then the final report with its review
-      const reportInput = { claimId: c.id, businessId: business.id, state, ing, claims, reasonCode: refund.reasonCode, reasonText: refund.reasonText, integrity: integ.doc, score, sessions, lanesOnly, limits, reel, transcribed: !!tr.transcript?.segments.length };
+      const factoryAssessment = assessRefund(state.assessment, [...state.findings.values()], claims, refund.amount, lanesOnly);
+      const reportInput = { claimId: c.id, businessId: business.id, state, ing, claims, reasonCode: refund.reasonCode, reasonText: refund.reasonText, order: { item: facts.order.item, description: facts.order.description, priceCents: purchase.amount, requestedCents: refund.amount }, integrity: integ.doc, score, sessions, lanesOnly, limits, reel, transcribed: !!tr.transcript?.segments.length, transcript: tr, factoryAssessment };
       const draft = assembleReport(reportInput);
       await step('review', 'running', '', 'The CREAO Refund Reviewer is reading the report');
       const creaoOn = this.creaoOn();
@@ -368,31 +392,76 @@ export class ReviewRunner {
       await r.writeReport({ claimId: c.id, jobId, json: files.json, markdownPath: files.md, proofReelUrl: report.video.proofReelUrl, auditPassed: rejected === 0 });
       await step('review', review.provenance === 'offline' ? 'skipped' : 'done', review.provenance === 'offline' ? review.businessSummary : `${review.agrees ? 'Agrees' : 'Disagrees'} (${review.provenance}): ${review.businessSummary.slice(0, 400)}`);
 
-      // 10. the decision: a proposal a person acts on, or the one automatic pay-out the module allows
+      // 10. the decision: a proposal a person acts on, the one extra clip, or the one automatic pay-out the module allows
       await step('decision', 'running', '', 'Preparing the recommendation');
-      const customerMsg = outcome.liaison?.customerMessage || review.customerMessage || customerLine(tier.tier, tier.refundNowCents, tier.refundOnReturnCents);
+      const A = factoryAssessment;
+      const plural = c.fingerCount === 1 ? 'finger' : 'fingers';
+      const challenge = challengeOf(state);
+      const challengeMissed = !lanesOnly && (challenge === 'failed' || challenge === 'unclear');
+      const usedExtra = ing.clips.length > 1;
+      // The credit score is untouched by an extra-clip request or a hand-off to a person.
+      const move = nextMove(A, challenge, usedExtra, lanesOnly);
+      const wantsClip = move === 'extra_clip' || (move === 'person' && usedExtra && (challengeMissed || A.nextStep === 'extra_clip'));
+      const requests = [
+        ...(A.status === 'validated' && A.action === 'more_evidence' ? A.missingEvidence : []),
+        ...(challengeMissed ? [`End the clip by holding up ${c.fingerCount} ${plural} next to the item, clearly in frame.`] : []),
+      ];
+      const verdict = A.status === 'validated' && A.action !== 'more_evidence';
+      const reviewReason = review.provenance === 'offline' ? { text: review.businessSummary, cites: 'creao:offline' } : { text: `CREAO Refund Reviewer ${review.agrees ? 'agrees' : 'disagrees'}: ${review.businessSummary.slice(0, 300)}`, cites: `creao:${review.runId}` };
+      const factoryReasons = [
+        { text: `Factory (${A.status}): ${A.action === 'accept' ? `accept ${money(A.amountCents)}` : A.action}. ${A.rationale}`, cites: 'factory:assessment' },
+        ...A.forRefund.map((x) => ({ text: `For refund: ${x.reason}`, cites: `finding:${x.findingId}` })),
+        ...A.againstRefund.map((x) => ({ text: `Against refund: ${x.reason}`, cites: `finding:${x.findingId}` })),
+        ...A.guardNotes.map((text) => ({ text, cites: 'factory:guard' })),
+      ];
+      const challengeReason = challengeMissed ? [{ text: `The finger challenge (${c.fingerCount}) was ${challenge === 'failed' ? 'not shown' : 'unclear'} at the end of ${usedExtra ? 'the extra clip' : 'the video'}. This is a reason to retry, never evidence against the claim.`, cites: 'integrity:challenge' }] : [];
+      const runId = review.runId || `droid-${jobId}`;
+      // A model's friendly wording must not promise payment before the reducer commits it.
+      let customerMsg = A.status !== 'validated' ? 'Thanks for the video. A person will review the available evidence; processing did not produce a verified recommendation.'
+        : A.action === 'accept' ? `Thanks for the video. A refund of ${money(A.amountCents)} is recommended, pending approval and any return requirements.`
+        : A.action === 'decline' ? 'Thanks for the video. The review found evidence against the refund. A person must check it before any final decision.'
+        : 'Thanks for the video. A person at the store will review your claim.';
       if (!creaoOn) {
         // Same rule as the Desk Lead: with the kill switch off there is no proposal, and a person may only ask for more evidence.
         await call('recordEvidence', r.recordEvidence({ claimId: c.id, seat: 'system', runId: '', runUrl: '', json: JSON.stringify({ offline: true, reason: 'creao_enabled is off', report: 'written' }), provenance: 'live' }));
         await call('setClaimStatus', r.setClaimStatus({ claimId: c.id, status: 'offline' }));
         await step('decision', 'skipped', 'Investigator offline (CREAO kill switch): the report is ready; a person may only request more evidence.', 'A person will review your claim.');
+      } else if (move === 'extra_clip') {
+        await r.propose({
+          refundId: refund.id, action: 'more_evidence', amount: 0, method: 'none', confidence: A.confidence, runId, runUrl: outcome.runUrl,
+          reasonsJson: JSON.stringify([
+            { text: 'One extra clip was requested from the customer (the only one allowed). Nothing is paid or declined, and the credit score does not change, while it is pending.', cites: 'evidence:extra_clip' },
+            ...requests.map((text) => ({ text, cites: 'evidence:requested' })),
+            ...challengeReason, ...factoryReasons, reviewReason,
+          ]),
+        });
+        await call('setClaimStatus', r.setClaimStatus({ claimId: c.id, status: 'more_evidence' }));
+        customerMsg = `Thanks for the video. One more short clip would settle this: ${requests.join(' ')} You can send one extra clip.`;
+        await step('decision', 'done', `Extra clip requested (1 allowed): ${requests.join(' ')} No credit change.`, customerMsg);
+      } else if (move === 'person') {
+        // A person decides: the extra clip is used up, or no clip could settle it. The Factory verdict, if any, still leads.
+        const why = wantsClip ? 'The customer has already sent their one extra clip; a person decides.' : A.status === 'validated' ? `No clip can settle this: ${A.rationale}` : 'The recommendation did not pass its evidence checks; a person decides.';
+        const action = verdict ? A.action : 'more_evidence';
+        await r.propose({
+          refundId: refund.id, action, amount: action === 'accept' ? A.amountCents : 0, method: action === 'accept' ? 'original_payment' : 'none', confidence: A.confidence, runId, runUrl: outcome.runUrl,
+          reasonsJson: JSON.stringify([{ text: `Needs a person. ${why}`, cites: 'review:human' }, ...challengeReason, ...factoryReasons, reviewReason, ...requests.map((text) => ({ text, cites: 'evidence:requested' }))]),
+        });
+        customerMsg = `Thanks for ${usedExtra ? 'the extra clip' : 'the video'}. A person at the store will review your claim.`;
+        await step('decision', 'done', `${tier.tier} ${TIER_LABEL[tier.tier]}: needs a person (${wantsClip ? 'extra clip already used' : 'cannot be settled from video'}); proposed ${action}${action === 'accept' ? ` ${money(A.amountCents)}` : ''}.`, customerMsg);
       } else {
-        const payNow = tier.tier === 'T1' || tier.tier === 'T2';
-        const action = payNow || tier.tier === 'T3' ? 'accept' : 'more_evidence';
-        const amount = payNow ? tier.refundNowCents : tier.tier === 'T3' ? tier.refundOnReturnCents : 0;
-        const method = tier.tier === 'T3' ? 'original_payment_on_return' : tier.tier === 'T2' ? 'split_now_and_on_return' : 'original_payment';
-        const reasons = [
-          ...tier.reasons,
-          review.provenance === 'offline' ? { text: review.businessSummary, cites: 'creao:offline' } : { text: `CREAO Refund Reviewer ${review.agrees ? 'agrees' : 'disagrees'}: ${review.businessSummary.slice(0, 300)}`, cites: `creao:${review.runId}` },
-          ...(tier.evidenceRequested ?? []).map((text) => ({ text, cites: 'evidence:requested' })),
-        ];
-        await r.propose({ refundId: refund.id, action, amount, method, confidence: score.legit.pLegit, reasonsJson: JSON.stringify(reasons), runId: review.runId || `droid-${jobId}`, runUrl: outcome.runUrl });
+        const action = A.action;
+        const matchesTier = action === 'accept' && ['T1', 'T2', 'T3'].includes(tier.tier) && A.amountCents === tier.refundNowCents + tier.refundOnReturnCents;
+        const payNow = matchesTier && (tier.tier === 'T1' || tier.tier === 'T2');
+        const amount = matchesTier ? (tier.tier === 'T3' ? tier.refundOnReturnCents : tier.refundNowCents) : action === 'accept' ? A.amountCents : 0;
+        const method = matchesTier && tier.tier === 'T3' ? 'original_payment_on_return' : matchesTier && tier.tier === 'T2' ? 'split_now_and_on_return' : 'original_payment';
+        await r.propose({ refundId: refund.id, action, amount, method, confidence: A.confidence, reasonsJson: JSON.stringify([...factoryReasons, reviewReason]), runId, runUrl: outcome.runUrl });
         let decided = '';
         const limit = Math.min(autoLimit, MATERIALITY_CENTS);
         if (payNow && tier.autoDecidable && review.agrees && !lanesOnly && tier.refundNowCents > 0 && tier.refundNowCents <= limit) {
           try {
             await r.autoDecide({ refundId: refund.id, amount: tier.refundNowCents, note: `Auto-approved: ${tier.tier}, P(legit) ${pct(score.legit.pLegit)}, Reviewer agreed (${review.provenance})` });
             decided = ` Auto-approved ${money(tier.refundNowCents)} (within the ${money(limit)} limit).`;
+            customerMsg = `Thanks for the video. Your refund of ${money(tier.refundNowCents)} is approved.${tier.refundOnReturnCents ? ` ${money(tier.refundOnReturnCents)} remains conditional on the return.` : ''}`;
           } catch (e) {
             limits.push(`The automatic decision was refused: ${(e as Error).message.slice(0, 160)}`);
             state.log(`autoDecide refused: ${(e as Error).message}`);

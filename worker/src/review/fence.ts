@@ -38,7 +38,7 @@ export const DISABLED_TOOLS = ['WebSearch', 'FetchUrl', 'Task'];
 const READ_ONLY_TOOLS = new Set(['Read', 'LS', 'Glob', 'Grep', 'TodoWrite', 'ToolSearch']);
 export const WRITE_DIR: Record<Role, string> = { analyst: 'work', proof: 'proof', auditor: 'work' };
 export const MCP_TOOLS: Record<Role, string[]> = {
-  analyst: ['get_case', 'get_policy', 'get_customer_summary', 'vision_label', 'add_artifact', 'add_finding', 'set_live_note', 'list_findings', 'list_artifacts'],
+  analyst: ['get_case', 'get_policy', 'get_customer_summary', 'vision_label', 'add_artifact', 'add_finding', 'recommend_refund', 'set_live_note', 'list_findings', 'list_artifacts'],
   proof: ['get_case', 'list_findings', 'list_artifacts', 'add_artifact', 'set_live_note'],
   auditor: ['get_case', 'list_findings', 'list_artifacts', 'audit_finding', 'set_live_note'],
 };
