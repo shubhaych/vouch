@@ -55,3 +55,12 @@ Loop 1 builds gate by gate (G0..G6, tests T0.1..T6.4 in PROGRESS.md). Loop 2 onl
 TypeScript strict. Small files. No clever abstractions. Comment why, not what.
 
 Note: `web/AGENTS.md` is written by Next.js. This Next.js has breaking changes from older versions: read `node_modules/next/dist/docs/` before writing web code.
+
+
+<claude-mem-context>
+# Memory Context
+
+# [vouch] recent context, 2026-10-24 7:57pm PDT
+
+No previous sessions found.
+</claude-mem-context>

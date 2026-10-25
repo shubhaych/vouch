@@ -11,6 +11,7 @@
     "test": "CREAO_MODE=fixture vitest run"
   },
   "dependencies": {
+    "@duckdb/node-api": "^1.4.1-r.4",
     "@factory/droid-sdk": "0.10.0",
     "@fastify/cors": "^11",
     "@fastify/multipart": "^10",
