@@ -169,13 +169,17 @@ export async function extractUploadFrames(video: string, dir: string, times: num
 /** Handles one upload end to end. Throws UploadError with a message the phone shows. */
 export async function processUpload(conn: DbConnection, claimId: bigint, nonce: string, data: Buffer, ext: string, now = Date.now()): Promise<{ frames: number; checks: Checks }> {
   const processingStarted = Date.now();
-  // A claim created a moment ago may still be on its way to this worker's subscription.
+  // A claim created a moment ago may still be on its way to this worker's subscription; under a busy simulation the
+  // subscription can trail by several seconds, so wait up to 20 s before giving up.
   let c = conn.db.claim.id.find(claimId);
-  for (let i = 0; !c && i < 20; i++) {
-    await new Promise((r) => setTimeout(r, 150));
+  for (let i = 0; !c && i < 100; i++) {
+    await new Promise((r) => setTimeout(r, 200));
     c = conn.db.claim.id.find(claimId);
   }
-  if (!c) throw new UploadError(404, 'No such claim.');
+  if (!c) {
+    log(`upload for C-${claimId}: claim not in this worker's subscription after 20 s`);
+    throw new UploadError(404, 'This claim has not reached the reviewer yet. Wait a few seconds and upload again.');
+  }
   if (!nonce || nonce !== c.nonce) throw new UploadError(403, 'This upload link is not valid for that claim (wrong nonce).');
   if (c.status !== 'awaiting_video' && c.status !== 'more_evidence') throw new UploadError(409, `This claim is ${c.status.replace('_', ' ')} and does not need a video.`);
   const age = now - Number(c.createdAt.microsSinceUnixEpoch / 1000n);
