@@ -34,6 +34,7 @@ export function FinanceDesk() {
   const [queue] = useTable(tables.financeQueue.where((r) => r.companyId.eq(selectedId)));
   const [closes] = useTable(tables.financeClose.where((r) => r.companyId.eq(selectedId)));
   const [bridgeRows] = useTable(tables.financeBridge.where((r) => r.companyId.eq(selectedId)));
+  const [clusterRows] = useTable(tables.financeCluster.where((r) => r.companyId.eq(selectedId)));
   const [agentRuns] = useTable(tables.financeAgentRun.where((r) => r.companyId.eq(selectedId)));
   const [agentSetup, setAgentSetup] = useState<Record<string, { configured: boolean; found: boolean; nameMatches: boolean; checked: boolean }> | null>(null);
   const [claimAnalysis, setClaimAnalysis] = useState("idle");
@@ -47,6 +48,9 @@ export function FinanceDesk() {
   const isLivePortfolio = !!simState[0];
   const close = closes.find((c) => c.period === period);
   const bridge = bridgeRows.filter((b) => b.period === period).sort((a, b) => Number(b.id - a.id));
+  const periodClusters = clusterRows.filter((c) => c.period === period);
+  const exceptionClusters = periodClusters.filter((c) => !c.cls.startsWith("driver:"));
+  const driverClusters = periodClusters.filter((c) => c.cls.startsWith("driver:")).sort((a, b) => Number(b.cents - a.cents));
 
   useEffect(() => {
     let active = true;
@@ -172,9 +176,24 @@ export function FinanceDesk() {
             <Mini label="Matched / events" value={`${close.matched.toLocaleString()} / ${close.events.toLocaleString()}`} />
             <Mini label="Close status" value={close.status} />
           </div>
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <Mini label="Closed by playbook" value={close.closedByPlaybook} />
+            <Mini label="To investigator" value={close.toInvestigator} />
+            <Mini label="To controller" value={close.toController} />
+            <Mini label="Unexplained $" value={Number(close.unexplainedCents) / 100} formatMoney />
+          </div>
           <p className="text-xs text-ink-soft-dark">{close.memo}</p>
         </> : <p className="text-sm text-ink-soft-dark">No close snapshot for {period} yet.</p>}
         {bridge.length ? <div className="overflow-x-auto"><table className="w-full min-w-[660px] text-left text-sm"><thead className="text-xs text-ink-soft-dark"><tr><th className="p-2">Variance bridge</th><th className="p-2">Delta</th><th className="p-2">Authority</th><th className="p-2">Explanation</th></tr></thead><tbody>{bridge.map((b) => <tr key={String(b.id)} className="border-t border-line-dark/70"><td className="p-2">{b.cause}</td><td className="p-2 font-mono">{cents(b.cents)}</td><td className="p-2">{b.winner}</td><td className="p-2 text-xs text-ink-soft-dark">{b.why} · {b.explained ? "explained" : "unexplained"}</td></tr>)}</tbody></table><p className="mt-2 text-right text-xs text-ink-soft-dark">Bridge total: {cents(bridge.reduce((sum, b) => sum + b.cents, 0n))}</p></div> : null}
+        {exceptionClusters.length ? <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-left text-sm"><thead className="text-xs text-ink-soft-dark"><tr><th className="p-2">Exception cluster</th><th className="p-2">Orders</th><th className="p-2">Amount</th><th className="p-2">Playbook</th><th className="p-2">Status</th></tr></thead><tbody>{exceptionClusters.map((c) => <tr key={String(c.id)} className="border-t border-line-dark/70 align-top"><td className="p-2"><div>{c.cls}</div><p className="text-xs text-ink-soft-dark">{c.explanation || c.reason}</p></td><td className="p-2">{c.orders}</td><td className="p-2 font-mono">{cents(c.cents)}</td><td className="p-2 font-mono text-xs">{c.playbook}</td><td className="p-2">{c.status}</td></tr>)}</tbody></table></div> : null}
+      </section>
+
+      <section className="glass space-y-3 p-4" data-testid="finance-drivers">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div><p className="panel-title">Driver board</p><p className="mt-1 text-xs text-ink-soft-dark">Every exception dollar is assigned to exactly one cause. Defects go to procurement; contradicted claims go to review — never an auto-denial.</p></div>
+          <Badge kind="simulated" />
+        </div>
+        {driverClusters.length ? <div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm"><thead className="text-xs text-ink-soft-dark"><tr><th className="p-2">Driver</th><th className="p-2">Owner</th><th className="p-2">Effect</th><th className="p-2">Action</th></tr></thead><tbody>{driverClusters.map((c) => <tr key={String(c.id)} className="border-t border-line-dark/70 align-top"><td className="p-2 font-mono text-xs">{c.cls.replace("driver:", "")}</td><td className="p-2">{c.winner}</td><td className="p-2 font-mono">{cents(c.cents)}</td><td className="p-2 text-xs text-ink-soft-dark">{c.reason}</td></tr>)}</tbody></table></div> : <p className="text-sm text-ink-soft-dark">Run close on Brindle &amp; Co. to build the driver board from the reconciliation.</p>}
       </section>
 
       <section className="glass space-y-3 p-4" data-testid="finance-agent-proof">

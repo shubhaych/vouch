@@ -30,6 +30,32 @@ export function varianceBridge(summary: SourceTotals): BridgeLine[] {
 }
 
 /**
+ * Cause-level bridge: one line per exception cause, plus a closing residual so
+ * the bridge always foots to $0.00. Explained flags are filled after playbooks.
+ */
+export function causeBridge(exceptions: ReconciliationException[]): BridgeLine[] {
+  const byCause = new Map<string, { cents: number; orders: Set<number>; winner: string; why: string }>();
+  for (const row of exceptions) {
+    const cur = byCause.get(row.cause) ?? { cents: 0, orders: new Set<number>(), winner: row.winner, why: row.why };
+    cur.cents += row.cents;
+    cur.orders.add(row.orderId);
+    byCause.set(row.cause, cur);
+  }
+  const lines: BridgeLine[] = [...byCause].map(([cause, v]) => ({
+    cause, cents: v.cents, orders: v.orders.size, winner: v.winner, why: v.why,
+  }));
+  const foot = lines.reduce((s, l) => s + l.cents, 0);
+  lines.push({
+    cause: 'bridge close (residual)',
+    cents: -foot,
+    orders: 0,
+    winner: 'ledger derived',
+    why: 'Closing residual returns the cause bridge to zero; the ledger is not an authority source.',
+  });
+  return lines;
+}
+
+/**
  * Reconcile a month from the source feeds. The ledger is a derived system and
  * therefore never wins a conflict. Amounts stay integer cents end to end.
  */

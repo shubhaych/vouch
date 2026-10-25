@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { DuckDBConnection } from '@duckdb/node-api';
 import { openBook } from '../src/finance/book';
-import { reconcilePeriod, varianceBridge } from '../src/finance/reconcile';
+import { causeBridge, reconcilePeriod, varianceBridge } from '../src/finance/reconcile';
 
 let connection: DuckDBConnection | undefined;
 
@@ -49,5 +49,14 @@ describe('Finance Desk source reconciliation', () => {
     const bridge = varianceBridge({ ledgerCents: 74088565, processorCents: 74113130, bankCents: 73488827, events: 0, matched: 0, exceptions: 0 });
     expect(bridge.map((line) => line.cents)).toEqual([24565, -624303, 599738]);
     expect(bridge.reduce((s, line) => s + line.cents, 0)).toBe(0);
+  });
+
+  it('builds a cause-level bridge that foots to zero', () => {
+    const bridge = causeBridge([
+      { orderId: 2, cause: 'processor refund missing or different in ledger', cents: 150, winner: 'processor', why: 'missing' },
+      { orderId: 2, cause: 'processor refund differs from authorized amount', cents: 50, winner: 'decision log', why: 'auth' },
+    ]);
+    expect(bridge.reduce((s, line) => s + line.cents, 0)).toBe(0);
+    expect(bridge.filter((l) => l.cause !== 'bridge close (residual)')).toHaveLength(2);
   });
 });

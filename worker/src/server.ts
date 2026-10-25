@@ -68,6 +68,9 @@ async function runCloseAgents(conn: DbConnection, period: string, close: Awaited
   const caseRef = `close:${period}`;
   if (activeFinanceCases.has(caseRef) || [...conn.db.financeAgentRun.iter()].some((row) => row.caseRef === caseRef && ['running', 'done'].includes(row.status))) return;
   activeFinanceCases.add(caseRef);
+  const unexplained = close.bridge
+    .filter((line) => line.cause !== 'bridge close (residual)')
+    .reduce((sum, line) => sum + Math.abs(line.cents), 0);
   const closeInput = {
     close_summary: {
       period,
@@ -75,8 +78,14 @@ async function runCloseAgents(conn: DbConnection, period: string, close: Awaited
       bridge_lines: close.bridge.map((line) => ({ cause: line.cause, cents: line.cents, order_count: line.orders, source_that_won: line.winner })),
       open_obligations: [],
       reserve_change_cents: 0,
-      driver_actions: [],
-      unexplained_cents: close.bridge.reduce((sum, line) => sum + Math.abs(line.cents), 0),
+      driver_actions: close.drivers.actions,
+      unexplained_cents: unexplained,
+      funnel: {
+        closed_by_playbook: close.closedByPlaybook,
+        to_investigator: close.toInvestigator,
+        to_controller: close.toController,
+        verifier_rejected: close.verifierRejected,
+      },
       controller_decisions: [],
     },
     code_may_lock: false,
@@ -89,7 +98,8 @@ async function runCloseAgents(conn: DbConnection, period: string, close: Awaited
       open_obligations: [],
       forecast_cents: close.summary.processorCents,
       actual_cents: close.summary.bankCents,
-      action_candidates: [],
+      action_candidates: close.drivers.actions,
+      by_cause: close.drivers.by_cause,
     },
     scenario_options: ['reconciliation_variance', 'settlement_timing', 'UNKNOWN'],
   };
