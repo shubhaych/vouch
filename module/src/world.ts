@@ -177,7 +177,7 @@ export interface CatalogItem { sku: number; name: string; category: Category; pr
 type Row = [name: string, dollars: number, description: string, parts: string];
 const RAW: Record<Category, Row[]> = {
   electronics: [
-    ['Noise-cancelling headphones', 249, 'Matte black over-ear headphones, silver hinges, logo on each cup', 'ear cup,hinge,headband,charging port'],
+    ['Wireless headphones', 249, 'Black over-ear wireless headphones without noise cancelling, silver hinges, logo on each cup', 'ear cup,hinge,headband,charging port'],
     ['Wireless earbuds', 89, 'White in-ear buds in a pill-shaped charging case with a status light', 'left bud,right bud,case,charging port'],
     ['Smartwatch', 199, 'Square face smartwatch with a black silicone strap and side crown', 'screen,strap,crown,sensor'],
     ['Bluetooth speaker', 79, 'Cylindrical fabric-wrapped speaker in grey with rubber end caps', 'grille,button,charging port,end cap'],
@@ -328,5 +328,5 @@ export const itemsIn = (category: string): CatalogItem[] => CATALOG.filter((c) =
 export const regionById = (id: number): Region | undefined => REGIONS[id - 1];
 export const businessDef = (id: number): BusinessDef | undefined => BUSINESSES[id - 1];
 
-/** The headphones the showcase agent buys from B-019 and claims on at B-002. */
+/** The black wireless headphones (SKU 1) the showcase agent buys from B-019 and claims on at B-002. */
 export const SHOWCASE_SKU = 1;

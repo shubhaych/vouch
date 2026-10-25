@@ -33,8 +33,8 @@ describe('Bright Data response normalisation', () => {
 
 describe('fixture mode', () => {
   it('builds listings from the catalogue with the ordered item first and a close variant second', () => {
-    const l = fixtureListings('Noise-cancelling headphones');
-    expect(l[0]!.title).toBe('Noise-cancelling headphones');
+    const l = fixtureListings('Wireless headphones');
+    expect(l[0]!.title).toBe('Wireless headphones');
     expect(l[1]!.title).toContain('refurbished');
     expect(l.length).toBeGreaterThanOrEqual(4);
   });

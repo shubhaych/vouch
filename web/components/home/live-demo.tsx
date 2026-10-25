@@ -92,7 +92,7 @@ export function LiveDemo() {
   return (
     <HudFrame label={replaying ? "REPLAY OF RECORDED ROWS" : "LIVE"} right={<span className="font-mono">A-00421 · CHICAGO (SIMULATED) <Badge kind="simulated" /></span>} className="mt-8">
       <div className="grid gap-6 p-5 md:grid-cols-[17rem_1fr] md:p-7" data-testid="live-demo">
-        <Phone stage={stage} itemName={item?.name ?? "Noise-cancelling headphones"} frames={claim?.frameUrls ?? []} credit={credit} />
+        <Phone stage={stage} itemName={item?.name ?? "Wireless headphones"} frames={claim?.frameUrls ?? []} credit={credit} />
         <div>
           <div className="mb-3 flex items-center justify-between">
             <span className="panel-title">Verification</span>

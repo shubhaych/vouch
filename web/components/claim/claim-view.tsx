@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useTable } from "spacetimedb/react";
 import { tables } from "@/module_bindings";
-import type { AnalysisStep } from "@/module_bindings/types";
+import type { AnalysisStep, ScoreReview } from "@/module_bindings/types";
 import { Badge } from "@/components/ui/badge";
 import { Tween } from "@/components/ui/num";
 import { Recorder } from "./recorder";
@@ -32,6 +32,8 @@ export function ClaimView({ idParam, hint: hintProps }: { idParam: string; hint:
   const [runs] = useTable(tables.agentRun.where((r) => r.caseRef.eq(`C-${id}`)));
   const [decisions] = useTable(tables.decision.where((r) => r.refundId.eq(refundId)), { enabled: refundId !== 0n });
   const [credits] = useTable(tables.creditEvent.where((r) => r.causeTable.eq("refund")).where((r) => r.causeId.eq(refundId)), { enabled: refundId !== 0n });
+  const [scoreReviews] = useTable(tables.scoreReview.where((r) => r.refundId.eq(refundId)), { enabled: refundId !== 0n });
+  const scoreReview = scoreReviews.find((r) => r.refundId === refundId);
   const [jobs] = useTable(tables.analysisJob.where((r) => r.claimId.eq(id)));
   const job = [...jobs].sort((a, b) => Number(b.id - a.id))[0];
   const [analysisSteps] = useTable(tables.analysisStep.where((r) => r.jobId.eq(job?.id ?? 0n)), { enabled: !!job });
@@ -100,7 +102,7 @@ export function ClaimView({ idParam, hint: hintProps }: { idParam: string; hint:
       ) : null}
 
       {job ? (
-        <ReviewerStepper rows={analysisSteps} />
+        <ReviewerStepper rows={analysisSteps} decided={!!decided} scoreReview={scoreReview} />
       ) : (
         <ol className="space-y-2" data-testid="claim-stepper">
           {steps.map((s, i) => (
@@ -114,7 +116,7 @@ export function ClaimView({ idParam, hint: hintProps }: { idParam: string; hint:
       )}
 
       <AnimatePresence>
-        {decided && refund ? <DecisionCard status={refund.status} amount={refund.amount} method={proposal?.method ?? ""} credit={credits[0]} /> : null}
+        {decided && refund ? <DecisionCard status={refund.status} amount={refund.amount} method={proposal?.method ?? ""} credit={credits[0]} scoreReview={scoreReview} /> : null}
       </AnimatePresence>
 
       <p className="pt-2 text-[0.65rem] text-ink-soft">Challenge nonce {nonce}. Video checks are internally consistent, not proof of authenticity; doubtful claims go to a person.</p>
@@ -141,9 +143,16 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Who judged the score change, from the score_review row's provenance. */
+const SCORE_JUDGE: Record<string, string> = { live: "CREAO Score Reviewer", fixture: "CREAO Score Reviewer (fixture)", rule: "by rule · CREAO Score Reviewer not connected" };
+
 // The phone shows progress only: step label, status and the customer-safe
 // liveNote. Findings, scores and summaries stay on the business side.
-function ReviewerStepper({ rows }: { rows: readonly AnalysisStep[] }) {
+// CREAO reviews a claim twice: the Refund Reviewer reads the report before the
+// decision, the Score Reviewer judges the score change after it. The "Reviewed by
+// CREAO" row follows that: once a decision exists it shows the Score Reviewer's
+// actual state (judging, done, or the labelled rule), never a stale "skipped".
+function ReviewerStepper({ rows, decided, scoreReview }: { rows: readonly AnalysisStep[]; decided: boolean; scoreReview?: ScoreReview }) {
   const byKey = new Map(rows.map((r) => [r.key, r]));
   const decision = byKey.get("decision");
   const message = decision && (decision.status === "done" || decision.status === "skipped") && decision.liveNote ? decision.liveNote : null;
@@ -152,18 +161,35 @@ function ReviewerStepper({ rows }: { rows: readonly AnalysisStep[] }) {
       <ol className="space-y-2" data-testid="claim-stepper">
         {STEP_KEYS.map((k, i) => {
           const s = byKey.get(k);
-          const status = s?.status ?? "pending";
+          let status = s?.status ?? "pending";
+          let tag: string | null = null;
+          let note: string | null = s?.liveNote || null;
+          if (k === "review" && decided) {
+            if (scoreReview) {
+              status = "done";
+              tag = SCORE_JUDGE[scoreReview.provenance] ?? scoreReview.provenance;
+              note = `Score ${scoreReview.delta > 0 ? "+" : ""}${scoreReview.delta === 0 ? "unchanged" : scoreReview.delta} · ${scoreReview.reason}`;
+            } else {
+              status = "running";
+              tag = null;
+              note = "The CREAO Score Reviewer is judging what this decision does to your score.";
+            }
+          } else if (k === "review" && status === "skipped") {
+            // Before the decision the Refund Reviewer seat may be absent; the Score Reviewer still runs after it.
+            tag = "after the decision";
+            note = null;
+          }
           const done = status === "done";
           const active = status === "running";
           const failed = status === "failed";
           const skipped = status === "skipped";
-          const tag = k === "droid_case" && (failed || skipped) ? "Automated checks only" : failed ? "did not finish" : skipped ? "skipped" : null;
+          if (!tag) tag = k === "droid_case" && (failed || skipped) ? "Automated checks only" : failed ? "did not finish" : skipped ? "skipped" : null;
           return (
-            <motion.li key={k} initial={false} animate={{ opacity: done || active || failed ? 1 : 0.4 }} className="flex items-start gap-3" data-status={status}>
+            <motion.li key={k} initial={false} animate={{ opacity: done || active || failed ? 1 : 0.4 }} className="flex items-start gap-3" data-status={status} data-step={k}>
               <span aria-hidden className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${done ? "bg-emerald-500 text-white" : active ? "animate-pulse bg-cyan-400 text-white" : failed ? "bg-red-400 text-white" : "bg-slate-200 text-slate-500"}`}>{done ? "✓" : failed ? "!" : skipped ? "–" : i + 1}</span>
               <div className="min-w-0">
                 <div className="text-sm font-medium">{STEP_LABEL[k]}{tag ? <span className="ml-2 text-xs font-normal text-ink-soft">{tag}</span> : null}</div>
-                {s?.liveNote && !(k === "decision" && message) ? <div className="text-xs text-ink-soft">{s.liveNote}</div> : null}
+                {note && !(k === "decision" && message) ? <div className="text-xs text-ink-soft">{note}</div> : null}
               </div>
             </motion.li>
           );
@@ -176,15 +202,20 @@ function ReviewerStepper({ rows }: { rows: readonly AnalysisStep[] }) {
   );
 }
 
-function DecisionCard({ status, amount, method, credit }: { status: string; amount: number; method: string; credit?: { before: number; after: number } }) {
+function DecisionCard({ status, amount, method, credit, scoreReview }: { status: string; amount: number; method: string; credit?: { before: number; after: number }; scoreReview?: ScoreReview }) {
   const ok = status === "accepted";
+  const before = scoreReview?.before ?? credit?.before;
+  const after = scoreReview?.after ?? credit?.after;
   return (
     <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className={`rounded-xl p-4 ${ok ? "bg-emerald-50 text-emerald-900" : "bg-red-50 text-red-900"}`} data-testid="claim-decision">
       <div className="text-lg font-bold">{ok ? `Refund approved: ${money(amount)}` : "Refund declined"}</div>
       {ok ? <div className="text-sm">{method === "store_credit" ? "As store credit." : "To your original payment method."}</div> : <div className="text-sm">A person at the store made this decision.</div>}
-      {credit ? (
-        <div className="mt-3 text-sm">Your score: <span className="font-mono">{credit.before}</span> → <span className="font-mono text-2xl font-bold"><Tween value={credit.after} duration={1.4} /></span> <Badge kind="live" /></div>
-      ) : null}
+      {before !== undefined && after !== undefined ? (
+        <div className="mt-3 text-sm" data-testid="claim-score-change">Your score: <span className="font-mono">{before}</span> → <span className="font-mono text-2xl font-bold"><Tween value={after} duration={1.4} /></span> <Badge kind="live" /></div>
+      ) : (
+        <div className="mt-3 text-sm" data-testid="claim-score-pending">Your score is being reviewed by the CREAO Score Reviewer…</div>
+      )}
+      {scoreReview ? <div className="mt-1 text-xs opacity-80" data-testid="claim-score-judge">{scoreReview.reason} <span className="whitespace-nowrap">· {SCORE_JUDGE[scoreReview.provenance] ?? scoreReview.provenance}</span></div> : null}
     </motion.div>
   );
 }

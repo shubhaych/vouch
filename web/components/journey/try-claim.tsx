@@ -24,7 +24,7 @@ const STEPS = [
   {
     title: "Video + spoken claim",
     detail:
-      "Customer films the headphones and explains the mismatch. Evidence on camera — not a confidence number.",
+      "Customer films the black wireless headphones and explains the mismatch. Evidence on camera — not a confidence number.",
   },
   {
     title: "Order · shipping · policy",
@@ -83,7 +83,7 @@ export function TryClaim() {
             Ordered
           </span>
           <p className="evidence-example__line">
-            {item?.name ?? "Noise-cancelling headphones"} · Matte black
+            {item?.name ?? "Wireless headphones"} · Black · no noise cancelling
           </p>
         </div>
         <div className="evidence-example__arrow" aria-hidden>
@@ -307,8 +307,8 @@ function LiveHandoff() {
         <p className="section__eyebrow">Try it on your phone</p>
         <h3 className="try-handoff__title">Simulate returning wireless headphones.</h3>
         <p className="try-handoff__product">
-          Demo order: <strong>{item?.name ?? "Noise-cancelling headphones"}</strong>
-          <span className="try-handoff__product-meta"> · Lakeshore Audio · not as described</span>
+          Demo order: <strong>{item?.name ?? "Wireless headphones"}</strong>
+          <span className="try-handoff__product-meta"> · black, no noise cancelling · Lakeshore Audio · not as described</span>
         </p>
 
         {!mounted ? (

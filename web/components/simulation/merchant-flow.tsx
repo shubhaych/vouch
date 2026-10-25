@@ -1,12 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useRowsThrottled } from "@/lib/stdb/hooks";
 import { Badge } from "@/components/ui/badge";
 import { money, moneyShort } from "@/lib/format";
 import type { Business, CreditEvent, Purchase, Refund } from "@/module_bindings/types";
 import { BAND_COLOR, type AgentPoint, type Band } from "@/components/world/use-world";
+import { AgentAcrossMerchants, LiveFlow } from "./live-flow";
 
 const IN = "#2f9e7a";
 const OUT = "#c45b6a";
@@ -26,14 +26,19 @@ type Ledger = { key: string; day: number; dir: "in" | "out" | "held"; agentId: n
  * One merchant, last 30 simulated days, straight from purchase / refund / credit_event rows:
  * who paid in (by the buyer's Vouch band), what went back out, and what each refund did to a score.
  */
-export function MerchantFlow({ business, day, agents, onClose }: {
+export function MerchantFlow({ business, day, agents, businesses, running, onClose }: {
   business: Business;
   day: number;
   agents: Map<number, AgentPoint>;
+  businesses: Map<number, string>;
+  running: boolean | null;
   onClose: () => void;
 }) {
   const from = Math.max(0, day - WINDOW_DAYS);
   const id = business.id;
+  // A shopper picked from the ledger or a score mark: the live graphs switch to every merchant moving their score.
+  // The scene keys this panel by merchant, so the pick resets when another merchant opens.
+  const [focusAgent, setFocusAgent] = useState<number | null>(null);
   const { rows: purchasesAll, ready: pReady } = useRowsThrottled<Purchase>("purchase", `SELECT * FROM purchase WHERE business = ${id} AND day >= ${from}`, 1000);
   const { rows: refundsAll, ready: rReady } = useRowsThrottled<Refund>("refund", `SELECT * FROM refund WHERE business_id = ${id} AND day >= ${from}`, 1000);
   const { rows: creditsAll } = useRowsThrottled<CreditEvent>("creditEvent", `SELECT * FROM credit_event WHERE cause_table = 'refund' AND day >= ${from}`, 1500);
@@ -65,14 +70,6 @@ export function MerchantFlow({ business, day, agents, onClose }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [purchases, refunds, agents]);
 
-  const series = useMemo(() => {
-    const m = new Map<number, { day: number; in: number; out: number }>();
-    for (let d = from; d <= day; d++) m.set(d, { day: d, in: 0, out: 0 });
-    for (const p of purchases) { const x = m.get(p.day); if (x) x.in += p.amount / 100; }
-    for (const r of refunds) if (r.status === "accepted") { const x = m.get(r.decidedDay || r.day); if (x) x.out += r.amount / 100; }
-    return [...m.values()];
-  }, [purchases, refunds, from, day]);
-
   const ledger: Ledger[] = useMemo(() => {
     const rows: Ledger[] = [];
     for (const p of purchases) rows.push({ key: `p${p.id}`, day: p.day, dir: "in", agentId: p.buyer, amount: p.amount, score: scoreOf(p.buyer), delta: null, status: "purchase" });
@@ -88,28 +85,26 @@ export function MerchantFlow({ business, day, agents, onClose }: {
   const W = 560, H = 220, nodeX = 250, nodeW = 60;
   const maxCents = Math.max(1, flow.totalIn, flow.paid + flow.declined + flow.open);
   const scale = (c: number) => Math.max(c > 0 ? 2 : 0, (c / maxCents) * 150);
-  let yIn = 30;
-  const left = BANDS.map((b) => {
+  const stacked = BANDS.reduce<{ rows: (typeof BANDS[number] & { cents: number; n: number; y: number; link: { y0: number; y1: number; h: number } })[]; end: number }>((acc, b) => {
     const v = flow.inBy.get(b.band)!;
     const h = scale(v.cents);
     const y = 18 + BANDS.indexOf(b) * 50;
-    const link = { y0: y + 14, y1: yIn + h / 2, h };
-    yIn += h;
-    return { ...b, ...v, y, link };
-  });
+    return { rows: [...acc.rows, { ...b, ...v, y, link: { y0: y + 14, y1: acc.end + h / 2, h } }], end: acc.end + h };
+  }, { rows: [], end: 30 });
+  const left = stacked.rows;
+  const yIn = stacked.end;
   const outs = [
     { key: "paid", label: "Refunds paid", cents: flow.paid, n: flow.nPaid, color: OUT },
     { key: "declined", label: "Declined (kept)", cents: flow.declined, n: flow.nDecl, color: "#7a6a78" },
     { key: "open", label: "Still open", cents: flow.open, n: flow.nOpen, color: HELD },
   ];
-  let yOut = 30;
-  const right = outs.map((o, i) => {
+  const stackedOut = outs.reduce<{ rows: (typeof outs[number] & { y: number; link: { y0: number; y1: number; h: number } })[]; end: number }>((acc, o, i) => {
     const h = scale(o.cents);
     const y = 30 + i * 62;
-    const link = { y0: yOut + h / 2, y1: y + 14, h };
-    yOut += h;
-    return { ...o, y, link };
-  });
+    return { rows: [...acc.rows, { ...o, y, link: { y0: acc.end + h / 2, y1: y + 14, h } }], end: acc.end + h };
+  }, { rows: [], end: 30 });
+  const right = stackedOut.rows;
+  const yOut = stackedOut.end;
   const curve = (x0: number, y0: number, x1: number, y1: number) => `M${x0},${y0} C${(x0 + x1) / 2},${y0} ${(x0 + x1) / 2},${y1} ${x1},${y1}`;
 
   return (
@@ -156,27 +151,22 @@ export function MerchantFlow({ business, day, agents, onClose }: {
         </div>
 
         <div className="merchant-flow__chart">
-          <p className="merchant-flow__legend"><span style={{ background: IN }} />Money in (purchases) <span style={{ background: OUT }} />Money out (paid refunds)</p>
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={series} margin={{ top: 6, right: 6, bottom: 0, left: -10 }}>
-              <CartesianGrid stroke="rgba(58,15,52,0.08)" vertical={false} />
-              <XAxis dataKey="day" tick={{ fill: "#6b4a66", fontSize: 10 }} tickFormatter={(d) => `D${d}`} />
-              <YAxis tick={{ fill: "#6b4a66", fontSize: 10 }} tickFormatter={(v) => moneyShort(Math.round(v * 100))} width={46} />
-              <Tooltip labelFormatter={(d) => `Day ${d}`} formatter={(v, n) => [money(Math.round(Number(v) * 100)), n === "in" ? "In" : "Out"]} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-              <Area type="monotone" dataKey="in" stroke={IN} fill={IN} fillOpacity={0.18} isAnimationActive={false} />
-              <Area type="monotone" dataKey="out" stroke={OUT} fill={OUT} fillOpacity={0.25} isAnimationActive={false} />
-            </AreaChart>
-          </ResponsiveContainer>
+          <p className="sim-panel__eyebrow">{focusAgent === null ? "Live · rows as SpacetimeDB writes them · last 40 s" : "Live · one shopper, every merchant"} <Badge kind="simulated" /></p>
+          {focusAgent === null ? (
+            <LiveFlow businessId={id} day={day} running={running} onSelectAgent={setFocusAgent} />
+          ) : (
+            <AgentAcrossMerchants agentId={focusAgent} agent={agents.get(focusAgent)} businesses={businesses} day={day} onBack={() => setFocusAgent(null)} />
+          )}
         </div>
 
         <div className="merchant-flow__ledger" data-lenis-prevent>
-          <p className="sim-panel__eyebrow">Ledger {hoverBand ? `· Vouch ${BANDS.find((b) => b.band === hoverBand)!.label}` : ""}</p>
+          <p className="sim-panel__eyebrow">Ledger {hoverBand ? `· Vouch ${BANDS.find((b) => b.band === hoverBand)!.label}` : ""} <span className="font-normal normal-case tracking-normal">· click a shopper</span></p>
           {ledger.length === 0 ? <p className="sim-panel__empty">No purchases or refunds in this window yet.</p> : (
             <table>
-              <thead><tr><th>Day</th><th>Shopper</th><th>Vouch</th><th>Event</th><th className="text-right">Amount</th><th className="text-right">Score Δ</th></tr></thead>
+              <thead><tr><th>Day</th><th>Shopper</th><th>Vouch</th><th>Event</th><th className="text-right">Amount</th><th className="text-right">Δ</th></tr></thead>
               <tbody>
                 {ledger.map((x) => (
-                  <tr key={x.key} className={`is-${x.dir}`}>
+                  <tr key={x.key} className={`is-${x.dir} ${focusAgent === x.agentId ? "is-focus" : ""}`} onClick={() => setFocusAgent(x.agentId)} style={{ cursor: "pointer" }} data-testid="ledger-row" data-agent={x.agentId}>
                     <td>D{x.day}</td>
                     <td className="font-mono">A-{x.agentId}</td>
                     <td><span className="merchant-flow__dot" style={{ background: BAND_COLOR[bandOf(x.score)] }} />{x.score}</td>

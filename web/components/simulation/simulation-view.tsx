@@ -111,6 +111,7 @@ function SimulationInner() {
   const [layer, setLayer] = useState<"purchases" | "refunds" | "scores">("purchases");
 
   const selected = selectedId !== null ? agents.byId.get(selectedId) ?? null : null;
+  const businessNames = useMemo(() => new Map(businessRows.map((b) => [b.id, b.name])), [businessRows]);
   const focusBiz = selectedBiz !== null ? businessRows.find((b) => b.id === selectedBiz) ?? null : null;
 
   const selectAgent = useCallback(
@@ -234,7 +235,7 @@ function SimulationInner() {
           <div className="sim-scene__globe">
             {focusBiz ? (
               <div className="sim-scene__merchant">
-                <MerchantFlow business={focusBiz} day={run?.day ?? 0} agents={agents.byId} onClose={() => setSelectedBiz(null)} />
+                <MerchantFlow key={focusBiz.id} business={focusBiz} day={run?.day ?? 0} agents={agents.byId} businesses={businessNames} running={running} onClose={() => setSelectedBiz(null)} />
               </div>
             ) : null}
             <WorldGlobe

@@ -83,9 +83,9 @@ INPUT
 The input "case" is JSON with this shape:
 {
   "claim_id": "C-0207",
-  "order": { "item": "Noise-cancelling headphones", "category": "electronics", "amount": 249.00, "purchased_day": 10, "delivered_day": 14 },
+  "order": { "item": "Wireless headphones", "category": "electronics", "amount": 249.00, "purchased_day": 10, "delivered_day": 14 },
   "claim": { "reason_code": "defective", "reason_text": "Left ear cup is cracked and the band creaks" },
-  "reference": { "description": "Matte black over-ear headphones, silver hinges, logo on each cup", "listing_image_urls": ["https://..."] },
+  "reference": { "description": "Black over-ear wireless headphones without noise cancelling, silver hinges, logo on each cup", "listing_image_urls": ["https://..."] },
   "policy": { "window_days": 30, "requires_video_over": 100, "notes": "Physical damage from misuse is not covered" },
   "challenge": { "fingers": 3 },
   "frames": [ { "index": 0, "t": 0.0, "url": "https://..." } ],
@@ -198,7 +198,7 @@ OUTPUT: ONE JSON object only, no prose, no code fences:
 Test case:
 
 ```json
-{"claim_id":"C-TEST2","amount_requested":249,"controller_threshold":500,"order":{"item":"Noise-cancelling headphones","category":"electronics","amount":249,"purchased_day":10,"delivered_day":14,"claim_day":18},"claim":{"reason_code":"defective","reason_text":"Left ear cup cracked out of the box"},"policy":{"window_days":30,"restocking_fee_pct":0,"store_credit_allowed":true,"notes":"Physical damage from misuse is not covered"},"evidence":{"item_matches_reference":{"value":"true","confidence":0.9},"claimed_defect_visible":{"value":"true","confidence":0.85,"frames":[3,4]},"defect_consistent_with_claim":{"value":"true","damage_type":"manufacturing"},"challenge":{"expected":3,"seen":3,"passed":true},"capture_flags":[],"unable_to_verify":false},"deterministic_checks":{"fresh":true,"duration_s":14,"frame_reuse":[],"within_window":true},"history":{"agent_id":"A-00421","score":684,"band":"neutral","account_age_days":120,"purchases_completed":38,"businesses":6,"refunds_requested_90d":2,"refunds_accepted_total":3,"refunds_declined_total":0,"refund_ratio_90d":0.08,"recent_credit_events":[{"id":"CE-1042","day":12,"kind":"refund_accepted","delta":12}]},"credential":{"presented":true,"verified":true,"failed_step":null,"issuer":"B-019","claims":{"completed_purchases_gte":10,"refund_ratio_band":"low","no_confirmed_fraud_180d":true}},"patterns":[]}
+{"claim_id":"C-TEST2","amount_requested":249,"controller_threshold":500,"order":{"item":"Wireless headphones","category":"electronics","amount":249,"purchased_day":10,"delivered_day":14,"claim_day":18},"claim":{"reason_code":"defective","reason_text":"Left ear cup cracked out of the box"},"policy":{"window_days":30,"restocking_fee_pct":0,"store_credit_allowed":true,"notes":"Physical damage from misuse is not covered"},"evidence":{"item_matches_reference":{"value":"true","confidence":0.9},"claimed_defect_visible":{"value":"true","confidence":0.85,"frames":[3,4]},"defect_consistent_with_claim":{"value":"true","damage_type":"manufacturing"},"challenge":{"expected":3,"seen":3,"passed":true},"capture_flags":[],"unable_to_verify":false},"deterministic_checks":{"fresh":true,"duration_s":14,"frame_reuse":[],"within_window":true},"history":{"agent_id":"A-00421","score":684,"band":"neutral","account_age_days":120,"purchases_completed":38,"businesses":6,"refunds_requested_90d":2,"refunds_accepted_total":3,"refunds_declined_total":0,"refund_ratio_90d":0.08,"recent_credit_events":[{"id":"CE-1042","day":12,"kind":"refund_accepted","delta":12}]},"credential":{"presented":true,"verified":true,"failed_step":null,"issuer":"B-019","claims":{"completed_purchases_gte":10,"refund_ratio_band":"low","no_confirmed_fraud_180d":true}},"patterns":[]}
 ```
 
 Expected: accept, 249, original\_payment, reasons citing frames 3 and 4 and the credential. Then change `frame_reuse` to `[{"frame":2,"matches_claim":"C-0193","distance":3}]` and check that it no longer accepts.
@@ -403,11 +403,11 @@ INPUT
 The input "case" is JSON:
 {
   "claim_id": "C-0207",
-  "order": { "item": "Noise-cancelling headphones", "sku": "SKU-0", "category": "electronics", "amount": 249.00, "description": "Matte black over-ear headphones, silver hinges, logo on each cup", "parts": ["ear cup", "hinge", "headband", "charging port"] },
+  "order": { "item": "Wireless headphones", "sku": "SKU-0", "category": "electronics", "amount": 249.00, "description": "Black over-ear wireless headphones without noise cancelling, silver hinges, logo on each cup", "parts": ["ear cup", "hinge", "headband", "charging port"] },
   "claim": { "reason_code": "defective", "reason_text": "Left ear cup cracked out of the box" },
   "evidence": { "unable_to_verify": false, "item_matches_reference": { "value": "true", "confidence": 0.9 }, "defect_consistent_with_claim": { "value": "true", "damage_type": "manufacturing" },
                 "frames": [ { "index": 3, "t": 4.1, "observation": "Close-up of the left ear cup; a crack runs from the hinge." } ], "frame_urls": ["https://..."] },
-  "scraped_listings": { "source": "bright_data_serp" | "fixture", "query": "Noise-cancelling headphones", "fetched_at": "2026-10-24T20:01:00Z", "cached": false, "error": null,
+  "scraped_listings": { "source": "bright_data_serp" | "fixture", "query": "Wireless headphones", "fetched_at": "2026-10-24T20:01:00Z", "cached": false, "error": null,
                         "items": [ { "title": "...", "price": 249.00, "currency": "USD", "seller": "...", "url": "https://...", "image": "https://...", "rating": 4.4, "reviews": 318, "snippet": "..." } ] },
   "policy": { "window_days": 30, "notes": "Physical damage from misuse is not covered", "store_credit_allowed": true },
   "deterministic_checks": { "within_window": true, "days_since_delivery": 4 }

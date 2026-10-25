@@ -44,3 +44,7 @@ CREAO_SCORE_REVIEWER_KEY=<its capi_ key>
 ```
 
 Until then the worker answers with the same rules in code and labels the result "rule" on the business page.
+
+## How the answer is checked
+
+The worker (`worker/src/review/score-rule.ts`, `evaluateScoreVerdict`) checks every answer against the rules above before the module applies it: a declined claim cannot gain, an accepted one cannot lose, the sign of `delta` must match `direction`, a decline the footage did not contradict is held to a small loss (−15 at most), and a gain needs video support for the claim. Out-of-bounds deltas are clamped and noted on the run; an answer that breaks a rule is rejected, the rule answers instead, and the result is labelled "rule". Each run is an `agent_run` row on the claim, so the phone and the business page show the Reviewer at work.
