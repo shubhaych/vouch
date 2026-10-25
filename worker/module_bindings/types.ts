@@ -184,6 +184,32 @@ export const CreditEvent = __t.object("CreditEvent", {
 });
 export type CreditEvent = __Infer<typeof CreditEvent>;
 
+export const CrsCall = __t.object("CrsCall", {
+  id: __t.u64(),
+  product: __t.string(),
+  status: __t.u16(),
+  latencyMs: __t.u32(),
+  source: __t.string(),
+  at: __t.timestamp(),
+});
+export type CrsCall = __Infer<typeof CrsCall>;
+
+export const CrsStat = __t.object("CrsStat", {
+  id: __t.u8(),
+  calls: __t.u64(),
+  failedCalls: __t.u64(),
+  screenings: __t.u64(),
+  cachedScreenings: __t.u64(),
+  routesJson: __t.string(),
+  productsJson: __t.string(),
+  simRefundsScreened: __t.u64(),
+  simRoutesJson: __t.string(),
+  lastHealthStatus: __t.u16(),
+  lastHealthAt: __t.timestamp(),
+  updatedAt: __t.timestamp(),
+});
+export type CrsStat = __Infer<typeof CrsStat>;
+
 export const Decision = __t.object("Decision", {
   id: __t.u64(),
   refundId: __t.u64(),
@@ -693,6 +719,27 @@ export const FraudPattern = __t.object("FraudPattern", {
   reviewedDay: __t.u32(),
 });
 export type FraudPattern = __Infer<typeof FraudPattern>;
+
+export const IdentityScreening = __t.object("IdentityScreening", {
+  id: __t.u64(),
+  claimId: __t.u64(),
+  refundId: __t.u64(),
+  agentId: __t.u32(),
+  personaId: __t.string(),
+  trigger: __t.string(),
+  source: __t.string(),
+  cached: __t.bool(),
+  contactRiskScore: __t.i32(),
+  contactRiskBand: __t.string(),
+  identityStatus: __t.string(),
+  messageCodes: __t.string(),
+  route: __t.string(),
+  reasonsJson: __t.string(),
+  errorsJson: __t.string(),
+  latencyMs: __t.u32(),
+  checkedAt: __t.timestamp(),
+});
+export type IdentityScreening = __Infer<typeof IdentityScreening>;
 
 export const JournalEntry = __t.object("JournalEntry", {
   id: __t.u64(),

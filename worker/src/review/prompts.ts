@@ -7,6 +7,7 @@ import type { Role } from './fence';
 import type { IngestResult } from './ingest';
 import type { IntegrityDoc } from './lanes';
 import { hms } from './paths';
+import type { CaseIdentity } from '../identity';
 
 export interface CaseFacts {
   caseRef: string;
@@ -22,9 +23,22 @@ export interface CaseFacts {
   ingest: IngestResult;
   /** What the customer was asked to show in their one extra clip (set when clip 2 is in the timeline). */
   extraRequest?: string[];
+  /** The CRS identity step-up for this claim (worker/src/identity.ts), redacted. */
+  identity?: CaseIdentity;
 }
 
 const money = (c: number) => `$${(c / 100).toFixed(2)}`;
+
+/** The identity section: what CRS said and what it may and may not be used for. */
+export function identityLines(id: CaseIdentity | undefined): string[] {
+  if (!id || id.status === 'not_run') return [`- Not screened: ${id?.reason ?? 'no identity step-up for this claim'}. That is normal and says nothing about the customer.`];
+  return [
+    `- ${id.provider} sandbox (${id.products.join(' + ')}), ${id.source === 'sandbox' ? 'a real sandbox answer for a scripted test persona' : 'a fixture'}; triggered by ${id.trigger.replaceAll('_', ' ')}.`,
+    `- Contact risk: ${id.contact_risk_score ?? 'unavailable'} (${id.contact_risk_band}); identity: ${id.identity_status}${id.message_codes.length ? ` (codes ${id.message_codes.join(', ')})` : ''}; route: ${id.route.replaceAll('_', ' ')}.`,
+    ...id.reasons.map((r) => `  - ${r}`),
+    '- Use this only to decide whether a person should check identity. It never shows whether the item is defective and is never a reason to reject the claim on its own.',
+  ];
+}
 
 export function caseMarkdown(f: CaseFacts): string {
   const m = f.ingest.meta;
@@ -61,6 +75,9 @@ export function caseMarkdown(f: CaseFacts): string {
     f.claimsFrom === 'transcript' ? '## Spoken claims (claims.json)' : '## Claims (claims.json): nothing was transcribed, so these come from the written reason',
     `${f.claimsNote}`,
     ...f.claims.map((c) => `- **${c.id}** (${c.kind}, ${f.claimsFrom === 'transcript' ? 'said at' : 'never spoken; start looking around'} ${hms(c.tSaid)}): ${c.text}`),
+    '',
+    '## Identity (CRS screening, separate from the item question)',
+    ...identityLines(f.identity),
     '',
     '## Integrity lane (integrity.json)',
     ...(f.integrity.notes.length ? f.integrity.notes.map((n) => `- ${n}`) : ['- Nothing flagged by the automated checks.']),

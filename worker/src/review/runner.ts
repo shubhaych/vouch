@@ -16,6 +16,8 @@ import { catalogItem, type Policy } from '@vouch/module/world';
 import { DEFAULT_AUTO_APPROVE_CENTS, FORMULA_VERSION, TIER_LABEL, type Band, type IntegrityFlag, type Tier, type VerifiedIdentity } from '@vouch/module/review-score';
 import type { DroidSessionSummary, StepKey } from '@vouch/module/review-types';
 import { config, log } from '../env';
+import { identityVerified, type CaseIdentity, type IdentityDesk } from '../identity';
+import { historySummary } from '../history';
 import { label } from '../history';
 import { mirrorOf } from '../mirror';
 import type { CredentialChecker } from '../orchestrator';
@@ -71,6 +73,8 @@ export interface ReviewRunnerOptions {
   liveShowcaseClaims: Set<bigint>;
   /** A verdict that was not put on hold: the shopper's score is judged now, not after a person decides. */
   onVerdict?: (refundId: bigint) => void;
+  /** CRS identity step-up (worker/src/identity.ts): a clean match counts as a verified identity. */
+  identity?: IdentityDesk;
 }
 
 class ReviewFailure extends Error {}
@@ -227,8 +231,18 @@ export class ReviewRunner {
       // 4. the case file and the history the scorer and get_customer_summary use
       const policy = JSON.parse(business.policy) as Policy & { autoApproveLimitCents?: number };
       const credential = await this.checkCredential(refund.agentId, refund.id, refund.businessId).catch(() => null);
-      const verified: VerifiedIdentity = credential?.verified ? 'verified' : credential?.presented ? 'unverified' : 'unknown';
-      if (!config.crs.configured) limits.push('Identity verification (CRS) is not configured; a verified Vouch credential from another store counts instead.');
+      // CRS identity step-up for thin histories, missing credentials and claims over the store limit (docs/CRS.md).
+      const summary = await historySummary(this.conn, refund.agentId);
+      const identity: CaseIdentity = this.opts.identity
+        ? await this.opts.identity.stepUp({
+          claimId: c.id, refund, kind: c.kind, autoApproveLimitCents: policy.autoApproveLimitCents ?? DEFAULT_AUTO_APPROVE_CENTS,
+          history: summary, credentialVerified: !!credential?.verified,
+        })
+        : { status: 'not_run', reason: 'The identity desk is not running.' };
+      // A clean CRS match counts like a verified credential; anything else is "unverified", never suspicious.
+      const verified: VerifiedIdentity = credential?.verified || identityVerified(identity) ? 'verified' : credential?.presented || identity.status === 'screened' ? 'unverified' : 'unknown';
+      if (identity.status === 'not_run') limits.push(`Identity: ${identity.reason}`);
+      else if (identity.route !== 'refund_investigator') limits.push(`Identity (CRS ${identity.source}): routed to ${identity.route.replaceAll('_', ' ')}. A person checks identity separately from the item; it never decides the claim.`);
       const hist = historyFor(this.conn, purchase, refund, policy.windowDays, verified);
       const facts: CaseFacts = {
         caseRef,
@@ -243,6 +257,7 @@ export class ReviewRunner {
         integrity: integ.doc,
         ingest: ing,
         ...(extra ? { extraRequest: this.extraRequest(refund.id) } : {}),
+        identity,
       };
       const caseMd = caseMarkdown(facts);
       writeFileSync(resolve(dir, 'CASE.md'), caseMd);

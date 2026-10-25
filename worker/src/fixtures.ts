@@ -82,6 +82,20 @@ export function fixtureResponse(seat: Seat, c: unknown): unknown {
       const text = `A credential from ${String(issuer)} verified in all five steps${band ? ` and shows a ${String(band)} refund ratio there` : ''}.`;
       reasons.push({ text, cites: `credential:${String(issuer)}` });
     }
+    // CRS identity step-up (docs/CRS.md): cited as context. It can lower confidence so a person checks
+    // identity, but it never changes the action: identity is a separate question from the item.
+    const idn = get(c, 'identity') as Obj | undefined;
+    if (idn?.status === 'screened') {
+      const route = String(idn.route);
+      const risk = idn.contact_risk_score ?? 'unavailable';
+      const text = route === 'refund_investigator'
+        ? `CRS identity screening matched: TruValidate returned no discrepancies and Fraud Finder contact risk is ${String(risk)} (${String(idn.contact_risk_band)}).`
+        : route === 'merchant_identity_review'
+          ? `CRS identity screening returned ${(idn.message_codes as string[] | undefined)?.length ? `codes ${(idn.message_codes as string[]).join(', ')}` : `contact risk ${String(risk)}`}; a person checks identity separately, and this does not change the item decision.`
+          : 'CRS asked for step-up identity proof (a fraud alert may be one the shopper placed themselves); a person handles it, and this does not change the item decision.';
+      reasons.push({ text, cites: 'identity:crs' });
+      if (route !== 'refund_investigator') accept.confidence = Math.min(Number(accept.confidence ?? 0.78), route === 'merchant_identity_review' ? 0.6 : 0.55);
+    }
     accept.reasons = reasons;
     return accept;
   }

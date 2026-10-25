@@ -13,6 +13,7 @@ import type { Refund } from '../../module_bindings/types';
 import type { Report } from '@vouch/module/review-types';
 import { businessDef, catalogItem } from '@vouch/module/world';
 import { config, log, type Seat } from '../env';
+import type { IdentityDesk } from '../identity';
 import { fillFromChat, parseVerdict, seatAvailable, seatPath, startRun, waitForRun, type RunHandle } from '../creao';
 import { historySummary } from '../history';
 import { call } from '../stdb';
@@ -25,6 +26,9 @@ interface Context { input: ScoreInput; caseRef: string; report: Report | null; r
 
 export class ScoreReviewer {
   private busy = new Set<bigint>();
+  /** CRS identity desk (worker/src/identity.ts): the scorecard reads the latest screening. */
+  identity: IdentityDesk | null = null;
+
   constructor(private conn: DbConnection) {}
 
   private creaoOn() { return this.conn.db.control.key.find('creao_enabled')?.value !== 'false'; }
@@ -134,10 +138,11 @@ export class ScoreReviewer {
       policy: policy ? { window_days: policy.windowDays, restocking_fee_pct: policy.restockingFeePct, store_credit_allowed: policy.storeCreditAllowed, notes: policy.notes } : {},
       evidence, deterministic_checks: { fresh: true, frame_reuse: [], still_image: false, within_window: true },
       history, credential, patterns, today: db.simRun.id.find(1)?.day ?? 0,
+      identity: this.identity ? this.identity.forRefund(r.id) : { status: 'not_run', reason: 'The identity desk is not running.' },
     };
     const scorecard = {
       claim_id: caseRef, amount_requested: r.amount / 100, history, credential, patterns,
-      identity: { status: 'not_run', reason: config.crs.configured ? 'no CRS persona is linked to this shopper' : 'CRS is not configured' },
+      identity: this.identity ? this.identity.forRefund(r.id) : { status: 'not_run', reason: 'The identity desk is not running.' },
       item_context: { sku: `SKU-${purchase?.item ?? 0}`, name: item?.name ?? 'item', pulse: null, business_context: {} },
       video_checks: { fresh: true, frame_reuse_count: 0, still_image: false, challenge_passed: evidence.challenge.passed, capture_flags: evidence.capture_flags, unable_to_verify: evidence.unable_to_verify },
       evidence_summary: evidence.summary,

@@ -537,11 +537,61 @@ const monitorNote = table({ name: 'monitor_note', public: true }, {
   at: t.timestamp(),
 });
 
+// CRS identity screening (worker/src/crs.ts, docs/CRS.md). Redacted on purpose: persona ids,
+// bands, message codes and routes only. Persona details, tokens and vendor payloads never
+// leave the worker, so nothing here can identify a person.
+const identityScreening = table({ name: 'identity_screening', public: true }, {
+  id: t.u64().primaryKey().autoInc(),
+  claimId: t.u64().index(), // 0 when the screening is not tied to a live claim
+  refundId: t.u64().index(),
+  agentId: t.u32().index(),
+  personaId: t.string(), // P01 | P12 | P13 | P16: CRS's scripted sandbox personas
+  trigger: t.string(), // thin_history | over_limit | no_credential | showcase | manual
+  source: t.string(), // sandbox | fixture
+  cached: t.bool(), // answered from the worker's 10-minute cache, no CRS request made
+  contactRiskScore: t.i32(), // Fraud Finder risk.score 0..100, or -1 when unavailable
+  contactRiskBand: t.string(), // low | review | unavailable
+  identityStatus: t.string(), // match | discrepancy | additional_verification | unavailable
+  messageCodes: t.string(), // JSON array of TruValidate message codes, e.g. ["2101"]
+  route: t.string(), // refund_investigator | merchant_identity_review | additional_verification
+  reasonsJson: t.string(), // Vouch's plain-language routing rules
+  errorsJson: t.string(), // failed calls; never a judgement about the shopper
+  latencyMs: t.u32(),
+  checkedAt: t.timestamp(),
+});
+
+// Every request the worker sends to the CRS sandbox, metered: product, HTTP status, latency.
+const crsCall = table({ name: 'crs_call', public: true }, {
+  id: t.u64().primaryKey().autoInc(),
+  product: t.string(), // login | refresh | fraud_finder | truvalidate_basic | health
+  status: t.u16(), // HTTP status; 0 when the request never got an answer
+  latencyMs: t.u32(),
+  source: t.string(), // sandbox | fixture
+  at: t.timestamp(),
+});
+
+// Running totals for /system and the README's usage numbers (one row, id 1).
+const crsStat = table({ name: 'crs_stat', public: true }, {
+  id: t.u8().primaryKey(),
+  calls: t.u64(), // requests sent to CRS
+  failedCalls: t.u64(),
+  screenings: t.u64(), // identity screenings recorded (live claims, showcase, manual)
+  cachedScreenings: t.u64(),
+  routesJson: t.string(), // { refund_investigator: n, merchant_identity_review: n, additional_verification: n }
+  productsJson: t.string(), // { fraud_finder: n, truvalidate_basic: n, login: n, ... }
+  simRefundsScreened: t.u64(), // simulated investigation refunds routed through a persona screening
+  simRoutesJson: t.string(),
+  lastHealthStatus: t.u16(),
+  lastHealthAt: t.timestamp(),
+  updatedAt: t.timestamp(),
+});
+
 export const spacetimedb = schema({
   role, seatCode, counter, simRun, simTick, agent, agentTruth, shopperLink, business, purchase, refundIntent, refund,
   creditEvent, eventFeed, regionStat, merchantFlowDay, fraudPattern, patternEvent, claim, evidence, agentRun, control, decision,
   journalEntry, journalLine, credential, verification, labJob, labEvent, metrics, latencyPing, benchResult,
   analysisJob, analysisStep, artifact, finding, report, claimScore, recommendation, partnerOrder, scoreReview, returnsPulse, monitorNote,
+  identityScreening, crsCall, crsStat,
   // The Refund Finance Desk (finance-schema.ts). Nothing above reads these.
   financeCompany, financeProduct, financeAccount, financePeriod, financeRequest, financeEntry, financeLine, financeObligation,
   financeAudit, financeQueue, financePrecedent, financeReserve, financeClose, financeBridge, financeCluster,

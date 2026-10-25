@@ -9,6 +9,7 @@ import type { DbConnection } from '../module_bindings/index';
 import type { Claim, FraudPattern } from '../module_bindings/types';
 import { catalogItem } from '@vouch/module/world';
 import { config, log, type Seat } from './env';
+import type { CaseIdentity, IdentityDesk } from './identity';
 import { call } from './stdb';
 import { fillFromChat, parseVerdict, seatAvailable, startRun, waitForRun, type RunHandle } from './creao';
 import { searchListings } from './brightdata';
@@ -110,6 +111,8 @@ export class Orchestrator {
   handledByReviewer: ((c: Claim) => boolean) | null = null;
   /** The latest returns-pulse line for an item, from the PulseRunner, for the Risk Scorecard's item context. */
   pulseFor: ((sku: number) => { count: number; perSecond: number; baselinePerSecond: number; spike: boolean } | null) | null = null;
+  /** CRS identity step-up (worker/src/identity.ts); null leaves identity "not run". */
+  identity: IdentityDesk | null = null;
 
   constructor(private conn: DbConnection, private checkCredential: CredentialChecker) {}
 
@@ -289,6 +292,13 @@ export class Orchestrator {
     }));
     const history = await historySummary(this.conn, refund.agentId);
     const reasonAllowed = checks.reason_allowed !== false;
+    // 1b. CRS identity step-up for thin histories, missing credentials and claims over the store limit (docs/CRS.md).
+    const identity: CaseIdentity = this.identity
+      ? await this.identity.stepUp({
+        claimId: c.id, refund, kind: c.kind, autoApproveLimitCents: (policy as { autoApproveLimitCents?: number }).autoApproveLimitCents ?? CONTROLLER_THRESHOLD_CENTS,
+        history, credentialVerified: !!credential?.verified,
+      })
+      : { status: 'not_run', reason: 'The identity desk is not running.' };
 
     // 1c. Policy Checker (optional seat): the policy, rule by rule, over the deterministic checks and the listing match.
     const policyCheck = await this.optionalSeat<PolicyCheckJson>(c, 'policy_checker', caseRef, () => ({
@@ -314,7 +324,7 @@ export class Orchestrator {
       history,
       credential: credential ?? { presented: false, verified: false, failed_step: null, issuer: null, claims: {} },
       patterns,
-      identity: { status: 'not_run', reason: config.crs.configured ? 'no CRS persona is linked to this shopper' : 'CRS is not configured (docs/CRS.md)' },
+      identity,
       item_context: { sku: `SKU-${purchase.item}`, name: item?.name ?? 'item', pulse: this.pulseFor?.(purchase.item) ?? null, business_context: skuContext },
       video_checks: {
         fresh: checks.fresh ?? null, frame_reuse_count: ((checks.frame_reuse as unknown[] | undefined) ?? []).length, still_image: checks.still_image ?? false,
@@ -342,6 +352,7 @@ export class Orchestrator {
       history,
       credential: credential ?? { presented: false, verified: false, failed_step: null, issuer: null, claims: {} },
       patterns,
+      identity,
       today: day,
     };
     const fallback = {

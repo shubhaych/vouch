@@ -84,9 +84,12 @@ import PingReducer from "./ping_reducer";
 import PostReducer from "./post_reducer";
 import ProposeReducer from "./propose_reducer";
 import RecordBenchReducer from "./record_bench_reducer";
+import RecordCrsCallReducer from "./record_crs_call_reducer";
 import RecordEvidenceReducer from "./record_evidence_reducer";
+import RecordIdentityScreeningReducer from "./record_identity_screening_reducer";
 import RecordMonitorNoteReducer from "./record_monitor_note_reducer";
 import RecordRunReducer from "./record_run_reducer";
+import RecordSimScreeningsReducer from "./record_sim_screenings_reducer";
 import RecordVerificationReducer from "./record_verification_reducer";
 import RequestRefundReducer from "./request_refund_reducer";
 import RequestVerificationReducer from "./request_verification_reducer";
@@ -128,6 +131,8 @@ import ClaimScoreRow from "./claim_score_table";
 import ControlRow from "./control_table";
 import CredentialRow from "./credential_table";
 import CreditEventRow from "./credit_event_table";
+import CrsCallRow from "./crs_call_table";
+import CrsStatRow from "./crs_stat_table";
 import DecisionRow from "./decision_table";
 import EventFeedRow from "./event_feed_table";
 import EvidenceRow from "./evidence_table";
@@ -158,6 +163,7 @@ import FinanceVouchLedgerRow from "./finance_vouch_ledger_table";
 import FinanceVouchSignalRow from "./finance_vouch_signal_table";
 import FindingRow from "./finding_table";
 import FraudPatternRow from "./fraud_pattern_table";
+import IdentityScreeningRow from "./identity_screening_table";
 import JournalEntryRow from "./journal_entry_table";
 import JournalLineRow from "./journal_line_table";
 import LabEventRow from "./lab_event_table";
@@ -334,6 +340,28 @@ const tablesSchema = __schema({
       { name: 'credit_event_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, CreditEventRow),
+  crsCall: __table({
+    name: 'crs_call',
+    indexes: [
+      { accessor: 'id', name: 'crs_call_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'crs_call_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, CrsCallRow),
+  crsStat: __table({
+    name: 'crs_stat',
+    indexes: [
+      { accessor: 'id', name: 'crs_stat_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'crs_stat_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, CrsStatRow),
   decision: __table({
     name: 'decision',
     indexes: [
@@ -768,6 +796,26 @@ const tablesSchema = __schema({
       { name: 'fraud_pattern_signature_key', constraint: 'unique', columns: ['signature'] },
     ],
   }, FraudPatternRow),
+  identityScreening: __table({
+    name: 'identity_screening',
+    indexes: [
+      { accessor: 'agentId', name: 'identity_screening_agent_id_idx_btree', algorithm: 'btree', columns: [
+        'agentId',
+      ] },
+      { accessor: 'claimId', name: 'identity_screening_claim_id_idx_btree', algorithm: 'btree', columns: [
+        'claimId',
+      ] },
+      { accessor: 'id', name: 'identity_screening_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'refundId', name: 'identity_screening_refund_id_idx_btree', algorithm: 'btree', columns: [
+        'refundId',
+      ] },
+    ],
+    constraints: [
+      { name: 'identity_screening_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, IdentityScreeningRow),
   journalEntry: __table({
     name: 'journal_entry',
     indexes: [
@@ -1103,9 +1151,12 @@ const reducersSchema = __reducers(
   __reducerSchema("post", PostReducer),
   __reducerSchema("propose", ProposeReducer),
   __reducerSchema("record_bench", RecordBenchReducer),
+  __reducerSchema("record_crs_call", RecordCrsCallReducer),
   __reducerSchema("record_evidence", RecordEvidenceReducer),
+  __reducerSchema("record_identity_screening", RecordIdentityScreeningReducer),
   __reducerSchema("record_monitor_note", RecordMonitorNoteReducer),
   __reducerSchema("record_run", RecordRunReducer),
+  __reducerSchema("record_sim_screenings", RecordSimScreeningsReducer),
   __reducerSchema("record_verification", RecordVerificationReducer),
   __reducerSchema("request_refund", RequestRefundReducer),
   __reducerSchema("request_verification", RequestVerificationReducer),

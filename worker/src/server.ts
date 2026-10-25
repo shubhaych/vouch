@@ -26,7 +26,8 @@ import { checkFinanceCreaoAgents, financeCreaoEnvStatus, resumeFinanceAgentRun, 
 import type { DbConnection } from '../module_bindings';
 import { POLICY } from '../../module/src/finance/policy';
 import { allowedRungs as allowedFinanceRungs, zeroSignals, type Signals } from '../../module/src/finance/exposure';
-import { isPersonaId, sandboxReady, screen, type PersonaId } from './crs';
+import { isPersonaId, personaFor, sandboxReady, screen, type PersonaId } from './crs';
+import { IdentityDesk } from './identity';
 import { PulseRunner } from './pulse';
 import { brightdataReady, scrapesUsedToday } from './brightdata';
 
@@ -37,6 +38,7 @@ const WORKER_QUERIES = [
   'SELECT * FROM verification', 'SELECT * FROM lab_job', 'SELECT * FROM partner_order',
   'SELECT * FROM analysis_job', 'SELECT * FROM analysis_step', 'SELECT * FROM artifact', 'SELECT * FROM finding', 'SELECT * FROM report',
   'SELECT * FROM claim_score', 'SELECT * FROM recommendation', 'SELECT * FROM score_review',
+  'SELECT * FROM identity_screening', 'SELECT * FROM crs_stat',
 ];
 const FINANCE_WORKER_QUERIES = [
   'SELECT * FROM finance_agent_run', 'SELECT * FROM finance_sim_state', 'SELECT * FROM finance_company_state',
@@ -328,11 +330,17 @@ async function main() {
   await credentials.start();
   const orchestrator = new Orchestrator(conn, (agentId, refundId, verifier) => credentials.check(agentId, refundId, verifier));
   const scoreReviewer = new ScoreReviewer(conn);
+  // CRS identity step-up: the video reviewer, the Desk Lead and the Score Reviewer all read it (docs/CRS.md).
+  const identity = new IdentityDesk(conn);
+  identity.start();
+  orchestrator.identity = identity;
+  scoreReviewer.identity = identity;
   // The video reviewer owns every claim with a video; the Desk Lead keeps simulated and video-less claims. REVIEW_ENABLED=0 restores the old path.
   if (config.review.enabled) {
     const reviewer = new ReviewRunner(conn, (agentId, refundId, verifier) => credentials.check(agentId, refundId, verifier), {
       takeCreaoBudget: () => orchestrator.takeBudget(), liveShowcaseClaims: orchestrator.liveShowcaseClaims,
       onVerdict: (refundId) => scoreReviewer.afterVerdict(refundId),
+      identity,
     });
     orchestrator.handledByReviewer = (c) => reviewer.handles(c);
     reviewer.start();
@@ -475,6 +483,28 @@ async function main() {
     const notReady = config.crs.mode === 'sandbox' ? sandboxReady() : null;
     if (notReady) return reply.code(503).send({ error: `CRS sandbox is not configured: ${notReady}` });
     try { return await screen(id); } catch (e) { return reply.code(502).send({ error: (e as Error).message }); }
+  });
+  // A person re-screens a claim's shopper as a chosen persona (controller only), so a judge can watch every
+  // route: P01 clean, P12/P13 a person checks identity, P16 step-up proof. Recorded like any other screening.
+  app.post<{ Body: { code?: string; refundId?: string; personaId?: string } }>('/identity/screen-refund', async (req, reply) => {
+    if (req.body?.code !== config.demoControllerCode) return reply.code(403).send({ error: 'controller code required' });
+    const refund = conn.db.refund.id.find(BigInt(req.body?.refundId ?? '0'));
+    if (!refund) return reply.code(404).send({ error: 'no such refund' });
+    const persona = req.body?.personaId ?? personaFor(refund.agentId);
+    if (!isPersonaId(persona)) return reply.code(400).send({ error: 'personaId must be one of the CRS sandbox personas' });
+    const notReady = config.crs.mode === 'sandbox' ? sandboxReady() : null;
+    if (notReady) return reply.code(503).send({ error: `CRS sandbox is not configured: ${notReady}` });
+    const claim = [...conn.db.claim.iter()].find((c) => c.refundId === refund.id);
+    return identity.screenRefund({ refundId: refund.id, claimId: claim?.id ?? 0n, agentId: refund.agentId, trigger: 'manual', persona });
+  });
+  // Usage totals for /system and the README: requests by product, screenings, routes, simulated refunds routed.
+  app.get('/identity/usage', async () => {
+    const s = conn.db.crsStat.id.find(1);
+    return s ? {
+      mode: config.crs.mode, calls: Number(s.calls), failedCalls: Number(s.failedCalls), screenings: Number(s.screenings), cachedScreenings: Number(s.cachedScreenings),
+      routes: JSON.parse(s.routesJson), products: JSON.parse(s.productsJson), simRefundsScreened: Number(s.simRefundsScreened), simRoutes: JSON.parse(s.simRoutesJson),
+      lastHealthStatus: s.lastHealthStatus,
+    } : { mode: config.crs.mode, calls: 0, screenings: 0 };
   });
   // Scale view: route N returns whose shoppers map onto the sandbox personas in a chosen mix.
   // Each persona is checked once (results are cached), so 1,000 returns cost at most 4 CRS calls.
