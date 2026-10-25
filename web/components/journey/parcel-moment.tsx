@@ -84,7 +84,7 @@ export function ParcelMoment({
       </motion.div>
 
       <motion.p className="parcel__caption" style={{ opacity: captionOpacity }}>
-        A purchase becomes a claim.
+        Ordered one thing. Claiming another.
       </motion.p>
     </div>
   );

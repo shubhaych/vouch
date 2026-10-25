@@ -129,15 +129,15 @@ export function HeroWheel({ embedded = false }: { embedded?: boolean }) {
         <p className="hero-wheel__eyebrow">
           <span>Vouch</span>
           <span className="hero-wheel__eyebrow-rule" aria-hidden />
-          <span>Trust for agentic commerce</span>
+          <span>Refund trust for agent shopping</span>
         </p>
         <h1 className="hero-wheel__title">
-          When every shopper has an agent,
+          Agents can buy and claim at scale.
           <br />
-          every refund becomes a prompt.
+          Merchants need a signal they can trust.
         </h1>
         <p className="hero-wheel__sub">
-          Vouch gives merchants the evidence and trust history to resolve credible claims fast.
+          Submit a video claim, see the investigation and decision, and watch the portable Vouch score update only from confirmed outcomes.
         </p>
         <div className="hero-wheel__cta-row">
           <a
@@ -149,7 +149,7 @@ export function HeroWheel({ embedded = false }: { embedded?: boolean }) {
               scrollToId("demo");
             }}
           >
-            Watch a claim move through Vouch
+            Try a live refund claim
             <span aria-hidden> →</span>
           </a>
           <span className="hero-wheel__live">10,000 shopping agents · simulated activity</span>

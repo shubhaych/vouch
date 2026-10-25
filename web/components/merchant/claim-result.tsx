@@ -113,7 +113,7 @@ function LiveResult({ claimId }: { claimId: bigint }) {
             </form>
           )}
           <Link href="/shop" className="btn btn--ghost-dark btn--sm">
-            Company network →
+            Partner shops →
           </Link>
         </div>
       </header>
@@ -355,7 +355,7 @@ function FixtureResult() {
 
       <p className="text-center text-sm text-ink-soft">
         <Link href="/shop" className="underline">
-          Company network →
+          Partner shops →
         </Link>
       </p>
     </main>

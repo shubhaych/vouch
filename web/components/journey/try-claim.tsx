@@ -54,10 +54,10 @@ export function TryClaim() {
   return (
     <section className="section journey-section" id="try" data-testid="try-claim">
       <p className="section__eyebrow">How Vouch works</p>
-      <h2 className="section__title">One claim, five steps.</h2>
+      <h2 className="section__title">One refund claim, investigated in five steps.</h2>
       <p className="claim-path__lede">
-        Whether a claim is valid and who is asking stay separate questions. The merchant sees what
-        was ordered next to what the camera shows, with the reasons spelled out.
+        Claim validity and customer history stay separate. The merchant sees ordered vs observed, with
+        reasons — not a black-box score.
       </p>
 
       <ol className="claim-path">
@@ -307,7 +307,7 @@ function LiveHandoff() {
     <div className="try-handoff" id="demo" data-testid="live-handoff">
       <div className="try-handoff__copy">
         <p className="section__eyebrow">Try it on your phone</p>
-        <h3 className="try-handoff__title">Simulate returning wireless headphones.</h3>
+        <h3 className="try-handoff__title">Return the wireless headphones.</h3>
         <p className="try-handoff__product">
           Demo order: <strong>{item?.name ?? "Wireless headphones"}</strong>
           <span className="try-handoff__product-meta"> · black, no noise cancelling · Lakeshore Audio · not as described</span>
@@ -324,7 +324,7 @@ function LiveHandoff() {
         )}
         {mounted ? (
           <button type="button" className="btn btn--primary btn--sm try-handoff__again" onClick={restart} disabled={phase === "buying"} data-testid="simulate-return">
-            {claimId ? "Start another return" : phase === "buying" ? "Preparing the return…" : "Simulate returning wireless headphones"}
+            {claimId ? "Start another return" : phase === "buying" ? "Preparing the return…" : "Return the wireless headphones"}
           </button>
         ) : null}
 
@@ -351,7 +351,7 @@ function LiveHandoff() {
             {fixture ? (
               <>
                 <span className="badge badge--fixture">Fixture</span>
-                <span>Presentation path while live data is offline.</span>
+                <span>SpacetimeDB offline — using a fixture claim.</span>
               </>
             ) : phoneReachable ? (
               <>

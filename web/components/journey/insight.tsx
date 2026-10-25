@@ -27,9 +27,9 @@ export function Insight() {
       id="insight"
       data-testid="insight"
     >
-      <p className="section__eyebrow">The insight</p>
+      <p className="section__eyebrow">Why a portable score</p>
       <h2 className="insight-compare__headline">
-        When trust has to travel, you need a portable signal.
+        Refunds need a shared history the way lending needed a shared score.
       </h2>
       <p className="insight-compare__quiet">
         Credit scores gave people a public record that proves they repay. Vouch builds the same
@@ -65,8 +65,8 @@ export function Insight() {
         transition={{ duration: 0.45, delay: 0.12 }}
       >
         <span className="insight-compare__converge-line" aria-hidden />
-        <p className="insight-compare__converge-label">Both paths lead to</p>
-        <p className="insight-compare__converge-brand">Vouch</p>
+        <p className="insight-compare__converge-label">So merchants get:</p>
+        <p className="insight-compare__converge-brand">Vouch — a portable refund reliability score</p>
       </motion.div>
 
       <VouchReveal reduced={!!reduced} />
@@ -146,7 +146,7 @@ function VouchReveal({ reduced }: { reduced: boolean }) {
           <span className="badge badge--fixture">Demo</span>
         </div>
         <div className="score-card__value">78</div>
-        <div className="score-card__band">Strong · confirmed outcomes only</div>
+        <div className="score-card__band">Example · confirmed outcomes only</div>
         <div className="score-card__flag">
           <span className="panel-title">AI flag</span>
           <div className="score-card__flag-line">Mismatch → human review</div>

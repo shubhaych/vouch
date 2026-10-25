@@ -63,7 +63,7 @@ function DilemmaIntro() {
       </h2>
       <p className="dilemma-intro__lede">
         Approve too freely and absorb losses. Review every claim and make good customers wait.
-        That dilemma is the business problem Vouch sells into.
+        That is the problem Vouch is built for.
       </p>
     </>
   );
@@ -79,7 +79,7 @@ function Pressures() {
           Instant refunds feel great — until abuse and serial claims eat margin.
           Merchants absorb the bill for decisions made without reliable history.
         </p>
-        <p className="dilemma-editorial__cost"><span>Cost</span>Money lost to fraudulent returns.</p>
+        <p className="dilemma-editorial__cost"><span>Cost</span>Losses from easy approve-all policies.</p>
       </div>
       <div className="dilemma-editorial__rule" aria-hidden />
       <div className="dilemma-editorial__side">
@@ -89,7 +89,7 @@ function Pressures() {
           Manual queues protect the store, but honest shoppers wait — and many never come back
           after a slow or opaque return.
         </p>
-        <p className="dilemma-editorial__cost"><span>Cost</span>Good customers leave.</p>
+        <p className="dilemma-editorial__cost"><span>Cost</span>Churn after slow, opaque reviews.</p>
       </div>
     </div>
   );

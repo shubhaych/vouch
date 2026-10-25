@@ -16,11 +16,11 @@ export function JudgeNext() {
       id="next"
       data-testid="judge-next"
     >
-      <p className="section__eyebrow">Next chapter</p>
-      <h2 className="section__title">After the claim, follow the story.</h2>
+      <p className="section__eyebrow">Where to go next</p>
+      <h2 className="section__title">See the merchant case, then the shops, then the economy at scale.</h2>
       <p className="chapter-path__lede">
-        The live merchant result is the primary destination once a phone claim is submitted. Then widen
-        out to the company network and the simulation at scale.
+        Open the merchant case for your claim. Then browse the 100 simulated shops, or open the
+        10,000-agent simulation.
       </p>
 
       <ol className="chapter-path">
@@ -62,9 +62,9 @@ export function JudgeNext() {
           <Link href="/shop" className="chapter-path__link" data-testid="chapter-network">
             <span className="chapter-path__n">02</span>
             <span className="chapter-path__body">
-              <span className="chapter-path__label">Company network</span>
+              <span className="chapter-path__label">Partner shops</span>
               <span className="chapter-path__detail">
-                100 merchants and their products: buy one, or return it through the same phone flow.
+                100 simulated merchants. Buy or open a return with the same phone flow.
               </span>
             </span>
             <span className="chapter-path__arrow" aria-hidden>
@@ -97,15 +97,11 @@ export function JudgeNext() {
           </Link>
           <span aria-hidden>·</span>
           <Link href="/business" className="chapter-path__secondary-link">
-            /business
-          </Link>
-          <span aria-hidden>·</span>
-          <Link href="/shop" className="chapter-path__secondary-link">
-            /shop
+            Business desk
           </Link>
           <span aria-hidden>·</span>
           <Link href="/world" className="chapter-path__secondary-link">
-            /world
+            World globe
           </Link>
         </p>
       </div>
