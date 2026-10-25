@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import { useScrollHolds } from "@/lib/scroll/use-scroll-holds";
 import {
   motion,
   useReducedMotion,
@@ -44,6 +45,9 @@ const STAT_RANGES = [
 const FINALE_IN = 0.82;
 const FINALE_SETTLE = 0.9;
 
+/** Where the scroll pauses to let a reader take in each beat: the headline, each figure with its label, the closing screen. */
+const READING_BEATS = [0.06, ...STAT_RANGES.map(([a, b]) => a + (b - a) * 0.64), 0.92] as const;
+
 export function Dilemma() {
   const reduced = useReducedMotion();
   if (reduced) return <DilemmaStatic />;
@@ -75,6 +79,7 @@ function Pressures() {
           Instant refunds feel great — until abuse and serial claims eat margin.
           Merchants absorb the bill for decisions made without reliable history.
         </p>
+        <p className="dilemma-editorial__cost"><span>Cost</span>Money lost to fraudulent returns.</p>
       </div>
       <div className="dilemma-editorial__rule" aria-hidden />
       <div className="dilemma-editorial__side">
@@ -84,6 +89,7 @@ function Pressures() {
           Manual queues protect the store, but honest shoppers wait — and many never come back
           after a slow or opaque return.
         </p>
+        <p className="dilemma-editorial__cost"><span>Cost</span>Good customers leave.</p>
       </div>
     </div>
   );
@@ -115,6 +121,7 @@ function DilemmaScroll() {
     target: trackRef,
     offset: ["start start", "end end"],
   });
+  useScrollHolds(trackRef, scrollYProgress, READING_BEATS);
 
   // Intro shows first, then fully yields so numbers own the stage alone.
   const headlineOpacity = useTransform(scrollYProgress, [0, 0.03, 0.1, 0.16], [0, 1, 1, 0]);

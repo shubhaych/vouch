@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "lenis/dist/lenis.css";
 
 /*
   Vouch visual system — editorial fintech × live commerce control room.
@@ -267,7 +266,8 @@ a { color: inherit; text-decoration: none; }
   background: transparent; color: var(--aubergine); isolation: isolate;
   display: flex; flex-direction: column;
   justify-content: flex-end;
-  padding: clamp(4.5rem, 8vh, 5.5rem) 0 clamp(1.5rem, 4vh, 2.75rem);
+  /* The copy sits about a fifth of the screen above the bottom, so it reads as centred, not parked at the edge. */
+  padding: clamp(4.5rem, 8vh, 5.5rem) 0 calc(clamp(1.5rem, 4vh, 2.75rem) + 18vh);
   box-sizing: border-box;
 }
 /* Full-viewport positioning plane — no height clamp, no mask, no overflow crop. */
@@ -319,7 +319,7 @@ a { color: inherit; text-decoration: none; }
 }
 .hero-wheel__title {
   margin: 0; font-family: var(--font-display), serif; font-weight: 650;
-  font-size: clamp(1.55rem, 3.2vw, 2.55rem); line-height: 1.06; letter-spacing: -0.035em;
+  font-size: clamp(1.4rem, 2.85vw, 2.25rem); line-height: 1.06; letter-spacing: -0.035em;
   color: var(--aubergine); text-wrap: balance;
 }
 .hero-wheel__sub {
@@ -592,10 +592,15 @@ a { color: inherit; text-decoration: none; }
   text-align: center;
 }
 .dilemma-intro__title { text-wrap: balance; }
+.dilemma-intro { max-width: 52rem; }
+.dilemma-intro .section__eyebrow { font-size: 0.85rem; }
+.dilemma-intro .dilemma-intro__title { font-size: clamp(2.4rem, 5.2vw, 4rem); line-height: 1.05; }
 .dilemma-intro__lede {
-  margin: 0.85rem auto 0; max-width: 34rem;
-  color: var(--ink-soft); font-size: 0.98rem; line-height: 1.55;
+  margin: 0.85rem auto 0; max-width: 40rem;
+  color: var(--ink-soft); font-size: clamp(1.08rem, 1.6vw, 1.3rem); line-height: 1.55;
 }
+.dilemma-finale__intro .dilemma-intro__title { font-size: clamp(1.8rem, 3.4vw, 2.6rem); }
+.dilemma-finale__intro .dilemma-intro__lede { font-size: 1rem; }
 .dilemma-stat-stage {
   position: absolute; inset: 4% 0 10%;
   z-index: 1;
@@ -731,6 +736,15 @@ a { color: inherit; text-decoration: none; }
   letter-spacing: -0.02em; font-weight: 650; color: var(--aubergine);
 }
 .dilemma-editorial__body { margin: 0; color: var(--ink-soft); font-size: 0.98rem; line-height: 1.55; max-width: 28rem; }
+.dilemma-editorial { align-items: stretch; }
+.dilemma-editorial__side { display: flex; flex-direction: column; }
+.dilemma-editorial__cost {
+  margin: auto 0 0; padding-top: 0.75rem; font-size: 0.9rem; font-weight: 600; color: #8a2f1d;
+}
+.dilemma-editorial__cost span {
+  font-family: var(--font-mono), monospace; font-size: 0.68rem; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--ink-soft); margin-right: 0.4rem; font-weight: 500;
+}
 
 /* Insight analogy — ice-silver continuation of the dilemma */
 .insight-compare {
@@ -830,7 +844,9 @@ a { color: inherit; text-decoration: none; }
 .insight-path__n {
   font-family: var(--font-mono), monospace;
   font-size: 0.7rem;
-  color: var(--marigold);
+  font-weight: 700;
+  /* marigold itself is too light on the ice background */
+  color: #8f5f00;
   padding-top: 0.2rem;
 }
 .insight-path__label {
@@ -1223,6 +1239,11 @@ a { color: inherit; text-decoration: none; }
   border-color: color-mix(in srgb, var(--aubergine) 28%, transparent);
   background: color-mix(in srgb, var(--marigold) 10%, #fff);
 }
+/* Hovering another chapter takes the highlight off the merchant result until the pointer leaves. */
+.chapter-path:has(.chapter-path__item:not(.chapter-path__item--primary) .chapter-path__link:hover) .chapter-path__item--primary .chapter-path__link {
+  border-color: color-mix(in srgb, var(--aubergine) 12%, transparent);
+  background: var(--surface);
+}
 .chapter-path__n {
   font-family: var(--font-mono), monospace;
   font-size: 0.72rem;
@@ -1371,7 +1392,8 @@ a { color: inherit; text-decoration: none; }
 .evidence-example__note { grid-column: 1 / -1; margin: 0; font-size: 0.88rem; color: var(--ink-soft); }
 .evidence-example__line { margin: 0.35rem 0 0; font-size: 1.15rem; font-weight: 700; font-family: var(--font-display), serif; }
 .evidence-example__line--flag { color: #8a5a00; }
-.evidence-example__arrow { color: var(--ink-soft); font-size: 1.4rem; }
+.evidence-example { align-items: end; }
+.evidence-example__arrow { color: var(--ink-soft); font-size: 1.4rem; line-height: 1; padding-bottom: 0.15rem; justify-self: center; }
 @media (max-width: 640px) {
   .evidence-example { grid-template-columns: 1fr; }
   .evidence-example__arrow { display: none; }

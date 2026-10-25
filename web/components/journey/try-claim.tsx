@@ -56,8 +56,8 @@ export function TryClaim() {
       <p className="section__eyebrow">How Vouch works</p>
       <h2 className="section__title">One claim, five steps.</h2>
       <p className="claim-path__lede">
-        Claim validity and customer history stay separate. For this headphones mismatch, the merchant
-        should see what was ordered beside what was observed — not a black-box score.
+        Whether a claim is valid and who is asking stay separate questions. The merchant sees what
+        was ordered next to what the camera shows, with the reasons spelled out.
       </p>
 
       <ol className="claim-path">
@@ -128,7 +128,8 @@ function LiveHandoff() {
     setMounted(true);
   }, []);
 
-  const purchaseFloor = useRef<bigint>(0n);
+  // Orders at or below this id belong to an earlier return; a restart raises it so the new claim is found, not the old one.
+  const [purchaseFloor, setPurchaseFloor] = useState<bigint>(0n);
   const [purchases] = useTable(
     tables.purchase.where((r) => r.buyer.eq(agentId ?? 0)),
     { enabled: agentId != null },
@@ -136,15 +137,15 @@ function LiveHandoff() {
   /** Prefer the purchase created by this handoff, not an older order. */
   const newestPurchase = useMemo(() => {
     const mine = [...purchases]
-      .filter((p) => p.id > purchaseFloor.current && p.item === DEMO_SKU)
+      .filter((p) => p.id > purchaseFloor && p.item === DEMO_SKU)
       .sort((a, b) => Number(b.id - a.id));
     return (
       mine[0] ??
       [...purchases]
-        .filter((p) => p.id > purchaseFloor.current)
+        .filter((p) => p.id > purchaseFloor)
         .sort((a, b) => Number(b.id - a.id))[0]
     );
-  }, [purchases]);
+  }, [purchases, purchaseFloor]);
   const [refunds] = useTable(
     tables.refund.where((r) => r.agentId.eq(agentId ?? 0)),
     { enabled: agentId != null },
@@ -180,13 +181,25 @@ function LiveHandoff() {
     setPhase("fixture");
   }, [status]);
 
+  /** A fresh order and claim, as many times as anyone likes: the demo return is always available. */
+  const restart = useCallback(() => {
+    started.current = false;
+    navigated.current = false;
+    refunding.current = false;
+    setClaimId(null);
+    setClaimPath("");
+    setNote(null);
+    setFixtureStatus("waiting_phone");
+    setPurchaseFloor(purchases.reduce((m, p) => (p.id > m ? p.id : m), 0n));
+    setPhase(status === "live" ? "idle" : "fixture");
+  }, [status, purchases]);
+
   const bootstrap = useCallback(async () => {
     if (started.current || agentId == null) return;
     started.current = true;
     setPhase("buying");
     setNote(null);
-    const maxId = purchases.reduce((m, p) => (p.id > m ? p.id : m), 0n);
-    purchaseFloor.current = maxId;
+    setPurchaseFloor(purchases.reduce((m, p) => (p.id > m ? p.id : m), 0n));
     const ok = await call("buy", (r) => r.buy({ businessId: BUSINESS_A, sku: DEMO_SKU }));
     if (!ok) {
       setPhase("fixture");
@@ -250,12 +263,12 @@ function LiveHandoff() {
   }, [phase, newestPurchase, targetRefund, call]);
 
   useEffect(() => {
-    if (!claim || claimId != null) return;
+    if (!claim || claimId != null || phase !== "buying") return; // only the claim of the order this page just placed
     setClaimId(claim.id);
     setClaimPath(claimHref(claim, newestPurchase, targetRefund));
     setPhase("ready");
     setLiveMerchantClaimId(claim.id.toString());
-  }, [claim, claimId, newestPurchase, targetRefund, setLiveMerchantClaimId]);
+  }, [claim, claimId, phase, newestPurchase, targetRefund, setLiveMerchantClaimId]);
 
   const liveStatus: HandoffStatus = useMemo(() => {
     if (fixture) return fixtureStatus;
@@ -292,7 +305,7 @@ function LiveHandoff() {
     <div className="try-handoff" id="demo" data-testid="live-handoff">
       <div className="try-handoff__copy">
         <p className="section__eyebrow">Try it on your phone</p>
-        <h3 className="try-handoff__title">Submit the same claim.</h3>
+        <h3 className="try-handoff__title">Simulate returning wireless headphones.</h3>
         <p className="try-handoff__product">
           Demo order: <strong>{item?.name ?? "Noise-cancelling headphones"}</strong>
           <span className="try-handoff__product-meta"> · Lakeshore Audio · not as described</span>
@@ -300,21 +313,18 @@ function LiveHandoff() {
 
         {!mounted ? (
           <p className="try-handoff__soft-note">Preparing the shared claim…</p>
-        ) : phoneReachable ? (
+        ) : (
           <ol className="try-handoff__howto">
             <li>Scan the QR with your phone</li>
-            <li>Record a short video of the item</li>
+            <li>Record a short video of the headphones and say what is wrong</li>
             <li>This desktop opens the merchant result for the same claim</li>
           </ol>
-        ) : (
-          <div className="try-handoff__unavailable" data-testid="qr-unavailable">
-            <p className="try-handoff__unavailable-title">Phone handoff isn’t reachable from here</p>
-            <p className="try-handoff__unavailable-body">
-              This page is on a local address phones cannot open. Use “Open on this device” to walk the
-              claim on this computer, then continue to the merchant result.
-            </p>
-          </div>
         )}
+        {mounted ? (
+          <button type="button" className="btn btn--primary btn--sm try-handoff__again" onClick={restart} disabled={phase === "buying"} data-testid="simulate-return">
+            {claimId ? "Start another return" : phase === "buying" ? "Preparing the return…" : "Simulate returning wireless headphones"}
+          </button>
+        ) : null}
 
         {note ? <p className="try-handoff__soft-note">{note}</p> : null}
 

@@ -5,7 +5,6 @@ import { OpeningScene } from "./opening-scene";
 import { Dilemma } from "./dilemma";
 import { Insight } from "./insight";
 import { TryClaim } from "./try-claim";
-import { PoweredBy } from "./powered-by";
 import { JudgeNext } from "./judge-next";
 
 export function Journey() {
@@ -16,7 +15,6 @@ export function Journey() {
       <Insight />
       <TryClaim />
       <JudgeNext />
-      <PoweredBy />
     </DemoProvider>
   );
 }

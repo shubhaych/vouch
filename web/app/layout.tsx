@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, Fraunces, JetBrains_Mono } from "next/font/google";
+// Loaded here, not via @import in globals.css: Tailwind's CSS resolver failed to find it under next dev.
+import "lenis/dist/lenis.css";
 import "./globals.css";
 import { Providers } from "./providers";
 import { Nav } from "@/components/ui/nav";

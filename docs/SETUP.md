@@ -1,6 +1,6 @@
 # Run Vouch World locally with Maincloud
 
-This starts the web app and worker on your laptop and connects them to the existing Maincloud database `vouch-world`. It runs the 10,000-shopper world, the 100-shop Finance Desk simulation, and the five Finance CREAO seats. Cloudflare and phone tunnels are not part of this setup.
+This starts the web app and worker on your laptop and connects them to the existing Maincloud database `vouch-world`. It runs the 10,000-shopper world, the 100-shop Finance Desk simulation, and the five Finance CREAO seats. To open it from another computer or a phone (the QR claim), add the Cloudflare tunnels in section 5.
 
 ## 1. Install and configure
 
@@ -87,6 +87,57 @@ Open these pages in your browser:
 On `/desk`, enter the controller code from `DEMO_CONTROLLER_CODE` in `.env` (local default: `vouch-controller`), choose **All 100 shops · network**, then press **Start portfolio**. Leave the speed at **Turbo** to make activity visible quickly. The finance simulation begins paused. Use **Ring attack**, **Sale day**, or **Defect batch** to introduce a labeled scenario into one shop and watch exposure and payout guidance respond. A proposed pause waits for a human controller; it never automatically denies refunds.
 
 The cashflow view uses persistent company totals from `finance_company_state` and rolling payout rows from `finance_stats_hourly`. Its Vouch score is explicitly an illustrative simulation visualization, not real customer credit. Gross order value is simulated demand, not settled bank cash.
+
+## 5. Share it through Cloudflare (phone QR and other computers)
+
+Phones and other machines cannot open `localhost`. Two free Cloudflare quick tunnels give the web app and the worker public `https://…trycloudflare.com` addresses. No Cloudflare account is needed; the addresses change every time a tunnel restarts.
+
+Install once: `brew install cloudflared`.
+
+1. Start the worker (section 3) and leave it running.
+2. Open one tunnel per service, each in its own terminal. The `--metrics` port lets you read the address back later:
+
+   ```bash
+   cloudflared tunnel --metrics 127.0.0.1:20242 --url http://localhost:8787
+   ```
+
+   ```bash
+   cloudflared tunnel --metrics 127.0.0.1:20243 --url http://localhost:3001
+   ```
+
+3. Read the two public addresses:
+
+   ```bash
+   curl -s http://127.0.0.1:20242/quicktunnel
+   ```
+
+   ```bash
+   curl -s http://127.0.0.1:20243/quicktunnel
+   ```
+
+   The first is the worker, the second the web app.
+4. Build the web app with both addresses baked in, then serve it on port 3001. A production build matters here: `next dev` over a tunnel is slow on a phone. Replace the two hostnames with yours:
+
+   ```bash
+   cd web && NEXT_PUBLIC_SITE_URL=https://WEB-HOST.trycloudflare.com NEXT_PUBLIC_WORKER_URL=https://WORKER-HOST.trycloudflare.com NEXT_PUBLIC_STDB_URI=https://maincloud.spacetimedb.com NEXT_PUBLIC_STDB_DB=vouch-world NEXT_PUBLIC_DESK=1 npx next build
+   ```
+
+   ```bash
+   cd web && npx next start -p 3001
+   ```
+
+5. Open `https://WEB-HOST.trycloudflare.com` on any computer. On the home page, the "Simulate returning wireless headphones" panel shows a QR code for a fresh live claim; scan it with a phone, record, and the desktop opens the merchant result. "Start another return" makes a new claim as often as you like.
+
+Check it from the laptop: `curl -s https://WORKER-HOST.trycloudflare.com/health` should print `{"ok":true,…}`.
+
+If a tunnel restarts, its address changes: rebuild the web app (step 4) with the new address and restart `next start`. The worker's own address only appears in the web build, so the worker itself does not need a restart.
+
+To use the phone QR from `npm run dev` on port 3000 instead, run the web tunnel against port 3000 and put both addresses in a git-ignored `web/.env.local`:
+
+```
+NEXT_PUBLIC_SITE_URL=https://WEB-HOST.trycloudflare.com
+NEXT_PUBLIC_WORKER_URL=https://WORKER-HOST.trycloudflare.com
+```
 
 ## Optional: reset the shopper world
 

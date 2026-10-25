@@ -41,16 +41,20 @@ export function JudgeNext() {
               </span>
             </Link>
           ) : (
-            <div className="chapter-path__link chapter-path__link--waiting" data-testid="chapter-merchant-waiting">
+            <Link href="/merchant/claim/fixture" className="chapter-path__link" data-testid="chapter-merchant-waiting">
               <span className="chapter-path__n">01</span>
               <span className="chapter-path__body">
-                <span className="chapter-path__label">Merchant result</span>
+                <span className="chapter-path__label">
+                  Merchant result <span className="badge badge--fixture">Preview</span>
+                </span>
                 <span className="chapter-path__detail">
-                  Opens automatically after you submit from the phone (or this device). That live case
-                  is the primary destination — not a fixture.
+                  See what the merchant gets for a claim. After you submit from the phone, this opens your live case instead.
                 </span>
               </span>
-            </div>
+              <span className="chapter-path__arrow" aria-hidden>
+                →
+              </span>
+            </Link>
           )}
         </li>
 
