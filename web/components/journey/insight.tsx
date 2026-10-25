@@ -32,8 +32,9 @@ export function Insight() {
         When trust has to travel, you need a portable signal.
       </h2>
       <p className="insight-compare__quiet">
-        Same structure, different market. Credit cards did not invent scoring — and Vouch does not
-        measure creditworthiness. It measures confirmed refund outcomes.
+        Credit scores gave people a public record that proves they repay. Vouch builds the same
+        thing for shopping online: a public ledger of refund outcomes, so an honest shopper (or the
+        agent buying for them) can prove they are trustworthy anywhere.
       </p>
 
       <div className="insight-compare__grid" data-testid="insight-era">
