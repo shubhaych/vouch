@@ -24,6 +24,28 @@ function savedToken(label: Label): string {
 
 export interface Connected { conn: DbConnection; identity: string }
 
+/**
+ * Asks SpacetimeDB itself, not this connection's replica, whether a claim exists. The worker subscribes to
+ * whole tables, so under a busy simulation its replica can trail the database by minutes; a phone that
+ * uploads in that window must not be told its claim does not exist. Undefined when the database cannot be asked.
+ */
+export async function claimOnServer(claimId: bigint): Promise<boolean | undefined> {
+  const base = config.stdbUri.replace(/^ws/, 'http').replace(/\/$/, '');
+  try {
+    const res = await fetch(`${base}/v1/database/${config.stdbDb}/sql`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${savedToken('worker')}` },
+      body: `SELECT id FROM claim WHERE id = ${claimId}`,
+      signal: AbortSignal.timeout(5_000),
+    });
+    if (!res.ok) return undefined;
+    const [result] = (await res.json()) as { rows?: unknown[] }[];
+    return (result?.rows?.length ?? 0) > 0;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Connects, subscribes to `queries` plus the role table, and claims the role if this identity has none. */
 export function connect(label: Label, queries: string[], timeoutMs = 30_000): Promise<Connected> {
   const saved = savedToken(label);

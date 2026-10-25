@@ -34,3 +34,4 @@ module/dist/
 
 # Finance Desk: the generated DuckDB book (rebuild with npm run desk:book)
 worker/data/
+.logs/

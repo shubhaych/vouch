@@ -11,6 +11,7 @@ import { promisify } from 'node:util';
 import type { DbConnection } from '../module_bindings/index';
 import { config, log } from './env';
 import { mirrorOf } from './mirror';
+import { claimOnServer } from './stdb';
 import { checkFingers, fingerMessage } from './fingers';
 
 const run = promisify(execFile);
@@ -166,20 +167,42 @@ export async function extractUploadFrames(video: string, dir: string, times: num
   return frames;
 }
 
+/** How long an upload waits for a claim the database has but this worker's replica does not yet; the phone gives up at 180 s. */
+export const REPLICA_WAIT_MS = 120_000;
+
+/**
+ * The claim row for an upload. A claim created a moment ago may still be on its way to this worker's subscription,
+ * and under a busy simulation the subscription has trailed by minutes. So a short miss asks the database itself:
+ * only a claim the database does not have is "no such claim"; one it has is waited for.
+ */
+export async function findClaim(conn: DbConnection, claimId: bigint, onServer: (id: bigint) => Promise<boolean | undefined> = claimOnServer, waitMs = REPLICA_WAIT_MS, stepMs = 200) {
+  const started = Date.now();
+  const wait = async (until: number) => {
+    let c = conn.db.claim.id.find(claimId);
+    while (!c && Date.now() - started < until) {
+      await new Promise((r) => setTimeout(r, stepMs));
+      c = conn.db.claim.id.find(claimId);
+    }
+    return c;
+  };
+  let c = await wait(Math.min(3_000, waitMs));
+  if (c) return c;
+  const exists = await onServer(claimId);
+  if (exists === false) throw new UploadError(404, 'No such claim. Open the claim again from the QR code on the shop page.');
+  log(`upload for C-${claimId}: ${exists ? 'in SpacetimeDB but not yet in this worker\'s subscription' : 'not in this worker\'s subscription and SpacetimeDB could not be asked'}; waiting`);
+  c = await wait(waitMs);
+  if (!c) {
+    log(`upload for C-${claimId}: still not in this worker's subscription after ${Math.round((Date.now() - started) / 1000)} s`);
+    throw new UploadError(503, 'The reviewer is catching up with new claims. Your recording is kept; upload again in a minute.');
+  }
+  log(`upload for C-${claimId}: claim reached this worker's subscription after ${Math.round((Date.now() - started) / 1000)} s`);
+  return c;
+}
+
 /** Handles one upload end to end. Throws UploadError with a message the phone shows. */
 export async function processUpload(conn: DbConnection, claimId: bigint, nonce: string, data: Buffer, ext: string, now = Date.now()): Promise<{ frames: number; checks: Checks }> {
   const processingStarted = Date.now();
-  // A claim created a moment ago may still be on its way to this worker's subscription; under a busy simulation the
-  // subscription can trail by several seconds, so wait up to 20 s before giving up.
-  let c = conn.db.claim.id.find(claimId);
-  for (let i = 0; !c && i < 100; i++) {
-    await new Promise((r) => setTimeout(r, 200));
-    c = conn.db.claim.id.find(claimId);
-  }
-  if (!c) {
-    log(`upload for C-${claimId}: claim not in this worker's subscription after 20 s`);
-    throw new UploadError(404, 'This claim has not reached the reviewer yet. Wait a few seconds and upload again.');
-  }
+  const c = await findClaim(conn, claimId);
   if (!nonce || nonce !== c.nonce) throw new UploadError(403, 'This upload link is not valid for that claim (wrong nonce).');
   if (c.status !== 'awaiting_video' && c.status !== 'more_evidence') throw new UploadError(409, `This claim is ${c.status.replace('_', ' ')} and does not need a video.`);
   const age = now - Number(c.createdAt.microsSinceUnixEpoch / 1000n);
