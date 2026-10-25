@@ -36,99 +36,155 @@ The Hyphenate judges ask: **Is it real enough? Would you hire it? Did we see som
 | Finance CREAO judgments | Schema-checked simulated outputs until each human-created CREAO agent is connected; see [FINANCE_STATUS.md](FINANCE_STATUS.md) |
 | Live demo shopper claim and video evidence | Real rows from the existing Vouch flow when run locally; finance impact is asynchronous |
 
-## CREAO: the agents do the core work
+## How the four sponsors carry the refund
 
-Three saved agents, built on agent.creao.ai, fill the investigation seats. The worker (`worker/src/creao.ts`, `worker/src/orchestrator.ts`) starts their runs, polls every 15 s (or takes the webhook), checks the JSON they return and writes it through reducers. An agent never writes to the database and never moves money.
+One refund on Vouch touches all four. A shopper (or an AI agent buying for one) records a video. **SpacetimeDB** stores the claim, every step of the analysis and every piece of evidence as rows the phone and the business page watch live. **Factory Droid** investigates the video claim by claim inside a fenced case folder and writes findings through custom tools. **CREAO** agents review that report, propose the decision and move the shopper's Vouch score. **CRS** is the identity check that sits beside the claim for the cases where the account itself is in doubt. Each section below says why the sponsor is load-bearing and ends with a "Where to find the proof" table so a person or an agent can check every claim in the code.
 
-| Agent | Agent ID | Run share link | What it does |
-| --- | --- | --- | --- |
-| Evidence Analyst | `<fill in>` | `<fill in>` | Reads the claim's video frames and the deterministic checks. Returns findings with boxes and a verdict: consistent, inconsistent or unable_to_verify. |
-| Refund Investigator | `<fill in>` | `<fill in>` | Reads the findings, the shopper's history, any credential check and the store's policy. Proposes accept, store credit, more evidence or decline, citing reasons. |
-| Pattern Analyst | `<fill in>` | `<fill in>` | Reads a flagged pattern's events and the agents' histories. Returns confirm, dismiss or needs_review, with each agent's role and a narrative. |
-| Listing Matcher (optional) | `<fill in>` | `<fill in>` | Matches the frames to product listings the worker scraped through Bright Data, says whether they show the ordered item, and checks the return against the policy. |
-| Policy Checker (optional) | `<fill in>` | `<fill in>` | Reads the store policy rule by rule (window, reason, video, category note, fee, item identity) and returns eligible, conditional, needs_person or not_eligible. |
-| Risk Scorecard (optional) | `<fill in>` | `<fill in>` | Reads history, credential, patterns, identity screening, the item's return pulse and the video checks as supports, neutral or caution. Context, never a decision. |
-| Returns Monitor (optional) | `<fill in>` | `<fill in>` | Reads one window of the returns pulse and web return signals scraped for the busiest items; notes spikes and the innocent explanation. Never names a shopper. |
+## CREAO: the agents make every judgement
 
-**Remove the agents and no claim is investigated and no fraud pattern is confirmed.**
+**What it does.** Every judgement call in Vouch is made by a saved CREAO agent, not by our code. The worker builds a case (JSON), starts a run on agent.creao.ai, polls it (or takes the webhook), checks the JSON the agent returns against a schema, and writes it through a SpacetimeDB reducer. An agent never writes to the database and never moves money: it proposes, a reducer or a person decides.
 
-**Kill switch.** Open `/business` and take the business seat with the demo code. In the org chart, click the CREAO switch.
-- New claims then show "Investigator offline", and the business can only ask for more evidence. Nothing is declined automatically.
-- Flagged patterns wait in `awaiting_review`.
-- The worker checks the switch before every run and again before every proposal. Click it again to turn the agents back on.
+**Why CREAO and not a prompt in our code.** Refund decisions need roles that a business recognises: an investigator, a reviewer, a policy checker, a risk analyst. CREAO let us build each role once as a saved agent with its own instructions, tools and run history, then call it by ID. That gave us three things we could not get from an inline LLM call:
+- *Separation of roles.* The agent that proposes is not the agent that reviews. The Score Reviewer panel (below) asks three different agents the same question and takes the cautious answer.
+- *An audit trail outside our system.* Every run has a CREAO run ID that is stored with the evidence, so a business can open the agent's own record of what it read and said.
+- *A method that generalises.* Adding a seat is a markdown file of instructions (`agents/creao/*.md`, `docs/CREAO.md`), an entry in `SEATS`, a validator and a fixture. That is how we went from three seats to ten during the weekend without touching the pipeline. Any decision that today is "a person reads a file and picks an option" fits the same shape.
 
-The agents' instructions and setup steps are in [docs/CREAO.md](docs/CREAO.md); the indicators the eligibility layer reads are listed there too. The scrapers behind the Listing Matcher and the Returns Monitor are in [docs/BRIGHTDATA.md](docs/BRIGHTDATA.md): the worker scrapes through Bright Data, caches, and hands the results to the agents; no agent holds a key. In this repository's test runs the agents were replaced by hand-written fixtures in `worker/fixtures/`, labelled Fixture on screen. See [docs/LIVE_CHECKLIST.md](docs/LIVE_CHECKLIST.md) for the live runs still to do.
+**What it saved us.** We did not write an agent runtime, a run store, retries, tool hosting or a run viewer. The adapter (`worker/src/creao.ts`) is about 250 lines; the rest of our time went into the evidence and the rules around the verdict.
 
-## Factory: the video reviewer
+**The seats and an example of each** (the examples are illustrative; `scripts/hello-creao.ts` holds one test case per seat):
 
-Every refund claim with a video is investigated by Droid sessions that run on the worker through `@factory/droid-sdk` (`worker/src/review/`). This is the part of Vouch that would be hard to build without Factory: the reviewer is not a prompt that returns a verdict, it is an agent that works inside a case folder, measures the footage with real tools, and leaves a complete, auditable trail that the business page shows.
+| Seat | Role | Example |
+| --- | --- | --- |
+| Evidence Analyst | Reads the video frames and the deterministic checks; returns findings and consistent / inconsistent / unable_to_verify. | Frames show a cracked mug base; checks say fresh, no reuse → consistent. |
+| Refund Investigator | Reads findings, history, credential check and store policy; proposes accept, store credit, more evidence or decline, with reasons. | Supported damage claim, clean history, inside the window → accept. |
+| Pattern Analyst | Reads a flagged pattern's events and the agents' histories; confirm, dismiss or needs_review. | Five accounts filing near-identical "never arrived" claims within minutes → confirm, with each account's role. |
+| Refund Reviewer | Reads the Droid report and says whether it agrees before any automatic decision. | T1 report with every claim supported → agrees; auto-decision allowed under the store's limit. |
+| Customer Liaison | Writes the message the shopper sees. | "Your refund of $2.99 is approved; no return needed." |
+| Listing Matcher | Matches frames to listings scraped through Bright Data; is it the ordered item, is the return eligible. | Frames show a 60% keyboard, order was full-size → mismatch, routed to a person. |
+| Returns Monitor | Reads one window of the returns pulse and web return signals; notes spikes and the innocent explanation. Never names a shopper. | Cable returns doubled → a known faulty batch is the likely reason. |
+| Policy Checker | Reads the store policy rule by rule; eligible, conditional, needs_person or not_eligible. | Day 31 of a 30-day window → needs_person, not a decline. |
+| Risk Scorecard | Reads history, credential, patterns, identity screening and video checks as supports / neutral / caution. Context, never a decision. | Long clean history, no identity screening run → supports, identity neutral. |
+| Score Reviewer | Decides how far a verdict moves the shopper's Vouch score, inside fixed bounds. | Accepted claim with strong evidence → +12. |
 
-**The pipeline for one claim** (`worker/src/review/runner.ts`; every step is an `analysis_step` row, so the phone shows progress live):
+The finance desk adds five more seats with the same adapter (impact analyst, impact reviewer, close controller, exposure guardian, forecast drivers advisor; instructions in `agents/creao/`).
 
-1. **Ingest.** ffmpeg normalises the upload to `cases/<claim>/video.mp4`, extracts `audio.wav`, samples frames every 0.5 s and at scene changes, and builds 3×3 contact sheets with the time burnt into each tile, so one `Read` shows Droid 4.5 s of video.
-2. **Lanes.** The transcript lane (faster-whisper, word timestamps) and the integrity lane (black and frozen frames, cut rate, frame reuse against earlier claims, metadata, the finger challenge) run in parallel. One Droid call turns the transcript (or the written reason) into **spoken claims** with the moment each was said.
-3. **Case Analyst (Droid, fenced).** A Droid session opens in the case folder with `CASE.md`, the frames, the mosaics and a set of read-only probes (`worker/tools/probes/`: luminance of a region over time, sound onsets, part motion, screen-recapture hints, OCR). It plans, looks at the moments each claim points to, runs probes or writes its own, and records **exactly one finding per claim** (supports / contradicts / neutral) plus integrity findings through the `vouch-case` MCP server. Every finding must cite a time window and an artifact it registered.
-4. **Proof.** For each finding a captioned clip and a still are cut, plus a 20–40 s proof reel. The worker cuts them by default; `REVIEW_DROID_PROOF=1` runs the Proof Builder as a second Droid session instead (same files).
-5. **Report Auditor (Droid) and the worker's own audit.** The auditor writes and runs a test over every finding (artifact exists and its hash matches, window inside the video, proof clip covers it, wording describes footage and never the person, one finding per claim). The worker runs the same checks itself; a rejection by either sticks, and rejected findings stay in the report under "Rejected by the audit".
-6. **Score, tier, recommendation.** The deterministic formula in `module/src/review-score.ts` (shared with the web) turns evidence support, coverage, integrity and account history into P(legit) and a tier: T1 refund now, T2 partial now and the rest on return, T3 refund on return, T4 more evidence, T5 a person decides. Nothing ever auto-denies.
-7. **CREAO Refund Reviewer.** The saved agent reads the report and says whether it agrees; auto-decision happens only for T1/T2, under the store's limit, when the Reviewer agrees. A Customer Liaison agent writes the customer message.
+**The automatic score after a verdict.** When the Droid report and the CREAO verdict agree on accept or decline (and the claim was not put on hold for an extra clip, a person, or because CREAO is offline), the worker asks a panel of three CREAO agents (Score Reviewer, Refund Investigator, Risk Scorecard) for a score change. `panelVerdict` keeps the answer only when the panel agrees and clamps it to fixed bounds; the module's `applyScoreReview` reducer applies it once per refund. Verified live on Maincloud: claims C-41, C-44 and C-45 each moved the shopper's score by +12 (555 → 591), recorded as `panel_live` rows in `score_review`.
 
-**What makes it a Factory feature.**
-- *A fenced agent, not a prompt.* The Droid SDK's permission handler (`worker/src/review/fence.ts`, 15 unit tests) sees every tool call before it runs, including each call inside a `Script`, and cancels anything outside the case: the Case Analyst may write only `work/`, run only `python3`/`node` on its own scripts or the shared probes, `ffmpeg`/`ffprobe` writing into `work/`, and the role's `vouch-case` tools; the web and subagents are disabled. Droid can write its own probe when none fits.
-- *Custom tools through `createSdkMcpServer`.* `get_case`, `add_artifact`, `add_finding`, `audit_finding`, `set_live_note`, `vision_label` are in-process MCP tools backed by SpacetimeDB reducers, so every artifact and finding is a row the business page subscribes to while the session is still running.
-- *Nested sessions with a budget.* `vision_label` runs a short nested Droid call over a frame; every session, retry and nested call counts against `MAX_DROID_SESSIONS_PER_HOUR`.
-- *Visible work.* The plan, every command with its exit code and duration, every fence decision and every message is in `cases/<claim>/droid.log`, linked from the report, and summarised under "How this was investigated".
-- *Graceful degradation.* No key, no budget or a failed session means "Automated checks only": the lanes still run, the report says so, the tier is capped at T3, and the business decides.
+**Kill switch.** Open `/business`, take the business seat with the demo code, and click the CREAO switch in the org chart. New claims show "Investigator offline", the business can only ask for more evidence, flagged patterns wait in `awaiting_review`, and no score moves. The worker checks the switch before every run and again before every proposal. **Remove the agents and no claim is decided automatically and no fraud pattern is confirmed.**
 
-**Verified live on the laptop (2026-10-24):** the fixture-mode run of the full pipeline, and real Droid sessions through the SDK (claims extraction, session start, MCP tools, fence decisions for direct calls and for `Script` batches). The last run (`qa/videos/S05-fresh.mp4` → C-6) took 150 s with three sessions: the Case Analyst wrote its plan and an audio-track probe, registered mosaics, frames and the probe's chart, and recorded three findings; the worker cut the clips and reel; the Report Auditor wrote and ran `work/audit_test.py`, verified every hash and clip and passed all three; the worker's audit agreed. The QA videos are synthetic and silent, so the tier was T4 "more evidence" every time, never a decline. Two facts found the hard way, both in [docs/VERIFIED.md](docs/VERIFIED.md): with autonomy *off* the session has no file-write tool (Droid writes files through `Execute`, which the fence judges), and with autonomy *low* file writes bypass the permission handler, so the reviewer stays on *off*. The transcript lane needs `pip install faster-whisper`; without it the report says "no transcript" and claims come from the written reason.
+**Live status.** The seats run live against agent.creao.ai (`CREAO_MODE=live`) with the worker connected to Maincloud. Tests and CI use the recorded fixtures in `worker/fixtures/` (`CREAO_MODE=fixture`), labelled Fixture on screen. Agent IDs are in the local `.env`, not in the repository.
 
-## Factory: the Detector Lab
+**Where to find the proof**
 
-`worker/src/lab.ts` runs a Droid SDK session when a lab job is enqueued. Four things can enqueue one:
-- an event (a person overrides a recommendation, or a pattern is dismissed),
-- a schedule (every 30 simulated days),
-- a user action (one of five preset goals on `/lab`),
-- another agent (the Pattern Analyst returns needs_review twice).
+| Claim | Location |
+| --- | --- |
+| Seat list | `worker/src/env.ts` → `SEATS` |
+| Start a run, poll, parse and validate the JSON | `worker/src/creao.ts` → `startRun`, `waitForRun`, `parseVerdict`, `fillFromChat` |
+| Refund Investigator proposes the decision | `worker/src/orchestrator.ts` → `runSeat('refund_investigator', …)` |
+| Pattern Analyst confirms or dismisses a pattern | `worker/src/orchestrator.ts` → `runSeat('pattern_analyst', …)` |
+| Kill switch checked before every run and proposal | `worker/src/orchestrator.ts` (`agentsOn`, `creao_enabled`), `worker/src/review/runner.ts`, `worker/src/review/score-review.ts` |
+| Score panel after a verdict | `worker/src/review/score-review.ts` → `afterVerdict`; wired in `worker/src/server.ts` (`onVerdict`) and `worker/src/review/runner.ts` |
+| Bounds and panel agreement | `worker/src/review/score-rule.ts` → `evaluateScoreVerdict`, `panelVerdict` |
+| Score applied once per refund | `module/src/review.ts` → `applyScoreReview` |
+| Seat instructions | `docs/CREAO.md`, `agents/creao/*.md` |
+| One live run per seat | `scripts/hello-creao.ts` (`CREAO_MODE=live npx tsx scripts/hello-creao.ts --seat <seat>`) |
+| Live rows | `spacetime sql vouch-world -s maincloud "SELECT * FROM score_review"`, `"SELECT * FROM agent_run"` |
 
-Droid may only edit `detectors/candidates/<job>/` and run two commands. The permission handler checks each call, including bundled `Script` calls. Its plan, every tool call, the diff and evaluator scores are stored in SpacetimeDB. The detector-lab page is currently hidden; a person still promotes or rejects candidates through the controller workflow.
+## CRS: identity screening for the account behind the claim
 
-Permission rules (`decideTool` in `worker/src/lab.ts`, unit tested in `worker/test/lab-fence.test.ts`):
-- Writes and edits are allowed only inside `candidates/<job>/` of the job's own workspace copy. Any path outside it is cancelled, including one that climbs out with `..`. Droid cannot make a symlink, because its only shell access is the two commands below.
-- Exactly two shell commands are allowed: `npx tsx test.ts candidates/<job>` and `npx tsx eval.ts --candidate candidates/<job> [--json] [--seed N] [--agents N]`.
-- The web tools (`WebSearch`, `FetchUrl`) and every MCP server except `vouch-lab` are disabled; any other tool type is cancelled.
-- At most 6 jobs run per simulation run. No job starts itself. Promotion bumps the version, reruns the tests, and restores the old detector if they fail.
+**What it does.** Video evidence answers "is this item damaged?". It cannot answer "is this account who it says it is?". CRS (identity and contact-risk screening) covers that second question: given a person's details it returns fraud and identity signals. The worker normalises the response into one small `IdentityScreening` shape (a routing outcome plus the reasons) so the rest of Vouch never sees raw CRS output.
 
-A lab job's recorded events: `<fill in>` (written to `worker/fixtures/lab/job-<n>.json` after the first real job on the laptop).
+**Why it matters.** The fraud that costs most is not one bad video; it is synthetic or borrowed identities filing many claims. A behaviour-only detector sees that late. An identity check sees it at the first claim. Keeping CRS behind one function also makes the method general: any screening provider can sit behind `screen()` and the agents still read the same three-value context (supports / neutral / caution).
 
-## SpacetimeDB: the economy lives in the module
+**How it is used today (honest status).** CRS is backend-only and is not yet in the claim flow. The worker can screen the four sandbox personas (`P01`, `P12`, `P13`, `P16`) live against the CRS sandbox or from fixtures, singly or in a batch, through three routes. The Risk Scorecard and the score panel already receive an `identity` field; today it is sent as `not_run` and the agents treat it as neutral, never as evidence against the shopper. Wiring it into claims is the next step and needs consent and real identity data, which the simulated shoppers do not have.
 
-- **The simulation is a scheduled reducer.** `sim_tick` schedules `tick` every 200 ms. Each tick steps 1,000 agents through the shared engine (`module/src/sim.ts`): purchases, deliveries, refund intents, fast decisions, investigations, ring bursts and credit changes. The engine is deterministic from a seed; its RNG state lives in `sim_run.rngState`.
-- **Ground truth stays private.** An agent's kind (honest, opportunist, serial, ring) is in the private `agent_truth` table. Losses and honest-customer declines are computed against it inside reducers, so the client never sees who is who.
-- **Segregation of duties is enforced by reducers** (`module/src/desk.ts`):
-  - the worker proposes; a business seat or the controller decides; the poster writes the journal entry;
-  - whoever proposes cannot decide;
-  - an accept above $500 needs the controller;
-  - an entry that does not balance is refused.
-- **Tables (31).**
-  - Public: `role`, `sim_run`, `agent`, `business`, `purchase`, `refund`, `credit_event`, `event_feed`, `region_stat`, `fraud_pattern`, `pattern_event`, `claim`, `evidence`, `agent_run`, `control`, `decision`, `journal_entry`, `journal_line`, `credential`, `verification`, `lab_job`, `lab_event`, `metrics`, `latency_ping`, `bench_result`.
-  - Private: `seat_code`, `counter`, `sim_tick`, `agent_truth`, `shopper_link`, `refund_intent`.
-- **Subscription strategy: keep the browser light.**
-  - `/world` subscribes to `agent`, `business`, `region_stat` and the 512-row `event_feed` ring, and re-renders on a throttle.
-  - Panels subscribe to one agent's rows with `where` filters, only while open.
-  - `/claim/[id]` subscribes to its own claim, refund, runs and decision.
-  - The shopper's identity is linked to their agent through the `my_agent` view.
-  - The worker keeps its own indexed mirror (`worker/src/mirror.ts`), because the client cache's `find()` scans every row.
+**Where to find the proof**
 
-**Numbers.** Measured 2026-10-24 on a cloud VM (Intel Xeon @ 2.10 GHz × 4) against a local SpacetimeDB 2.13.0 standalone server:
+| Claim | Location |
+| --- | --- |
+| Screening, sandbox and fixture paths | `worker/src/crs.ts` → `screen`, `sandboxScreening`, `fixtureScreening`, `normalize`, `PERSONA_IDS` |
+| HTTP routes | `worker/src/server.ts` → `/identity/status`, `/identity/check`, `/identity/batch` |
+| Tests | `worker/test/crs.test.ts` |
+| Identity passed to the agents as context | `worker/src/orchestrator.ts` and `worker/src/review/score-review.ts` (`identity` in the Risk Scorecard case) |
+| Rules and limits | `docs/CRS.md` |
+
+## Factory: the Droid SDK is the refund investigator
+
+**What it does.** Every refund claim with a video is investigated by Droid sessions that run on the worker through `@factory/droid-sdk` (`worker/src/review/`). The reviewer is not a prompt that returns a verdict. It is an agent that works inside a case folder, measures the footage with real tools, and leaves a complete, auditable trail the business page shows while it works.
+
+**Why this is more than a ChatGPT wrapper.** A wrapper sends frames and asks "is this a real refund?". It gets a confident paragraph that cannot be checked. Droid gives us four things a chat call does not:
+- *An agent loop with real tools.* Droid plans, reads contact sheets, runs probes (luminance over time, sound onsets, part motion, OCR) or writes its own probe in `work/`, and looks again. Findings come from measurements, not impressions.
+- *A permission handler on every tool call.* The SDK lets our fence (`worker/src/review/fence.ts`) see each call before it runs, including each call inside a `Script`, and cancel anything outside the case folder. The Case Analyst may write only `work/` and run only `python3`, `node`, `ffmpeg` and `ffprobe` there; the web and subagents are off.
+- *Custom tools backed by the database.* `createSdkMcpServer('vouch-case')` exposes `get_case`, `get_policy`, `get_customer_summary`, `list_artifacts`, `list_findings`, `vision_label`, `add_artifact`, `add_finding`, `set_live_note`, `recommend_refund` and `audit_finding`. Each write tool calls a SpacetimeDB reducer, so a finding is a row the business page subscribes to the moment Droid records it.
+- *Several sessions with different jobs.* A Case Analyst investigates, a Report Auditor writes and runs a test over every finding, nested calls label single frames, a separate call extracts the spoken claims, another checks the finger challenge. Each has its own fence and all count against one hourly budget.
+
+**The backbone of the refund process.** The pipeline for one claim (`worker/src/review/runner.ts`; every step is an `analysis_step` row, so the phone shows progress live):
+
+1. **Ingest.** ffmpeg normalises the upload to `cases/<claim>/video.mp4`, extracts audio, samples frames every 0.5 s and at scene changes, and builds 3×3 contact sheets with the time burnt in.
+2. **Lanes.** Transcript (faster-whisper) and integrity (black and frozen frames, cut rate, frame reuse against earlier claims, metadata, finger challenge) run in parallel. One Droid call turns the transcript (or written reason) into **spoken claims** with timestamps.
+3. **Case Analyst (Droid, fenced).** Records **exactly one finding per claim** (supports / contradicts / neutral) plus integrity findings. Every finding must cite a time window and an artifact it registered.
+4. **Proof.** A captioned clip and still per finding plus a 20–40 s proof reel.
+5. **Report Auditor (Droid) and the worker's own audit.** Artifact exists and its hash matches, window inside the video, clip covers it, wording describes footage and never the person. A rejection by either sticks.
+6. **Assessment guards.** `assessRefund` drops findings about claims that were never spoken (for example a stray `written_reason`) with a note instead of letting them veto, and `nextMove` decides between a verdict, one extra clip, or a person.
+7. **Score, tier, recommendation.** The formula in `module/src/review-score.ts` turns support, coverage, integrity and history into P(legit) and a tier: T1 refund now … T5 a person decides. Nothing auto-denies.
+8. **CREAO** reviews the report and proposes; the score panel moves the shopper's Vouch score.
+
+Without a key, budget or a working session the report says "Automated checks only", the tier is capped at T3, and the business decides.
+
+**The Detector Lab** is a second fenced Droid use (`worker/src/lab.ts`): Droid may edit only `detectors/candidates/<job>/` and run exactly two commands (`npx tsx test.ts candidates/<job>` and `npx tsx eval.ts --candidate …`); every plan, tool call, diff and score is a `lab_event` row; a person promotes. At most 6 jobs per simulation run. The lab page is currently hidden and lab jobs have not been run live.
+
+**Verified live:** real Droid sessions through the SDK on the laptop (claims extraction, session start, MCP tools, fence decisions for direct calls and for `Script` batches) and on the deployed demo for claims C-41 to C-45. Two facts found the hard way, in [docs/VERIFIED.md](docs/VERIFIED.md): with autonomy *off* the session has no file-write tool (Droid writes through `Execute`, which the fence judges), and with autonomy *low* file writes bypass the permission handler, so the reviewer stays on *off*.
+
+**Where to find the proof**
+
+| Claim | Location |
+| --- | --- |
+| Session start, autonomy off, permission handler | `worker/src/review/session.ts` → `sdk.createSession` |
+| Fence for every call, including inside `Script` | `worker/src/review/fence.ts` → `decideCaseTool`, `checkCommand`, `nestedDetails`, `insideCase` |
+| Custom MCP tools backed by reducers | `worker/src/review/case-tools.ts` → `sdk.tool(...)`, `createSdkMcpServer({ name: 'vouch-case' })` |
+| Spoken-claim extraction | `worker/src/review/claims.ts` → `sdk.run` |
+| Finger challenge check | `worker/src/fingers.ts` → `sdk.run` |
+| Assessment guards | `worker/src/review/assessment.ts` → `assessRefund`, `nextMove` |
+| Pipeline order and steps | `worker/src/review/runner.ts` |
+| Score and tier formula | `module/src/review-score.ts` → `pLegit`, `tierFor` |
+| Detector Lab fence | `worker/src/lab.ts` → `decideTool`, `vouch-lab` server; tests `worker/test/lab-fence.test.ts` |
+| Live rows | `analysis_step`, `artifact`, `finding`, `report` tables on Maincloud |
+
+## SpacetimeDB: the database is the public ledger of trust
+
+**What it does.** SpacetimeDB is the only database in Vouch. It holds the simulated economy, every real claim, every step of every investigation, every piece of evidence and every decision. The simulation itself runs inside the module as a scheduled reducer, browsers subscribe directly, and the rules that keep the refund process honest (who may propose, who may decide, what may be written) are reducers, not application code that could be bypassed.
+
+**Why it saves the Vouch system.** Vouch is a trust system: a shopper's score and a business's decision are only worth something if anyone can see how they were reached. SpacetimeDB makes that the default:
+- *One public ledger.* Claims, analysis steps, artifacts, findings, reports, recommendations, decisions, score reviews and credit events are public tables. The phone, the business page and the globe all read the same rows; nobody reconstructs state from logs.
+- *Video evidence as data, not as a blob.* The video file stays on the worker behind signed, expiring URLs (`/media`, `/cases`). What the decision depends on is in the database: frame hashes (for reuse checks against every earlier claim), every registered artifact with its path, time window and hash, every finding tied to a spoken claim and a time window, and the audit result. A finding that cites an artifact whose hash no longer matches fails the audit.
+- *Rules enforced where the data lives.* Segregation of duties is a reducer (`module/src/desk.ts`): the worker proposes, a business seat or the controller decides, whoever proposes cannot decide, an accept above $500 needs the controller, a journal entry that does not balance is refused. The score moves once per refund because `applyScoreReview` refuses a second one.
+- *Ground truth stays private.* Each simulated shopper's kind (honest, opportunist, serial, ring) is in the private `agent_truth` table. Losses and honest-customer declines are computed against it inside reducers, so no client can learn who is who.
+- *Live without a backend.* The phone shows each step as Droid works because `analysis_step` and `finding` rows arrive by subscription. We wrote no websocket server and no polling API.
+
+**Scale.** On Maincloud (`vouch-world`) at the time of writing: 596,834 purchases, 90,359 refunds and 951,135 credit events from 10,000 simulated shoppers, with the tick still running (250 agents per half second). The same database holds the 38 real claims, 44 CREAO runs and 90 analysis steps from the live demo. Earlier, on a local SpacetimeDB 2.13.0 server (Intel Xeon @ 2.10 GHz × 4):
 
 | Measure | Result |
 | --- | --- |
-| Live run, seed 11, 10,000 agents | 5 ticks/s, 1,000 agents per tick. Measured tick interval 203 ms. By simulated day 720: 201,460 purchases, 29,747 refunds and 288,423 credit events. |
+| Live run, seed 11, 10,000 agents | 5 ticks/s, 1,000 agents per tick, tick interval 203 ms. By simulated day 720: 201,460 purchases, 29,747 refunds, 288,423 credit events. |
 | Reducer round trip (`npx tsx scripts/hello-stdb.ts 50`) | p50 2 ms, p95 4 ms |
-| Unthrottled bench, 30 simulated days (`npx tsx scripts/bench.ts`) | 10,000 agents: 176,437 agent-steps/s. 50,000 agents: 196,962. 100,000 agents: 188,903. |
+| Unthrottled bench, 30 simulated days (`npx tsx scripts/bench.ts`) | 10,000 agents: 176,437 agent-steps/s. 50,000: 196,962. 100,000: 188,903. |
 
-The bench writes its results to `bench_result`, and `/system` shows them next to the live counters. Maincloud has not been measured yet ([docs/LIVE_CHECKLIST.md](docs/LIVE_CHECKLIST.md)).
+The bench writes its results to `bench_result`, and `/system` shows them next to the live counters. Maincloud latency has not been benchmarked.
 
+**Subscription strategy: keep the browser light.** `/world` subscribes to `agent`, `business`, `region_stat` and the 512-row `event_feed` ring and re-renders on a throttle. Panels subscribe to one agent's rows with `where` filters only while open. `/claim/[id]` subscribes to its own claim, steps, findings and decision. `useTableVersion` keeps the old subscription until the new one applies, so pages do not flash empty. The worker keeps its own indexed mirror because the client cache's `find()` scans every row.
+
+**Where to find the proof**
+
+| Claim | Location |
+| --- | --- |
+| Every table, public and private | `module/src/schema.ts` (`claim`, `evidence`, `analysis_job`, `analysis_step`, `artifact`, `finding`, `report`, `claim_score`, `score_review`, `credit_event`, `decision`, `journal_entry`, `agent_truth`, …) |
+| The simulation as a scheduled reducer | `module/src/economy.ts` (`sim_tick`, `tick`) → `module/src/sim.ts` |
+| Evidence and analysis written through reducers | `module/src/review.ts` → `startAnalysis`, `setStep`, `addArtifact`, `addFinding`, `auditFinding`, `writeReport`, `writeScore`, `writeRecommendation`, `finishAnalysis`, `autoDecide`, `applyScoreReview` |
+| Segregation of duties | `module/src/desk.ts` → `propose`, `decide` |
+| Frame hashes and reuse checks; signed media URLs | `worker/src/video.ts` → `dHash`, `findReuse`, `processUpload`, `signPath`, `checkSignature`; routes in `worker/src/server.ts` (`/media`, `/cases`) |
+| Browser subscriptions | `web/lib/stdb/hooks.ts` → `useTableVersion`, `useRowsThrottled` |
+| Worker mirror | `worker/src/mirror.ts` → `Mirror` |
+| Check the live counts | `spacetime sql vouch-world -s maincloud "SELECT COUNT(*) AS n FROM purchase"` |
 ## Detectors
 
 Three detectors live in `detectors/live/`: `coordinated` (rings), `false_defect` (opportunists) and `refund_frequency` (serial refunders). They use behaviour only: timing, repetition, claim similarity and refund-to-purchase ratio. A shared region or a shared business is never evidence; `detectors/test.ts` shuffles regions and relabels businesses to prove `coordinated` does not change.
@@ -147,18 +203,18 @@ These numbers are measured on a simulated economy we designed. They show the met
 
 | Thing | Status |
 | --- | --- |
-| SpacetimeDB state, subscriptions, reducers, the tick, throughput and latency numbers | Live (local server in this build) |
+| SpacetimeDB state, subscriptions, reducers and the tick | Live on Maincloud (`vouch-world`); throughput and latency numbers from a local server |
 | The 10,000 agents, their businesses, purchases and refunds | Simulated by our engine, deterministic from a seed |
 | Agent regions on the globe | Simulated positions; no real locations |
 | The shopper's purchase and payment | Simulated payment; the claim and the video are real |
 | Video frames, hashes, freshness, blank-frame, little-motion and reuse checks | Live (ffmpeg and dHash in the worker) |
-| CREAO findings, recommendations and pattern reviews | Fixture in this build (`CREAO_MODE=fixture`); live runs wait for the agents (see the checklist) |
+| CREAO findings, recommendations, score reviews and pattern reviews | Live on the deployed demo (`CREAO_MODE=live`); fixtures in tests (`CREAO_MODE=fixture`) |
 | The returns pulse on `/business` (returns per second, by item) | Live: counted from refund rows as they arrive; the band breakdown is Simulated |
 | Scraped listings and web return signals | Fixture in this build (`BRIGHTDATA_MODE=fixture`, built from the catalogue); Bright Data SERP API when live, shown with the fetch time |
 | The video reviewer's ingest, integrity checks, findings, proof clips, audit and score | Live (ffmpeg, the probes and the formula run in the worker; findings come from a live Droid session when `FACTORY_API_KEY` is set, otherwise the report says "Automated checks only") |
-| The CREAO Refund Reviewer's opinion | Fixture until the saved agent exists (labelled Fixture; "Reviewer offline" when neither is available) |
+| The CREAO Refund Reviewer's opinion | Live when the saved agent is configured; Fixture in tests; "Reviewer offline" when neither is available |
 | Detector scores | Measured on fresh simulated worlds against the simulation's ground truth |
-| Droid review sessions | Run live on the laptop through the SDK; see "Factory: the video reviewer" for what was verified |
+| Droid review sessions | Run live through the SDK; see "Factory: the Droid SDK is the refund investigator" |
 | Droid lab jobs | Not run live yet; the fence and the pipeline are unit tested |
 | Credentials | Real Ed25519 signatures and salted digests; simulated issuers; registry in SpacetimeDB, not on a public chain |
 
@@ -183,11 +239,9 @@ Full steps, including the CREAO agents, Maincloud publishing, the Droid CLI and 
 
 ## Known limits
 
-- **CREAO, Droid and Maincloud have not run live here.**
-  - The cloud session had no account-level CREAO key and no saved agents, so claims and patterns ran on fixtures.
-  - Droid jobs need the laptop.
-  - The SpacetimeDB numbers come from a local server.
-  - Each one has an exact command in [docs/LIVE_CHECKLIST.md](docs/LIVE_CHECKLIST.md).
+- **CRS is not in the claim flow yet.** The worker screens sandbox personas only; agents receive identity as `not_run`.
+- **SpacetimeDB latency and throughput numbers come from a local server.** Maincloud counts are live; Maincloud latency has not been benchmarked.
+- **Droid lab jobs have not run live.** The fence and pipeline are unit tested.
 - **The video checks are internally consistent, not proof of authenticity.** A convincing fake video can fool a vision model. Vouch raises the cost and routes doubt to a person. Findings describe the footage, never the person; the reviewer never auto-denies.
 - **The reviewer's transcript lane needs faster-whisper on the worker** (`pip install faster-whisper`). Without it, and for videos with no audio track, claims come from the written reason and the report says so.
 - **The shopping score is illustrative, not a consumer report.** In production it would need consent, explanations and an appeal path. Appeals are out of scope.
