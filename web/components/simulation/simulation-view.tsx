@@ -230,9 +230,6 @@ function SimulationInner() {
               agent={selected}
               highlightRefundId={highlightRefundId}
               onClearAgent={() => selectAgent(null)}
-              day={run?.day ?? 0}
-              running={running}
-              onSelectBusinessAgent={selectAgent}
             />
           </motion.div>
 

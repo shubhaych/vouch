@@ -9,7 +9,7 @@ import { agentLabel, businessLabel, money, titleCase } from "@/lib/format";
 import { START_SCORE } from "@vouch/module/score";
 import { catalogItem } from "@vouch/module/world";
 import { BAND_COLOR, type AgentPoint } from "@/components/world/use-world";
-import { LiveFlow } from "./live-flow";
+import { TotalWrites } from "./live-readings";
 
 export interface TrustCounts {
   agents: number;
@@ -28,17 +28,11 @@ export function TrustPanel({
   agent,
   highlightRefundId,
   onClearAgent,
-  day,
-  running,
-  onSelectBusinessAgent,
 }: {
   counts: TrustCounts;
   agent: AgentPoint | null;
   highlightRefundId: bigint | null;
   onClearAgent: () => void;
-  day: number;
-  running: boolean | null;
-  onSelectBusinessAgent: (id: number) => void;
 }) {
   return (
     <aside className="sim-panel sim-panel--trust" data-testid="sim-trust-panel">
@@ -66,8 +60,8 @@ export function TrustPanel({
 
       {agent ? null : (
         <div className="sim-trust__live" data-testid="sim-live-writes">
-          <p className="sim-panel__eyebrow">Live writes · all merchants · last 40 s <Badge kind="simulated" /></p>
-          <LiveFlow businessId={null} day={day} running={running} onSelectAgent={onSelectBusinessAgent} scores={false} />
+          <p className="sim-panel__eyebrow">SpacetimeDB · total writes <Badge kind="live" /></p>
+          <TotalWrites />
         </div>
       )}
 

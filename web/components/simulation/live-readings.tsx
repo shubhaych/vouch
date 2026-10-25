@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTable } from "spacetimedb/react";
 import { tables } from "@/module_bindings";
 import { useConn } from "@/lib/stdb/hooks";
@@ -54,5 +54,46 @@ export function LiveReadings() {
         <div><dt>round trip</dt><dd>{latency.p50 === null ? "…" : `${Math.round(latency.p50)} ms`}</dd></div>
       </dl>
     </section>
+  );
+}
+
+const TOTAL_WINDOW = 40;
+
+/** Running total of every row SpacetimeDB holds for the economy, from the module's own metrics row. */
+export function TotalWrites() {
+  const [m] = useTable(tables.metrics);
+  const row = m[0];
+  const raw = row?.rowCounts;
+  const counts = useMemo(() => {
+    try { return JSON.parse(raw || "{}") as Record<string, number>; } catch { return {} as Record<string, number>; }
+  }, [raw]);
+  const total = Object.values(counts).reduce((s, n) => s + (Number(n) || 0), 0);
+  const [series, setSeries] = useState<number[]>([]);
+  const last = useRef(0);
+  useEffect(() => {
+    if (!total || total === last.current) return;
+    last.current = total;
+    setSeries((s) => [...s.slice(-(TOTAL_WINDOW - 1)), total]);
+  }, [total]);
+  const lo = Math.min(...series), hi = Math.max(...series);
+  const range = Math.max(1, hi - lo);
+  const pts = series.map((v, i) => `${((i + TOTAL_WINDOW - series.length) / (TOTAL_WINDOW - 1)) * 200},${46 - ((v - lo) / range) * 40}`);
+  const line = pts.length > 1 ? `M${pts.join(" L")}` : "";
+  const area = line ? `${line} L200,48 L${pts[0]!.split(",")[0]},48 Z` : "";
+  const added = series.length > 1 ? hi - lo : 0;
+  const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 4);
+
+  return (
+    <div className="total-writes" data-testid="total-writes">
+      <div className="total-writes__value">{total ? total.toLocaleString() : "…"}</div>
+      <div className="total-writes__sub">rows written in total{added ? ` · +${added.toLocaleString()} since you opened this` : ""}</div>
+      <svg viewBox="0 0 200 48" preserveAspectRatio="none" className="total-writes__chart" aria-label="Total rows written, recent ticks">
+        <path d={area} fill="color-mix(in srgb, #3a0f34 10%, transparent)" />
+        <path d={line} fill="none" stroke="#3a0f34" strokeWidth={1.5} vectorEffect="non-scaling-stroke" />
+      </svg>
+      <ul className="total-writes__tables">
+        {top.map(([t, n]) => <li key={t}><span>{t}</span><b>{Number(n).toLocaleString()}</b></li>)}
+      </ul>
+    </div>
   );
 }

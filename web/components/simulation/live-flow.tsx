@@ -255,13 +255,11 @@ export function AgentAcrossMerchants({ agentId, agent, businesses, day, onBack }
 
   return (
     <div className="live-flow live-flow--agent" data-testid="agent-merchants">
-      <div className="flex items-start justify-between gap-2">
-        <p className="merchant-flow__legend">
+      <button type="button" className="agent-back" onClick={onBack} data-testid="agent-merchants-back">← Back to merchant flow</button>
+      <p className="merchant-flow__legend">
           <span className="merchant-flow__dot" style={{ background: BAND_COLOR[agent?.band ?? "neutral"] }} />
           <b className="font-mono">{agentLabel(agentId)}</b>&nbsp;· score {agent?.score ?? "…"} · {lanes.length} merchant{lanes.length === 1 ? "" : "s"} moved it {total} time{total === 1 ? "" : "s"} · days {from}–{day}
-        </p>
-        <button type="button" className="sim-flow__clear" onClick={onBack} data-testid="agent-merchants-back">Back to merchant</button>
-      </div>
+      </p>
       {!cReady || !rReady ? <div className="skeleton h-24 w-full rounded-lg" /> : lanes.length === 0 ? (
         <p className="sim-panel__empty">No decided refunds for this shopper yet; purchases alone do not move a score.</p>
       ) : (
