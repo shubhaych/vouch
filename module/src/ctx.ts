@@ -6,7 +6,7 @@ import { World } from './sim';
 import type { SimDb } from './simdb';
 
 export type Ctx = ReducerCtx<InferSchema<typeof spacetimedb>>;
-export type Role = 'worker' | 'poster' | 'business' | 'controller';
+export type Role = 'worker' | 'poster' | 'business' | 'controller' | 'accountant' | 'reconciler' | 'analyst';
 
 export const roleOf = (ctx: Ctx) => ctx.db.role.who.find(ctx.sender);
 

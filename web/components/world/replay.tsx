@@ -209,7 +209,7 @@ export function ReplayPanel({ pattern, replay, onAgent, onClose }: { pattern: Fr
           ) : null}
         </div>
 
-        {pattern.status === "confirmed" ? (
+        {pattern.status === "confirmed" || pattern.status === "simulated_confirmed" ? (
           <div className="rounded-lg border border-fraud/40 bg-fraud/5 p-3" data-testid="apply-to-credit">
             <div className="panel-title mb-2">Applied to credit · −120 per core agent <Badge kind="live" /></div>
             <ul className="space-y-1 text-sm">

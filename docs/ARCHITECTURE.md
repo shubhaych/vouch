@@ -34,7 +34,7 @@
 | `worker/src/crs.ts` | CRS identity and contact-risk screening ([CRS.md](CRS.md)). |
 | `worker/src/poster.ts`, `credentials.ts`, `lab.ts`, `showcase.ts` | Ledger poster (second identity), Ed25519 issuer and verifier, the Droid lab runner and its permission fence, the A-00421 showcase loop. |
 | `detectors/` | `live/` detectors, `candidates/` (Droid's only writable folder), `test.ts`, `eval.ts` (fresh worlds, ground truth), `LAB.md`. |
-| `web/app/*` | Pages: `/`, `/world`, `/shop`, `/claim/[id]`, `/business`, `/lab`, `/system`. `web/lib/routes.ts` is the nav. |
+| `web/app/*` | Pages: `/`, `/world`, `/shop`, `/claim/[id]`, `/business`, `/system`. `/lab` redirects to `/world`. `web/lib/routes.ts` is the nav. |
 | `web/lib/stdb/*` | Provider, hooks (`useConn`, `useTableVersion`, `useRowsThrottled`, `useCall`), latency. |
 | `web/components/*` | One folder per page, plus `ui/` (badges, numbers, nav) and `background/` (Constructa's HeroCanvas, recoloured). |
 | `scripts/` | Publish, generate, demo reset, env check, hello scripts, bench, claim flow, rule and badge checks. |

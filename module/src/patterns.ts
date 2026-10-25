@@ -27,10 +27,14 @@ export function flagPatternImpl(
   if (ctx.db.fraudPattern.signature.find(signature)) return null; // already flagged by this detector version
   const id = Number(nextCounter(ctx, 'pattern'));
   const run = ctx.db.simRun.id.find(1);
+  const truths = agents.map((agentId) => ctx.db.agentTruth.agentId.find(agentId));
+  const ringId = truths[0]?.ringId ?? 0;
+  const simulationConfirmed = a.kind === 'coordinated' && ringId > 0 && truths.every((truth) => truth?.kind === 'ring' && truth.ringId === ringId);
   const row = ctx.db.fraudPattern.insert({
-    id, kind: a.kind, status: 'detected', detectorId: a.detectorId, detectorVersion: a.detectorVersion, firstDay: a.firstDay, lastDay: a.lastDay,
-    agentIds: agents, businessIds: [...new Set(a.businessIds)].sort((x, y) => x - y), features: a.featuresJson, runId: '', runUrl: '', narrative: '',
-    rolesJson: '', signature, flaggedDay: run?.day ?? 0, reviewedDay: 0,
+    id, kind: a.kind, status: simulationConfirmed ? 'simulated_confirmed' : 'detected', detectorId: a.detectorId, detectorVersion: a.detectorVersion, firstDay: a.firstDay, lastDay: a.lastDay,
+    agentIds: agents, businessIds: [...new Set(a.businessIds)].sort((x, y) => x - y), features: a.featuresJson, runId: '', runUrl: '',
+    rolesJson: '', signature, flaggedDay: run?.day ?? 0, reviewedDay: simulationConfirmed ? run?.day ?? 0 : 0,
+    narrative: simulationConfirmed ? 'Simulation-confirmed ring: every member matches the simulator’s private ring label. This is simulated ground truth, not a live CREAO verdict.' : '',
   });
   for (const e of a.events) {
     ctx.db.patternEvent.insert({

@@ -16,6 +16,7 @@ import type { DbConnection } from '../module_bindings/index';
 import type { LabJob } from '../module_bindings/types';
 import { REPO_ROOT, config, log } from './env';
 import { call } from './stdb';
+import { nestedDetails, type ScriptCall } from './review/fence';
 
 const run = promisify(execFile);
 const LAB_ROOT = resolve(REPO_ROOT, 'worker/.lab');
@@ -25,7 +26,7 @@ const JOB_LIMIT_MS = 10 * 60_000;
 // ---------------------------------------------------------------- the fence
 
 export type Outcome = 'allow' | 'cancel';
-export interface ToolDetails { type: string; filePath?: string; fullCommand?: string; command?: string; serverName?: string; toolName?: string; files?: { filePath: string }[] }
+export interface ToolDetails { type: string; filePath?: string; fullCommand?: string; command?: string; serverName?: string; toolName?: string; files?: { filePath: string }[]; calls?: ScriptCall[] }
 
 /** Exact commands Droid may run, for this job only. */
 export const allowedCommands = (jobId: number) => [
@@ -43,6 +44,18 @@ export function decideTool(jobId: number, jobDetectorsDir: string, d: ToolDetail
     return !rel.startsWith('..') && !rel.startsWith(sep) && !rel.includes(`..${sep}`) && abs.startsWith(candidateDir + sep);
   };
   switch (d.type) {
+    case 'script': {
+      const safeReads = new Set(['Read', 'LS', 'Glob', 'Grep', 'TodoWrite', 'ToolSearch']);
+      if (!d.calls?.length) return { outcome: 'cancel', why: 'Script has no inspectable tool calls' };
+      for (const c of d.calls) {
+        if (safeReads.has(c.toolName)) continue;
+        const nested = nestedDetails(c);
+        if (nested.type === 'script') return { outcome: 'cancel', why: 'nested Script calls are not allowed' };
+        const decision = decideTool(jobId, jobDetectorsDir, nested);
+        if (decision.outcome === 'cancel') return { outcome: 'cancel', why: `Script: ${decision.why}` };
+      }
+      return { outcome: 'allow', why: `Script with ${d.calls.length} individually fenced calls` };
+    }
     case 'create':
     case 'edit':
       return inside(d.filePath) ? { outcome: 'allow', why: `write inside candidates/${jobId}/` } : { outcome: 'cancel', why: `write outside candidates/${jobId}/: ${d.filePath}` };

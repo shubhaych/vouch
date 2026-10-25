@@ -1,8 +1,5 @@
-import type { Metadata } from "next";
-import { LabView } from "@/components/lab/lab-view";
-
-export const metadata: Metadata = { title: "Detector Lab" };
+import { redirect } from "next/navigation";
 
 export default function LabPage() {
-  return <LabView />;
+  redirect("/world");
 }

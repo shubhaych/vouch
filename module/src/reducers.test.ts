@@ -154,6 +154,16 @@ describe('patterns and the Droid Lab triggers (T3.7, T4.1)', () => {
     expect(k.db.fraudPattern.id.find(p.id)!.status).toBe('confirmed');
   });
 
+  it('marks a detector hit as simulated ground-truth confirmation for a single planted ring, without changing credit', () => {
+    const k = world();
+    for (const id of [50, 51, 52, 53]) k.db.agentTruth.agentId.update({ agentId: id, kind: 'ring', ringId: 9 });
+    const before = [50, 51, 52, 53].map((id) => k.db.agent.id.find(id)!.score);
+    const p = k.as(worker, (ctx) => flag(ctx, [50, 51, 52, 53]))!;
+    expect(p.status).toBe('simulated_confirmed');
+    expect(p.narrative).toContain('private ring label');
+    expect([50, 51, 52, 53].map((id) => k.db.agent.id.find(id)!.score)).toEqual(before);
+  });
+
   it('a dismissal enqueues an event job; two needs_review enqueue an agent job; the tick enqueues a schedule job', () => {
     const k = world();
     const a = k.as(worker, (ctx) => flag(ctx, [20, 21, 22, 23]))!;

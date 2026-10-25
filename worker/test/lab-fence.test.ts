@@ -34,6 +34,18 @@ describe('Droid lab fence', () => {
     expect(DISABLED_TOOLS).toEqual(['WebSearch', 'FetchUrl']);
   });
 
+  it('allows inspectable Script batches only when every nested call passes the same fence', () => {
+    expect(allow({ type: 'script', calls: [
+      { toolName: 'Read', toolInput: { file_path: 'LAB.md' } },
+      { toolName: 'Execute', toolInput: { command: 'npx tsx test.ts candidates/7' } },
+    ] })).toBe('allow');
+    expect(allow({ type: 'script', calls: [
+      { toolName: 'Create', toolInput: { file_path: 'candidates/7/detector.ts' } },
+      { toolName: 'Execute', toolInput: { command: 'rm -rf .' } },
+    ] })).toBe('cancel');
+    expect(allow({ type: 'script', calls: [] })).toBe('cancel');
+  });
+
   it('promotion fixes import paths and bumps the version', () => {
     const src = "import type { Detector } from '../../types';\nimport { median } from '../../lib';\nexport const detector: Detector = { id: 'false_defect', version: 1, run: () => [] };";
     const out = toLiveSource(src, 3);
