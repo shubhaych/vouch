@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Line, LineChart, ResponsiveContainer, YAxis } from "recharts";
 import { useTable } from "spacetimedb/react";
@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { agentLabel, businessLabel, money, titleCase } from "@/lib/format";
 import { businessDef, catalogItem } from "@vouch/module/world";
 import { CredentialStepper } from "./credential-stepper";
+import { mediaUrl } from "@/lib/stdb/config";
+import { AgentCards, AgentLanes, MetricGrid, SafeVideo, hms, seatFlow, type Moment } from "./agent-flow";
 
 export interface EvidenceFrame { index: number; t?: number; observation?: string; boxes?: { label: string; x: number; y: number; w: number; h: number }[] }
 export interface EvidenceJson {
@@ -32,64 +34,80 @@ export function Investigation({ claim, refund, purchase, evidence, frame, onFram
   claim: Claim; refund: Refund; purchase?: Purchase; evidence: Evidence[]; frame: number; onFrame: (i: number) => void;
 }) {
   const analyst = evidence.find((e) => e.seat === "evidence_analyst");
-  const system = evidence.find((e) => e.seat === "system");
-  const ev = parse<EvidenceJson>(analyst?.json ?? system?.json, {});
+  const ev = parse<EvidenceJson>(analyst?.json, {});
   const checks = parse<Checks>(claim.checksJson, {});
   const item = purchase ? catalogItem(purchase.item) : undefined;
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [videoOk, setVideoOk] = useState(false);
   const [claims] = useTable(tables.claim);
-  const boxesFor = (i: number) => ev.frames?.find((f) => f.index === i)?.boxes ?? [];
+  const [decisions] = useTable(tables.decision.where((r) => r.refundId.eq(refund.id)));
+  const [scores] = useTable(tables.scoreReview.where((r) => r.refundId.eq(refund.id)));
+  const proposal = [...decisions].filter((d) => d.status !== "superseded").sort((a, b) => Number(b.id - a.id))[0];
+  const flow = useMemo(() => seatFlow({ claim, evidence, proposal, review: scores[0] }), [claim, evidence, proposal, scores]);
+  const frames = claim.frameUrls.map(mediaUrl);
+  // Frames that fail to load are dropped, and the viewer goes away when none load, so nothing broken is shown.
+  const [bad, setBad] = useState<ReadonlySet<string>>(new Set());
+  const markBad = (u: string) => setBad((b) => new Set(b).add(u));
+  const ok = frames.map((u, i) => ({ u, i })).filter((f) => !bad.has(f.u));
+  const shown = bad.has(frames[frame] ?? "") ? ok[0]?.i ?? frame : frame;
+  const boxesFor = (i: number) => (flow.contributors.some((c) => c.key === "evidence_analyst") ? ev.frames?.find((f) => f.index === i)?.boxes ?? [] : []);
+  const duration = checks.duration_s ?? checks.frame_times?.at(-1) ?? 0;
+  // A moment from an agent shows the frame it cited; the video follows through the effect below.
+  const onMoment = (m: Moment) => { if (m.frame !== undefined) onFrame(m.frame); };
 
   useEffect(() => {
     const t = checks.frame_times?.[frame];
-    if (videoRef.current && t !== undefined) videoRef.current.currentTime = t;
-  }, [frame, checks.frame_times]);
+    if (videoOk && videoRef.current && t !== undefined) videoRef.current.currentTime = t;
+  }, [frame, checks.frame_times, videoOk]);
 
   return (
     <div className="space-y-4" data-testid="investigation">
-      <div className="glass overflow-hidden">
-        {claim.frameUrls.length ? (
+      <MetricGrid metrics={flow.metrics} contributors={flow.contributors} onMoment={ok.length ? onMoment : undefined} />
+
+      {ok.length ? (
+        <div className="glass overflow-hidden">
           <div className="relative bg-black">
             <AnimatePresence mode="wait">
-              <motion.div key={frame} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="relative">
+              <motion.div key={shown} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={claim.frameUrls[frame]} alt={`Frame ${frame}`} className="aspect-video w-full object-contain" data-testid="frame-large" />
+                <img src={frames[shown]} alt={`Frame ${shown}`} onError={() => markBad(frames[shown]!)} className="aspect-video w-full object-contain" data-testid="frame-large" />
                 <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 h-full w-full">
-                  {boxesFor(frame).map((b, k) => (
+                  {boxesFor(shown).map((b, k) => (
                     <g key={k}>
-                      <motion.rect x={b.x * 100} y={b.y * 100} width={b.w * 100} height={b.h * 100} fill="none" stroke="#fbbf24" strokeWidth="0.5" vectorEffect="non-scaling-stroke"
+                      <motion.rect x={b.x * 100} y={b.y * 100} width={b.w * 100} height={b.h * 100} fill="none" stroke="var(--marigold)" strokeWidth="0.5" vectorEffect="non-scaling-stroke"
                         initial={{ pathLength: 0, opacity: 0 }} animate={{ pathLength: 1, opacity: 1 }} transition={{ duration: 0.6 }} />
-                      <text x={b.x * 100} y={b.y * 100 - 1} fill="#fbbf24" fontSize="3">{b.label} (approximate)</text>
+                      <text x={b.x * 100} y={b.y * 100 - 1} fill="var(--marigold)" fontSize="3">{b.label} (approximate)</text>
                     </g>
                   ))}
                 </svg>
               </motion.div>
             </AnimatePresence>
-            {claim.videoUrl ? <video ref={videoRef} src={claim.videoUrl} controls muted playsInline className="absolute bottom-2 right-2 w-40 rounded border border-white/20 opacity-90" data-testid="claim-video" /> : null}
+            {checks.frame_times?.[shown] !== undefined ? <span className="absolute left-2 top-2 rounded bg-black/70 px-1.5 py-0.5 font-mono text-xs text-white">{hms(checks.frame_times[shown]!)}</span> : null}
+            <SafeVideo videoRef={videoRef} src={claim.videoUrl ? mediaUrl(claim.videoUrl) : undefined} onReady={setVideoOk} controls muted
+              className="absolute bottom-2 right-2 w-40 rounded border border-white/20 opacity-90" data-testid="claim-video" />
           </div>
-        ) : (
-          <div className="flex aspect-video items-center justify-center bg-black/40 p-6 text-center text-sm text-ink-soft-dark">
-            {claim.kind === "simulated" ? "Simulated refund: claim text and timing only, no video." : claim.status === "awaiting_video" ? "Waiting for the shopper's video…" : "No frames."}
-          </div>
-        )}
-        {claim.frameUrls.length ? (
           <div className="scroll-thin flex gap-1.5 overflow-x-auto p-2" data-testid="frame-strip">
-            {claim.frameUrls.map((u, i) => (
-              <button key={u} onClick={() => onFrame(i)} className={`relative shrink-0 overflow-hidden rounded border-2 ${i === frame ? "border-accent" : "border-transparent"}`} data-testid={`frame-${i}`}>
+            {ok.map(({ u, i }) => (
+              <button key={u} onClick={() => onFrame(i)} className={`relative shrink-0 overflow-hidden rounded border-2 ${i === shown ? "border-accent" : "border-transparent"}`} data-testid={`frame-${i}`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={u} alt={`Frame ${i}`} className="h-14 w-24 object-cover" />
-                <span className="absolute left-1 top-0.5 font-mono text-[0.6rem] text-white drop-shadow">{i}{boxesFor(i).length ? " ◆" : ""}</span>
+                <img src={u} alt={`Frame ${i}`} onError={() => markBad(u)} className="h-14 w-24 object-cover" />
+                <span className="absolute left-1 top-0.5 font-mono text-[0.6rem] text-white drop-shadow">{checks.frame_times?.[i] !== undefined ? hms(checks.frame_times[i]!) : i}{boxesFor(i).length ? " ◆" : ""}</span>
               </button>
             ))}
           </div>
-        ) : null}
-      </div>
+          <div className="border-t border-line-dark p-3">
+            <AgentLanes contributors={flow.contributors} duration={duration} onMoment={onMoment} />
+          </div>
+        </div>
+      ) : null}
+
+      <AgentCards contributors={flow.contributors} metrics={flow.metrics} onMoment={ok.length ? onMoment : undefined} />
 
       <div className="flex flex-wrap gap-1.5" data-testid="check-chips">
-        <Chip ok={checks.fresh} label="Freshness" detail={checks.uploaded_after_s !== undefined ? `uploaded ${checks.uploaded_after_s}s after the claim` : undefined} />
-        <Chip ok={checks.duration_ok && checks.resolution_ok} label="Duration and resolution" detail={checks.duration_s ? `${checks.duration_s}s · ${checks.width}×${checks.height}` : undefined} />
-        <Chip ok={checks.frame_reuse ? checks.frame_reuse.length === 0 : undefined} label="Frame reuse" detail={checks.frame_reuse?.length ? `matches ${checks.frame_reuse.map((r) => r.matches_claim).join(", ")}` : "no match in other claims"} />
-        <Chip ok={checks.within_window !== undefined ? checks.within_window && checks.reason_allowed !== false : undefined} label="Policy fit" detail={checks.policy_line} />
+        {checks.fresh !== undefined ? <Chip ok={checks.fresh} label="Freshness" detail={checks.uploaded_after_s !== undefined ? `uploaded ${checks.uploaded_after_s}s after the claim` : undefined} /> : null}
+        {checks.duration_ok !== undefined ? <Chip ok={checks.duration_ok && checks.resolution_ok} label="Duration and resolution" detail={checks.duration_s ? `${checks.duration_s}s · ${checks.width}×${checks.height}` : undefined} /> : null}
+        {checks.frame_reuse ? <Chip ok={checks.frame_reuse.length === 0} label="Frame reuse" detail={checks.frame_reuse.length ? `matches ${checks.frame_reuse.map((r) => r.matches_claim).join(", ")}` : "no match in other claims"} /> : null}
+        {checks.within_window !== undefined ? <Chip ok={checks.within_window && checks.reason_allowed !== false} label="Policy fit" detail={checks.policy_line} /> : null}
         {checks.blank_frames ? <Chip ok={false} label="Blank frames" detail={`${checks.blank_frames} of ${claim.frameUrls.length}`} /> : null}
         {checks.still_image ? <Chip ok={false} label="Little motion" detail={`frames barely change (median difference ${checks.frame_motion} of 64 bits)`} /> : null}
       </div>
@@ -104,36 +122,15 @@ export function Investigation({ claim, refund, purchase, evidence, frame, onFram
                 <span className="text-xs text-ink-soft-dark">frame {r.frame} ≈ frame {r.matches_frame} (dHash distance {r.distance})</span>
                 <div className="flex gap-1">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={claim.frameUrls[r.frame]} alt="this claim" className="h-12 w-20 rounded object-cover" />
+                  <img src={frames[r.frame]} alt="this claim" onError={(e) => { e.currentTarget.style.display = "none"; }} className="h-12 w-20 rounded object-cover" />
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  {other?.frameUrls[r.matches_frame] ? <img src={other.frameUrls[r.matches_frame]} alt={r.matches_claim} className="h-12 w-20 rounded object-cover" /> : null}
+                  {other?.frameUrls[r.matches_frame] ? <img src={mediaUrl(other.frameUrls[r.matches_frame]!)} alt={r.matches_claim} onError={(e) => { e.currentTarget.style.display = "none"; }} className="h-12 w-20 rounded object-cover" /> : null}
                 </div>
               </div>
             );
           })}
         </div>
       ) : null}
-
-      <div className="glass p-3">
-        <div className="mb-2 flex items-center justify-between">
-          <span className="panel-title">Evidence Analyst findings</span>
-          {analyst ? <Badge kind={analyst.provenance === "fixture" ? "fixture" : analyst.provenance === "replay" ? "replay" : "live"} /> : null}
-        </div>
-        {ev.offline ? <p className="text-sm text-review">Investigator offline: request more evidence or review by hand.</p> : null}
-        {ev.summary ? <p className="text-sm">{ev.summary}</p> : !ev.offline ? <p className="text-sm text-ink-soft-dark">{claim.status === "investigating" ? "The Evidence Analyst is reviewing the frames…" : "No findings yet."}</p> : null}
-        {ev.summary ? <p className="mt-1 text-[0.7rem] text-ink-soft-dark">Internally consistent, not proof of authenticity.</p> : null}
-        <ul className="mt-2 space-y-1 text-sm">
-          {ev.item_matches_reference ? <li>Item matches reference: <b>{String(ev.item_matches_reference.value)}</b> ({ev.item_matches_reference.confidence ?? "?"})</li> : null}
-          {ev.claimed_defect_visible ? (
-            <li>Claimed defect visible: <b>{String(ev.claimed_defect_visible.value)}</b>{ev.claimed_defect_visible.frames?.length ? <> in frames {ev.claimed_defect_visible.frames.map((f) => <button key={f} className="mx-0.5 text-accent underline" onClick={() => onFrame(f)}>{f}</button>)}</> : null}</li>
-          ) : null}
-          {ev.challenge ? <li>Finger challenge: expected {claim.fingerCount}, seen {ev.challenge.seen ?? "none"} → <b className={ev.challenge.passed ? "text-honest" : "text-fraud"}>{ev.challenge.passed ? "passed" : "failed"}</b></li> : null}
-          {ev.capture_flags?.length ? <li>Capture flags: {ev.capture_flags.map((f) => <span key={f} className="chip chip--review mr-1">{f.replaceAll("_", " ")}</span>)}</li> : null}
-          {ev.frames?.map((f) => (
-            <li key={f.index}><button className="text-left hover:text-accent" onClick={() => onFrame(f.index)}><span className="font-mono text-xs text-ink-soft-dark">frame {f.index}</span> {f.observation}</button></li>
-          ))}
-        </ul>
-      </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="glass p-3 text-sm" data-testid="transaction">
@@ -148,9 +145,6 @@ export function Investigation({ claim, refund, purchase, evidence, frame, onFram
         </div>
         <AgentMini agentId={refund.agentId} />
       </div>
-
-      <ListingMatch row={evidence.find((e) => e.seat === "listing_matcher")} />
-      <Eligibility policy={evidence.find((e) => e.seat === "policy_checker")} card={evidence.find((e) => e.seat === "risk_scorecard")} />
 
       <CredentialStepper refundId={refund.id} />
     </div>
@@ -178,97 +172,11 @@ function AgentMini({ agentId }: { agentId: number }) {
         <div className="h-12 w-40">
           {series.length > 1 ? (
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={series}><YAxis hide domain={["dataMin - 10", "dataMax + 10"]} /><Line dataKey="s" stroke="#22d3ee" dot={false} strokeWidth={1.5} isAnimationActive={false} /></LineChart>
+              <LineChart data={series}><YAxis hide domain={["dataMin - 10", "dataMax + 10"]} /><Line dataKey="s" stroke="var(--marigold)" dot={false} strokeWidth={1.5} isAnimationActive={false} /></LineChart>
             </ResponsiveContainer>
           ) : <span className="text-xs text-ink-soft-dark">no credit history yet</span>}
         </div>
       </div>
-    </div>
-  );
-}
-
-interface ListingMatchJson {
-  matched_listing?: { index?: number; title?: string; seller?: string; price?: number | null; url?: string } | null;
-  same_as_ordered?: string; confidence?: number; differences?: string[]; summary?: string;
-  eligibility?: { within_window?: boolean; policy_rule?: string; condition_consistent?: string; verdict?: string; reasons?: { text: string; cites: string }[] };
-  scraped_listings?: { source?: string; query?: string; fetched_at?: string; cached?: boolean; error?: string | null; items?: { title: string; seller: string; price: number | null; url: string }[] };
-  skipped?: boolean; reason?: string;
-}
-
-/** What the Listing Matcher found: the scraped listing it matched, whether it is the ordered item, and the policy eligibility it derived. */
-function ListingMatch({ row }: { row?: Evidence }) {
-  if (!row) return null;
-  const lm = parse<ListingMatchJson>(row.json, {});
-  const e = lm.eligibility ?? {};
-  const scraped = lm.scraped_listings;
-  const live = scraped?.source === "bright_data_serp";
-  const verdictCls = e.verdict === "eligible" ? "chip chip--honest" : e.verdict === "ineligible" ? "chip chip--fraud" : "chip chip--review";
-  return (
-    <div className="glass p-3 text-sm" data-testid="listing-match">
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <span className="panel-title">Listing match</span>
-        <Badge kind={row.provenance === "fixture" ? "fixture" : "live"} />
-        {scraped ? <span className={`chip ${live ? "chip--accent" : ""}`} title={live ? `Google Shopping via Bright Data, fetched ${scraped.fetched_at}${scraped.cached ? " (cached)" : ""}` : "Fixture listings built from the catalogue"}>{live ? `${scraped.items?.length ?? 0} listings via Bright Data` : `${scraped.items?.length ?? 0} fixture listings`}</span> : null}
-        {e.verdict ? <span className={verdictCls} data-testid="listing-verdict">{titleCase(e.verdict)}</span> : null}
-        {lm.same_as_ordered ? <span className="chip">same as ordered: {lm.same_as_ordered}{typeof lm.confidence === "number" ? ` · ${Math.round(lm.confidence * 100)}%` : ""}</span> : null}
-      </div>
-      {lm.matched_listing ? (
-        <p className="text-xs">Closest listing: <span className="font-semibold">{lm.matched_listing.title}</span>{lm.matched_listing.seller ? ` from ${lm.matched_listing.seller}` : ""}{lm.matched_listing.price != null ? ` at ${money(Math.round(Number(lm.matched_listing.price) * 100))}` : ""}{lm.matched_listing.url ? <> · <a className="text-accent underline" href={lm.matched_listing.url} target="_blank" rel="noreferrer">open</a></> : null}</p>
-      ) : null}
-      {lm.summary ? <p className="mt-1 text-xs text-ink-soft-dark">{lm.summary}</p> : null}
-      {lm.differences?.length ? <p className="mt-1 text-xs text-ink-soft-dark">Differences: {lm.differences.join("; ")}</p> : null}
-      {e.reasons?.length ? (
-        <ul className="mt-2 space-y-0.5 text-xs">
-          {e.reasons.map((r, i) => <li key={i}>· {r.text} <span className="font-mono text-ink-soft-dark">[{r.cites}]</span></li>)}
-        </ul>
-      ) : null}
-      {scraped?.error ? <p className="mt-1 text-xs text-review">Scrape note: {scraped.error}</p> : null}
-    </div>
-  );
-}
-
-interface PolicyJson { outcome?: string; rules?: { rule: string; result: string; detail: string; cites: string }[]; refund_shape?: { max_amount?: number; restocking_fee_pct?: number; store_credit_only?: boolean }; exception_note?: string; summary?: string; skipped?: boolean }
-interface CardJson { caution?: string; indicators?: { name: string; value: unknown; reading: string; weight: number; why: string; cites: string }[]; strongest_support?: string; strongest_caution?: string; innocent_explanation_considered?: string; summary?: string; skipped?: boolean }
-
-/** The eligibility layer: the Policy Checker's rule-by-rule result and the Risk Scorecard's indicators. Context for the person; neither decides. */
-function Eligibility({ policy, card }: { policy?: Evidence; card?: Evidence }) {
-  if (!policy && !card) return null;
-  const p = parse<PolicyJson>(policy?.json, {});
-  const c = parse<CardJson>(card?.json, {});
-  const outcomeCls = p.outcome === "eligible" ? "chip chip--honest" : p.outcome === "not_eligible" ? "chip chip--fraud" : "chip chip--review";
-  const cautionCls = c.caution === "low" ? "chip chip--honest" : c.caution === "high" ? "chip chip--fraud" : "chip chip--review";
-  const ruleMark = (r: string) => (r === "pass" ? "✓" : r === "fail" ? "✕" : r === "unclear" ? "?" : "–");
-  const readMark = (r: string) => (r === "supports" ? <span className="text-honest">▲</span> : r === "caution" ? <span className="text-review">▼</span> : <span className="text-ink-soft-dark">•</span>);
-  return (
-    <div className="grid gap-4 md:grid-cols-2" data-testid="eligibility">
-      {policy ? (
-        <div className="glass p-3 text-sm" data-testid="policy-check">
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <span className="panel-title">Policy check</span>
-            <Badge kind={policy.provenance === "fixture" ? "fixture" : "live"} />
-            {p.outcome ? <span className={outcomeCls} data-testid="policy-outcome">{titleCase(p.outcome)}</span> : null}
-          </div>
-          <ul className="space-y-0.5 text-xs">
-            {(p.rules ?? []).map((r, i) => <li key={i} className={r.result === "fail" ? "text-fraud" : r.result === "unclear" ? "text-review" : r.result === "not_applicable" ? "text-ink-soft-dark" : ""}><span className="font-mono">{ruleMark(r.result)}</span> {titleCase(r.rule)}: {r.detail}</li>)}
-          </ul>
-          {p.refund_shape ? <p className="mt-2 text-xs text-ink-soft-dark">Refund shape: up to {money(Math.round(Number(p.refund_shape.max_amount ?? 0) * 100))}{p.refund_shape.restocking_fee_pct ? ` after a ${p.refund_shape.restocking_fee_pct}% fee` : ""}{p.refund_shape.store_credit_only ? ", store credit only" : ""}.</p> : null}
-          {p.summary ? <p className="mt-1 text-xs text-ink-soft-dark">{p.summary} {p.exception_note}</p> : null}
-        </div>
-      ) : null}
-      {card ? (
-        <div className="glass p-3 text-sm" data-testid="risk-scorecard">
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <span className="panel-title">Risk scorecard</span>
-            <Badge kind={card.provenance === "fixture" ? "fixture" : "live"} />
-            {c.caution ? <span className={cautionCls} data-testid="scorecard-caution">caution: {c.caution}</span> : null}
-          </div>
-          <ul className="space-y-0.5 text-xs">
-            {(c.indicators ?? []).map((i, k) => <li key={k} title={i.why}>{readMark(i.reading)} {titleCase(i.name)} <span className="font-mono text-ink-soft-dark">{String(i.value)}</span> <span className="text-ink-soft-dark">· {i.why}</span></li>)}
-          </ul>
-          {c.innocent_explanation_considered ? <p className="mt-2 text-xs text-ink-soft-dark"><span className="font-semibold">Innocent explanation considered:</span> {c.innocent_explanation_considered}</p> : null}
-          {c.summary ? <p className="mt-1 text-xs text-ink-soft-dark">{c.summary}</p> : null}
-        </div>
-      ) : null}
     </div>
   );
 }

@@ -112,10 +112,10 @@ function HandOff({ active, dashed }: { active: boolean; dashed?: boolean }) {
   return (
     <div className="hidden items-center md:flex" aria-hidden>
       <svg width="44" height="20">
-        <line x1="2" y1="10" x2="38" y2="10" stroke={active ? "#22d3ee" : "rgba(148,163,184,0.4)"} strokeWidth="2" strokeDasharray={dashed ? "3 4" : active ? "6 4" : undefined}>
+        <line x1="2" y1="10" x2="38" y2="10" stroke={active ? "var(--marigold)" : "var(--line-dark)"} strokeWidth="2" strokeDasharray={dashed ? "3 4" : active ? "6 4" : undefined}>
           {active ? <animate attributeName="stroke-dashoffset" from="20" to="0" dur="0.6s" repeatCount="indefinite" /> : null}
         </line>
-        <path d="M36,5 L43,10 L36,15 z" fill={active ? "#22d3ee" : "rgba(148,163,184,0.4)"} />
+        <path d="M36,5 L43,10 L36,15 z" fill={active ? "var(--marigold)" : "var(--line-dark)"} />
       </svg>
     </div>
   );

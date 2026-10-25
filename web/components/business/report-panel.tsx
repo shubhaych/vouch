@@ -5,23 +5,25 @@ import { createPortal } from "react-dom";
 import { useTable } from "spacetimedb/react";
 import Link from "next/link";
 import { tables } from "@/module_bindings";
-import type { AnalysisJob, Claim, Report as ReportRow } from "@/module_bindings/types";
+import type { AnalysisJob, Claim, Report as ReportRow, ScoreReview } from "@/module_bindings/types";
 import { Badge } from "@/components/ui/badge";
 import { claimLabel, money, pct, titleCase } from "@/lib/format";
 import { STEP_KEYS, STEP_LABEL, type DroidSessionSummary, type Report, type ReportArtifact, type ReportFinding } from "@vouch/module/review-types";
 import { TIER_LABEL } from "@vouch/module/review-score";
 import type { SpokenClaim } from "@vouch/module/review-score";
 import { parse } from "./investigation";
+import { mediaUrl } from "@/lib/stdb/config";
+import { AgentCards, AgentLanes, MetricGrid, SafeVideo, hms, reportFlow, type Moment } from "./agent-flow";
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
-const hms = (t: number) => {
-  const m = Math.floor(Math.max(0, t) / 60);
-  const s = Math.max(0, t) - m * 60;
-  return `${String(m).padStart(2, "0")}:${s.toFixed(1).padStart(4, "0")}`;
-};
+/** Stored links can name localhost; the browser may be on a tunnel, so every media link goes through mediaUrl. */
+const publicMedia = (r: Report): Report => ({
+  ...r,
+  video: { ...r.video, proofReelUrl: r.video.proofReelUrl && mediaUrl(r.video.proofReelUrl), sourceUrl: r.video.sourceUrl && mediaUrl(r.video.sourceUrl), audioUrl: r.video.audioUrl && mediaUrl(r.video.audioUrl) },
+  artifacts: r.artifacts.map((a) => (a.url ? { ...a, url: mediaUrl(a.url) } : a)),
+});
 
 const KIND_CHIP: Record<string, string> = { supports: "chip chip--honest", contradicts: "chip chip--fraud", integrity: "chip chip--review", neutral: "chip" };
-const MARK: Record<string, string> = { claim: "bg-slate-300", supports: "bg-honest", contradicts: "bg-fraud", integrity: "bg-review", challenge: "bg-review" };
 const IMAGE_KINDS = new Set(["frame", "mosaic", "crop", "chart"]);
 
 /** The compact panel shown while the reviewer is still running: steps with the business-side summary. */
@@ -65,6 +67,7 @@ export function ReportPanel({ claim, row, order, actions }: { claim: Claim; row:
   const report = useMemo(() => parse<Report | null>(row.json, null), [row.json]);
   const [recs] = useTable(tables.recommendation.where((r) => r.claimId.eq(claim.id)));
   const rec = recs.find((r) => r.jobId === row.jobId);
+  const [scores] = useTable(tables.scoreReview.where((r) => r.refundId.eq(claim.refundId)));
   if (!report) return <div className="glass p-4 text-sm text-review" data-testid="report-panel">The report for this claim could not be read.</div>;
   return (
     <div className="min-w-0 space-y-3">
@@ -73,7 +76,7 @@ export function ReportPanel({ claim, row, order, actions }: { claim: Claim; row:
           <Link className="btn btn--secondary btn--sm" href={`/desk?claim=${claim.id}&refund=${claim.refundId}`}>Finance impact</Link>
         </div>
       ) : null}
-      <ReportContent key={String(row.jobId)} report={report.order || !order ? report : { ...report, order }} claimId={claim.id} auditPassed={row.auditPassed} autoDecided={!!rec?.autoDecided} fallbackReel={row.proofReelUrl} actions={actions} />
+      <ReportContent key={String(row.jobId)} report={report.order || !order ? report : { ...report, order }} claimId={claim.id} auditPassed={row.auditPassed} autoDecided={!!rec?.autoDecided} fallbackReel={row.proofReelUrl} scoreReview={scores[0]} actions={actions} />
     </div>
   );
 }
@@ -81,16 +84,22 @@ export function ReportPanel({ claim, row, order, actions }: { claim: Claim; row:
 type OpenImage = (list: ReportArtifact[], index: number) => void;
 
 /** Presentational report, also used by browser regression fixtures without a live database. */
-export function ReportContent({ report, claimId, auditPassed, autoDecided = false, fallbackReel = "", actions }: { report: Report; claimId: bigint; auditPassed: boolean; autoDecided?: boolean; fallbackReel?: string; actions?: ReactNode }) {
+export function ReportContent({ report: stored, claimId, auditPassed, autoDecided = false, fallbackReel = "", scoreReview, actions }: { report: Report; claimId: bigint; auditPassed: boolean; autoDecided?: boolean; fallbackReel?: string; scoreReview?: ScoreReview; actions?: ReactNode }) {
   const [active, setActive] = useState<number | null>(null);
   const [viewer, setViewer] = useState<{ list: ReportArtifact[]; index: number } | null>(null);
+  // "failed" removes the player entirely; timestamps only seek once the video has really loaded.
+  const [video, setVideo] = useState<"loading" | "ok" | "failed">("loading");
   const player = useRef<HTMLVideoElement>(null);
+  const reelRef = useRef<HTMLVideoElement>(null);
+  const [reelOk, setReelOk] = useState(true);
+  const report = useMemo(() => publicMedia(stored), [stored]);
+  const flow = useMemo(() => reportFlow(report, scoreReview), [report, scoreReview]);
   const R = report.recommendation;
   const A = report.factoryAssessment;
   const arts = new Map(report.artifacts.map((a) => [a.id, a]));
   const claimsById = new Map(report.claimSummary.spokenClaims.map((c) => [c.id, c]));
   const source = report.video.sourceUrl || report.artifacts.find((a) => a.kind === "video" && a.path === "video.mp4")?.url;
-  const reel = report.video.proofReelUrl || fallbackReel;
+  const reel = report.video.proofReelUrl || (fallbackReel ? mediaUrl(fallbackReel) : "");
   const frames = report.artifacts.filter((a) => (a.kind === "frame" || a.kind === "crop") && a.url).sort((a, b) => a.tStart - b.tStart);
   const sheets = report.artifacts.filter((a) => a.kind === "mosaic" && a.url);
   const audio = report.video.audioUrl || report.artifacts.find((a) => a.kind === "audio")?.url;
@@ -99,26 +108,82 @@ export function ReportContent({ report, claimId, auditPassed, autoDecided = fals
   // The stored size can predate rotation handling; the player's real size wins once it loads.
   const [portrait, setPortrait] = useState(() => isPortrait(report.video.resolution));
   const clips = report.video.clips ?? [];
-  const pos = (t: number) => (duration > 0 ? clamp01(t / duration) * 100 : 0);
   const focus = (id: number) => {
     setActive(id);
     document.getElementById(`finding-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
+  const seekable = video === "ok";
   const seek = (t: number) => {
-    if (source && player.current) {
+    if (seekable && player.current) {
       player.current.currentTime = Math.max(0, Math.min(duration, t));
       player.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
+  };
+  // An agent's moment plays the video there and highlights the finding it came from.
+  const onMoment = (m: Moment) => {
+    seek(m.t);
+    if (m.findingId !== undefined) setActive(m.findingId);
   };
   const openImage: OpenImage = (list, index) => setViewer({ list, index });
   const review = report.creaoReview;
   const h = report.history;
   const transcript = report.transcript?.segments ?? [];
+  const said: Moment[] = report.claimSummary.claimsFrom === "transcript" ? report.claimSummary.spokenClaims.map((c) => ({ t: c.tSaid, text: `“${c.text}”` })) : [];
+  const showFootage = ((source || reel) && video !== "failed") || frames.length > 0;
 
   return (
     <div className="min-w-0 max-w-full space-y-4 [overflow-wrap:anywhere]" data-testid="report-panel">
       {A ? <Verdict A={A} claimsById={claimsById} focus={focus} actions={actions} />
         : actions ? <section className="glass p-4" data-testid="decision">{actions}</section> : null}
+
+      <MetricGrid metrics={flow.metrics} contributors={flow.contributors} onMoment={seekable ? onMoment : undefined} />
+
+      {showFootage ? (
+        <section className="glass min-w-0 p-4" data-testid="footage">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <span className="panel-title">{seekable ? "The video, marked by each agent" : "Key frames"}</span>
+            {seekable ? <span className="text-xs text-ink-soft-dark">{duration.toFixed(1)} s · {report.video.resolution} · {report.video.audio ? "with sound" : "no sound"}</span> : null}
+          </div>
+          <div className={`grid min-w-0 gap-4 ${portrait && video !== "failed" && (source || reel) ? "md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]" : ""}`}>
+            {(source || reel) && video !== "failed" ? (
+              <div className="min-w-0 space-y-2">
+                <div className={`flex justify-center overflow-hidden rounded-lg bg-black ${seekable ? "" : "hidden"}`}>
+                  <SafeVideo videoRef={player} controls src={source || reel} data-testid="source-video" onReady={(ok) => setVideo(ok ? "ok" : "failed")}
+                    onLoadedMetadata={(e) => { const v = e.currentTarget; if (v.videoWidth && v.videoHeight) setPortrait(v.videoHeight > v.videoWidth); }}
+                    className={`block max-w-full object-contain ${portrait ? "max-h-[32rem] w-auto" : "aspect-video max-h-[28rem] w-full"}`} />
+                </div>
+                {seekable && clips.length > 1 ? (
+                  <div className="flex flex-wrap gap-2" data-testid="clip-chips">
+                    {clips.map((c) => (
+                      <button key={c.n} className={`chip ${c.n === 2 ? "chip--review" : ""}`} onClick={() => seek(c.tStart)}>
+                        {c.n === 1 ? "Claim video" : "Extra clip"} · {hms(c.tStart)}–{hms(c.tEnd)}{c.audio ? "" : " · no sound"}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                {seekable ? <AgentLanes contributors={flow.contributors} duration={duration} onMoment={onMoment} extra={{ label: "Customer said", moments: said }} /> : null}
+              </div>
+            ) : null}
+            {frames.length ? (
+              <div className="min-w-0" data-testid="key-frames">
+                <div className="mb-2 text-xs text-ink-soft-dark">Key frames · click to enlarge</div>
+                <ul className={`grid gap-2 ${portrait ? "grid-cols-3 sm:grid-cols-4" : "grid-cols-2 sm:grid-cols-3"}`}>
+                  {frames.map((a, i) => (
+                    <li key={a.id} className="min-w-0 has-[[data-gone]]:hidden">
+                      <Thumb a={a} portrait={portrait} onOpen={() => openImage(frames, i)} />
+                      <div className="mt-0.5 truncate text-[0.7rem] text-ink-soft-dark" title={a.label}>
+                        {seekable ? <button className="font-mono text-accent underline" onClick={() => seek(a.tStart)}>{hms(a.tStart)}</button> : <span className="font-mono">{hms(a.tStart)}</span>} {a.label}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+
+      <AgentCards contributors={flow.contributors} metrics={flow.metrics} onMoment={seekable ? onMoment : undefined} />
 
       <section className="glass min-w-0 space-y-3 p-4" data-testid="customer-request">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -149,7 +214,7 @@ export function ReportContent({ report, claimId, auditPassed, autoDecided = fals
               <ol className="scroll-thin mt-1 max-h-56 space-y-1.5 overflow-y-auto pr-1" data-lenis-prevent data-testid="transcript">
                 {transcript.map((seg, i) => (
                   <li key={i} className="flex items-start gap-2">
-                    <button className="shrink-0 font-mono text-xs text-accent underline disabled:no-underline" onClick={() => seek(seg.start)} disabled={!source}>{hms(seg.start)}</button>
+                    <button className="shrink-0 font-mono text-xs text-accent underline disabled:text-ink-soft-dark disabled:no-underline" onClick={() => seek(seg.start)} disabled={!seekable}>{hms(seg.start)}</button>
                     <span className="min-w-0">{seg.text}</span>
                   </li>
                 ))}
@@ -162,68 +227,15 @@ export function ReportContent({ report, claimId, auditPassed, autoDecided = fals
         </div>
       </section>
 
-      <section className="glass min-w-0 p-4" data-testid="footage">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <span className="panel-title">{source ? "Footage · source timestamps" : "Proof reel · edited excerpts"}</span>
-          <span className="text-xs text-ink-soft-dark">{duration.toFixed(1)} s · {report.video.resolution} · {report.video.audio ? "with sound" : "no sound"}</span>
-        </div>
-        <div className={`grid min-w-0 gap-4 ${portrait ? "md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]" : ""}`}>
-          <div className="min-w-0 space-y-2">
-            {source || reel ? (
-              <div className="flex justify-center overflow-hidden rounded-lg bg-black">
-                <video ref={player} controls playsInline preload="metadata" src={source || reel} data-testid="source-video"
-                  onLoadedMetadata={(e) => { const v = e.currentTarget; if (v.videoWidth && v.videoHeight) setPortrait(v.videoHeight > v.videoWidth); }}
-                  className={`block max-w-full object-contain ${portrait ? "max-h-[32rem] w-auto" : "aspect-video max-h-[28rem] w-full"}`} />
-              </div>
-            ) : (
-              <div className="flex aspect-video items-center justify-center rounded-lg bg-black/40 text-sm text-ink-soft-dark">No video for this claim.</div>
-            )}
-            {clips.length > 1 ? (
-              <div className="flex flex-wrap gap-2" data-testid="clip-chips">
-                {clips.map((c) => (
-                  <button key={c.n} className={`chip ${c.n === 2 ? "chip--review" : ""}`} onClick={() => seek(c.tStart)} disabled={!source}>
-                    {c.n === 1 ? "Claim video" : "Extra clip"} · {hms(c.tStart)}–{hms(c.tEnd)}{c.audio ? "" : " · no sound"}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            <div className="relative h-6 rounded-full bg-white/10" data-testid="timeline">
-              {clips.slice(1).map((c) => <span key={c.n} aria-hidden title={`extra clip starts ${hms(c.tStart)}`} className="absolute inset-y-0 w-0.5 bg-review" style={{ left: `${pos(c.tStart)}%` }} />)}
-              {report.timeline.map((e, i) => (
-                <button key={i} type="button" title={`${hms(e.t)} · ${e.label}`} aria-label={e.label} onClick={() => { if (source) seek(e.t); else if (e.findingId !== undefined) focus(e.findingId); }}
-                  className={`absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/40 ${MARK[e.kind] ?? "bg-slate-300"} cursor-pointer hover:scale-125`}
-                  style={{ left: `${Math.min(98, Math.max(2, pos(e.t)))}%` }} />
-              ))}
-            </div>
-            <div className="flex justify-between font-mono text-[0.7rem] text-ink-soft-dark"><span>{hms(0)}</span><span>{hms(duration)}</span></div>
-          </div>
-          <div className="min-w-0" data-testid="key-frames">
-            <div className="mb-2 text-xs text-ink-soft-dark">Key frames · click to enlarge</div>
-            {frames.length ? (
-              <ul className={`grid gap-2 ${portrait ? "grid-cols-3 sm:grid-cols-4" : "grid-cols-2 sm:grid-cols-3"}`}>
-                {frames.map((a, i) => (
-                  <li key={a.id} className="min-w-0">
-                    <Thumb a={a} portrait={portrait} onOpen={() => openImage(frames, i)} />
-                    <div className="mt-0.5 truncate text-[0.7rem] text-ink-soft-dark" title={a.label}>
-                      <button className="font-mono text-accent underline disabled:no-underline" onClick={() => seek(a.tStart)} disabled={!source}>{hms(a.tStart)}</button> {a.label}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : <p className="text-sm text-ink-soft-dark">No frames were registered for this report.</p>}
-          </div>
-        </div>
-      </section>
-
       <div className="space-y-2" data-testid="findings">
         <div className="flex items-center justify-between"><span className="panel-title">Findings ({report.findings.length})</span><Badge kind="live" /></div>
         {report.findings.length === 0 ? <div className="glass p-3 text-sm text-ink-soft-dark">No finding passed the audit.</div> : null}
-        {report.findings.map((f) => <FindingCard key={f.id} f={f} claim={f.claimId ? claimsById.get(f.claimId) : undefined} arts={arts} active={active === f.id} portrait={portrait} onOpen={openImage} onSeek={source ? seek : undefined} />)}
+        {report.findings.map((f) => <FindingCard key={f.id} f={f} claim={f.claimId ? claimsById.get(f.claimId) : undefined} arts={arts} active={active === f.id} portrait={portrait} onOpen={openImage} onSeek={seekable ? seek : undefined} />)}
         {report.rejectedFindings.length ? (
           <details className="glass p-3" data-testid="rejected-findings">
             <summary className="cursor-pointer text-sm text-ink-soft-dark">Rejected by the audit ({report.rejectedFindings.length})</summary>
             <div className="mt-2 space-y-2">
-              {report.rejectedFindings.map((f) => <FindingCard key={f.id} f={f} claim={f.claimId ? claimsById.get(f.claimId) : undefined} arts={arts} active={active === f.id} portrait={portrait} onOpen={openImage} onSeek={source ? seek : undefined} />)}
+              {report.rejectedFindings.map((f) => <FindingCard key={f.id} f={f} claim={f.claimId ? claimsById.get(f.claimId) : undefined} arts={arts} active={active === f.id} portrait={portrait} onOpen={openImage} onSeek={seekable ? seek : undefined} />)}
             </div>
           </details>
         ) : null}
@@ -334,11 +346,11 @@ export function ReportContent({ report, claimId, auditPassed, autoDecided = fals
           </div>
 
           {audio ? <div className="space-y-1 text-sm"><div className="panel-title">Audio track</div><audio controls preload="none" src={audio} className="w-full max-w-full" data-testid="report-audio" /></div> : null}
-          {source && reel ? <div className="space-y-1 text-sm"><div className="panel-title">Proof reel · edited excerpts (not source time)</div><video controls playsInline preload="none" src={reel} className="block max-h-80 w-full max-w-full rounded bg-black object-contain" data-testid="proof-reel" /></div> : null}
+          {source && reel && reelOk ? <div className="space-y-1 text-sm"><div className="panel-title">Proof reel · edited excerpts (not source time)</div><SafeVideo videoRef={reelRef} controls preload="none" src={reel} onReady={(ok) => { if (!ok) setReelOk(false); }} className="block max-h-80 w-full max-w-full rounded bg-black object-contain" data-testid="proof-reel" /></div> : null}
           {sheets.length ? (
             <div className="space-y-2 text-sm">
               <div className="panel-title">Contact sheets ({sheets.length})</div>
-              <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">{sheets.map((a, i) => <li key={a.id}><Thumb a={a} portrait={portrait} onOpen={() => openImage(sheets, i)} /></li>)}</ul>
+              <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4">{sheets.map((a, i) => <li key={a.id} className="has-[[data-gone]]:hidden"><Thumb a={a} portrait={portrait} onOpen={() => openImage(sheets, i)} /></li>)}</ul>
             </div>
           ) : null}
 
@@ -372,7 +384,7 @@ export function ReportContent({ report, claimId, auditPassed, autoDecided = fals
       </details>
       <p className="text-[0.7rem] text-ink-soft-dark">Findings describe the footage, never the person. Internally consistent footage is not proof of authenticity.</p>
 
-      {viewer ? <Lightbox list={viewer.list} index={viewer.index} onIndex={(index) => setViewer({ ...viewer, index })} onClose={() => setViewer(null)} onSeek={source ? (t) => { setViewer(null); seek(t); } : undefined} /> : null}
+      {viewer ? <Lightbox list={viewer.list} index={viewer.index} onIndex={(index) => setViewer({ ...viewer, index })} onClose={() => setViewer(null)} onSeek={seekable ? (t) => { setViewer(null); seek(t); } : undefined} /> : null}
     </div>
   );
 }
@@ -426,11 +438,13 @@ function Verdict({ A, claimsById, focus, actions }: { A: NonNullable<Report["fac
 }
 
 function Thumb({ a, portrait, onOpen }: { a: ReportArtifact; portrait: boolean; onOpen: () => void }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <span data-gone hidden />;
   return (
     <button type="button" onClick={onOpen} title={`${a.label || a.path} · click to enlarge`} data-testid="thumb"
-      className={`group relative block w-full overflow-hidden rounded border border-line-dark bg-black focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${a.kind === "mosaic" || a.kind === "chart" ? "aspect-square" : portrait ? "aspect-[9/16]" : "aspect-video"}`}>
+      className={`group relative block w-full overflow-hidden rounded border border-line-dark bg-black focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${a.kind === "chart" ? "aspect-square" : portrait ? "aspect-[9/16]" : "aspect-video"}`}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={a.url} alt={a.label || a.kind} loading="lazy" className="h-full w-full object-cover transition group-hover:scale-105" />
+      <img src={a.url} alt={a.label || a.kind} loading="lazy" onError={() => setFailed(true)} className={`h-full w-full transition group-hover:scale-105 ${a.kind === "frame" || a.kind === "crop" ? "object-cover" : "object-contain"}`} />
     </button>
   );
 }
@@ -485,10 +499,13 @@ function Bar({ label, value }: { label: string; value: number }) {
 
 function FindingCard({ f, claim, arts, active, portrait, onOpen, onSeek }: { f: ReportFinding; claim?: SpokenClaim; arts: Map<number, ReportArtifact>; active: boolean; portrait: boolean; onOpen: OpenImage; onSeek?: (t: number) => void }) {
   const cited = f.artifactIds.map((id) => arts.get(id)).filter((a): a is ReportArtifact => !!a);
-  const images = cited.filter((a) => IMAGE_KINDS.has(a.kind) && a.url);
-  const other = cited.filter((a) => !images.includes(a));
+  // Pictures and clips share one gallery in video order; data files (transcript, measurements, logs) follow as links.
+  const media = cited.filter((a) => a.url && (IMAGE_KINDS.has(a.kind) || a.kind === "clip")).sort((x, y) => x.tStart - y.tStart || (x.kind === "clip" ? -1 : 1));
+  const images = media.filter((a) => a.kind !== "clip");
+  const audio = cited.filter((a) => a.kind === "audio" && a.url);
+  const files = cited.filter((a) => !media.includes(a) && !audio.includes(a));
   return (
-    <div id={`finding-${f.id}`} className={`glass space-y-2 p-3 text-sm transition ${active ? "ring-2 ring-accent" : ""}`} data-testid={`finding-${f.id}`}>
+    <div id={`finding-${f.id}`} className={`glass min-w-0 space-y-2 overflow-hidden p-3 text-sm transition ${active ? "ring-2 ring-accent" : ""}`} data-testid={`finding-${f.id}`}>
       <div className="flex flex-wrap items-center gap-2">
         <span className={KIND_CHIP[f.kind] ?? "chip"}>{f.kind}</span>
         {f.claimId ? <span className="chip font-mono">{f.claimId}</span> : null}
@@ -499,26 +516,53 @@ function FindingCard({ f, claim, arts, active, portrait, onOpen, onSeek }: { f: 
       {claim ? <p className="text-xs text-ink-soft-dark">Claim: “{claim.text}”</p> : null}
       <p>{f.observation}</p>
       {f.auditNote ? <p className="text-xs text-review">Audit: {f.auditNote}</p> : null}
-      {images.length ? (
-        <ul className={`grid gap-2 ${portrait ? "grid-cols-4 sm:grid-cols-6" : "grid-cols-3 sm:grid-cols-4"}`}>
-          {images.map((a, i) => <li key={a.id} className="min-w-0"><Thumb a={a} portrait={portrait} onOpen={() => onOpen(images, i)} /></li>)}
+      {media.length ? (
+        <ul className={`grid min-w-0 gap-2 ${portrait ? "grid-cols-3 sm:grid-cols-4 lg:grid-cols-6" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"}`} data-testid="finding-media">
+          {media.map((a) => (
+            <MediaTile key={a.id} a={a} onSeek={onSeek}>
+              {a.kind === "clip" ? <ClipTile a={a} portrait={portrait} /> : <Thumb a={a} portrait={portrait} onOpen={() => onOpen(images, images.indexOf(a))} />}
+            </MediaTile>
+          ))}
         </ul>
       ) : null}
-      {other.length ? <div className="grid min-w-0 gap-2 sm:grid-cols-2">{other.map((a) => <ArtifactView key={a.id} a={a} portrait={portrait} />)}</div> : null}
+      {audio.map((a) => <audio key={a.id} controls preload="none" src={a.url} title={a.label || a.path} className="w-full min-w-0 max-w-full" />)}
+      {files.length ? (
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
+          <span className="font-mono text-[0.6rem] uppercase tracking-[0.08em] text-ink-soft-dark">Data</span>
+          {files.map((a) => a.url
+            ? <a key={a.id} href={a.url} target="_blank" rel="noreferrer" className="chip max-w-full truncate hover:border-accent/60" title={a.label || a.path}>{a.label || a.path}</a>
+            : <span key={a.id} className="chip max-w-full truncate" title={a.label || a.path}>{a.label || a.path}</span>)}
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function ArtifactView({ a, portrait }: { a: ReportArtifact; portrait: boolean }) {
-  const title = `${a.label || a.path} · ${hms(a.tStart)}${a.tEnd > a.tStart ? `–${hms(a.tEnd)}` : ""}`;
-  if (!a.url) return <span className="chip" title={title}>{a.kind} · {a.label || a.path}</span>;
-  if (a.kind === "clip") return (
-    <div className="flex justify-center overflow-hidden rounded bg-black">
-      <video controls playsInline preload="none" src={a.url} title={title} className={`block max-w-full object-contain ${portrait ? "max-h-72 w-auto" : "aspect-video w-full"}`} />
+/** One gallery cell: the picture or clip, then its time in the video and what it is. */
+function MediaTile({ a, onSeek, children }: { a: ReportArtifact; onSeek?: (t: number) => void; children: ReactNode }) {
+  const when = `${hms(a.tStart)}${a.kind === "clip" && a.tEnd > a.tStart ? `–${hms(a.tEnd)}` : ""}`;
+  return (
+    <li className="min-w-0 has-[[data-gone]]:hidden">
+      {children}
+      <div className="mt-1 min-w-0 text-[0.7rem] leading-snug text-ink-soft-dark" title={a.label || a.path}>
+        {onSeek ? <button type="button" className="font-mono text-accent underline" onClick={() => onSeek(a.tStart)}>{when}</button> : <span className="font-mono">{when}</span>}
+        <span className="ml-1 font-mono text-[0.6rem] uppercase tracking-[0.06em]">{a.kind === "mosaic" ? "contact sheet" : a.kind}</span>
+        <span className="block truncate">{a.label || a.path}</span>
+      </div>
+    </li>
+  );
+}
+
+/** A clip sized like the frames beside it; it removes itself if it cannot play. */
+function ClipTile({ a, portrait }: { a: ReportArtifact; portrait: boolean }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const [failed, setFailed] = useState(false);
+  if (failed) return <span data-gone hidden />;
+  return (
+    <div className={`overflow-hidden rounded border border-line-dark bg-black ${portrait ? "aspect-[9/16]" : "aspect-video"}`}>
+      <SafeVideo videoRef={ref} src={a.url} controls preload="metadata" onReady={(ok) => { if (!ok) setFailed(true); }} title={a.label || a.path} className="h-full w-full object-contain" />
     </div>
   );
-  if (a.kind === "audio") return <audio controls preload="none" src={a.url} title={title} className="w-full min-w-0 max-w-full" />;
-  return <a href={a.url} target="_blank" rel="noreferrer" className="chip chip--accent max-w-full" title={title}>{a.kind} · {a.label || a.path}</a>;
 }
 
 function DroidSession({ s }: { s: DroidSessionSummary }) {

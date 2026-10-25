@@ -23,7 +23,9 @@ export function RecommendationCard({ claim, refund, decisions, evidence, seatRol
 }) {
   const proposal = latestProposal(decisions);
   const inv = evidence.find((e) => e.seat === "refund_investigator");
-  const analyst = evidence.find((e) => e.seat === "evidence_analyst");
+  // An analyst run that could not read the footage formed nothing here, so it is not linked.
+  const analystRow = evidence.find((e) => e.seat === "evidence_analyst");
+  const analyst = parse<{ unable_to_verify?: boolean; offline?: boolean }>(analystRow?.json, {}).unable_to_verify ? undefined : analystRow;
   const extra = parse<InvJson>(inv?.json, {});
   const reasons = parse<Reason[]>(proposal?.reasonsJson, []);
   const offline = claim.status === "offline";
