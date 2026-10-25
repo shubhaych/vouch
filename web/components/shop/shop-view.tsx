@@ -14,44 +14,81 @@ import { agentLabel, businessLabel, money, titleCase } from "@/lib/format";
 import { BUSINESS_A, BUSINESS_B, CATALOG, businessDef, catalogItem, type CatalogItem } from "@vouch/module/world";
 import { REASONS } from "@vouch/module/text";
 import { claimHref } from "@/lib/claim-link";
+import { DISCLAIMER } from "@vouch/module/finance/companies";
 
 const BAND_TEXT: Record<string, string> = { red: "text-red-600", amber: "text-amber-600", neutral: "text-slate-600", green: "text-emerald-600" };
 const SHOPS = [BUSINESS_A, BUSINESS_B];
 
 export function ShopView() {
-  const { status } = useStatus();
-  const [mine, mineReady] = useTable(tables.myAgent);
-  const call = useCall();
-  const agentId = mine[0]?.agentId ?? null;
-  const joining = useRef(false);
-
-  // The spec: a fresh visitor gets an agent on first visit.
-  useEffect(() => {
-    if (status === "live" && mineReady && agentId === null && !joining.current) {
-      joining.current = true;
-      void call("joinAsShopper", (r) => r.joinAsShopper({ name: "Judge" }));
-    }
-  }, [status, mineReady, agentId, call]);
-
   return (
     <main className="light min-h-screen bg-bg pb-16 text-ink" data-testid="shop">
       <div className="mx-auto max-w-6xl space-y-8 px-4 pt-8 sm:px-6">
-        <header className="flex flex-wrap items-end justify-between gap-4">
+        <header>
           <div>
-            <p className="section__eyebrow">Consumer app</p>
-            <h1 className="section__title">Shop, then claim a refund with a video</h1>
-            <p className="mt-1 max-w-xl text-sm text-ink-soft">Your purchases are real rows in SpacetimeDB; the payment is simulated. Fast-forward a delivery to land inside the refund window, then record the claim on your phone.</p>
+            <p className="section__eyebrow">Simulated partner network · SpacetimeDB</p>
+            <h1 className="section__title">Explore 100 shops</h1>
+            <p className="mt-1 max-w-xl text-sm text-ink-soft">Browse sample products from the simulated shops and open any shop’s Refund Finance Desk.</p>
           </div>
-          {agentId !== null ? <AgentCard agentId={agentId} /> : <div className="card-light px-5 py-4 text-sm text-ink-soft">{status === "live" ? "Creating your agent…" : "Connecting…"}</div>}
         </header>
-        {agentId !== null ? (
-          <>
-            <Orders agentId={agentId} />
-            <Catalog />
-          </>
-        ) : null}
+        <PartnerDirectory />
       </div>
     </main>
+  );
+}
+
+function PartnerDirectory() {
+  const [companies] = useTable(tables.financeCompany);
+  const [products] = useTable(tables.financeProduct);
+  const [states] = useTable(tables.financeCompanyState);
+  const [category, setCategory] = useState("all");
+  const categories = useMemo(() => [...new Set(companies.map((c) => c.category))].sort(), [companies]);
+  const visible = useMemo(() => [...companies]
+    .filter((c) => category === "all" || c.category === category)
+    .sort((a, b) => a.id - b.id), [companies, category]);
+
+  return (
+    <section className="space-y-4" data-testid="partner-directory">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="section__eyebrow">The partner network · SpacetimeDB</p>
+          <h2 className="text-2xl font-bold">100 simulated shops</h2>
+          <p className="mt-1 text-sm text-ink-soft">Every shop has a four-product catalog and live portfolio activity. Select one to inspect its Refund Finance Desk.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-ink-soft"><Badge kind="simulated" /> {companies.length} stores · {products.length} products</span>
+          <select aria-label="Filter shops by category" className="rounded-lg border border-line bg-white px-3 py-2 text-sm" value={category} onChange={(e) => setCategory(e.target.value)}>
+            <option value="all">All categories</option>
+            {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+      </div>
+      {companies.length === 0 ? <div className="card-light p-4 text-sm text-ink-soft">Partner catalog is loading. Start the worker with FINANCE_DESK=1 to seed the 100 shops.</div> : null}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {visible.map((company) => {
+          const catalog = products.filter((p) => p.companyId === company.id);
+          const state = states.find((s) => s.companyId === company.id);
+          return (
+            <article className="card-light flex flex-col gap-3 p-4" key={company.id} data-testid={`partner-${company.slug}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-3">
+                  <span aria-hidden="true" className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-sm font-bold text-white">{company.name.slice(0, 2).toUpperCase()}</span>
+                  <div><h3 className="font-bold">{company.name}</h3><p className="text-xs text-ink-soft">{company.category} · partner {String(company.id).padStart(3, "0")}</p></div>
+                </div>
+                {company.featured ? <span className="chip">Featured book</span> : null}
+              </div>
+              <p className="text-sm text-ink-soft">{company.tagline}</p>
+              <div className="grid grid-cols-2 gap-2">
+                {catalog.slice(0, 4).map((p) => <div key={p.sku} className="rounded-lg border border-line/70 p-2"><p className="truncate text-xs font-semibold">{p.name}</p><p className="mt-1 text-xs text-ink-soft">{money(p.priceCents)}</p></div>)}
+              </div>
+              <div className="mt-auto flex items-center justify-between border-t border-line/70 pt-3 text-xs text-ink-soft">
+                <span><Badge kind="simulated" /> {state ? `${state.orders.toLocaleString()} orders · ${state.flags.toLocaleString()} flags` : "Awaiting first finance tick"}</span>
+                <Link className="font-semibold text-cyan-800 underline" href={`/desk?company=${company.id}`}>Finance desk</Link>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

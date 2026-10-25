@@ -12,12 +12,12 @@ export const FINANCE_AGENT_NAMES = {
   guardian: 'Exposure Guardian',
 } as const;
 export type FinanceSeat = keyof typeof FINANCE_AGENT_NAMES;
-const ENV: Record<FinanceSeat, string> = {
-  impact_analyst: 'CREAO_AGENT_IMPACT_ANALYST',
-  impact_reviewer: 'CREAO_AGENT_IMPACT_REVIEWER',
-  close_controller: 'CREAO_AGENT_CLOSE_CONTROLLER',
-  advisor: 'CREAO_AGENT_ADVISOR',
-  guardian: 'CREAO_AGENT_GUARDIAN',
+export const FINANCE_AGENT_ENV: Record<FinanceSeat, { appId: string; apiKey: string }> = {
+  impact_analyst: { appId: 'CREAO_FINANCE_IMPACT_ANALYST_APP_ID', apiKey: 'CREAO_FINANCE_IMPACT_ANALYST_API_KEY' },
+  impact_reviewer: { appId: 'CREAO_FINANCE_IMPACT_REVIEWER_APP_ID', apiKey: 'CREAO_FINANCE_IMPACT_REVIEWER_API_KEY' },
+  close_controller: { appId: 'CREAO_FINANCE_CLOSE_CONTROLLER_APP_ID', apiKey: 'CREAO_FINANCE_CLOSE_CONTROLLER_API_KEY' },
+  advisor: { appId: 'CREAO_FINANCE_ADVISOR_APP_ID', apiKey: 'CREAO_FINANCE_ADVISOR_API_KEY' },
+  guardian: { appId: 'CREAO_FINANCE_GUARDIAN_APP_ID', apiKey: 'CREAO_FINANCE_GUARDIAN_API_KEY' },
 };
 
 const EvidenceFlag = z.object({ code: z.string(), reason: z.string(), evidence_ids: z.array(z.string()) }).strict();
@@ -122,7 +122,8 @@ export const validateFinanceOutput = validate;
 function mock(input: unknown, seat: FinanceSeat, started: number, extraError?: string): FinanceAgentResult {
   const valid = validate(seat, input, mockOutput(seat, input));
   const error = extraError ?? valid.error;
-  log(`WAITING FOR HUMAN: create ${FINANCE_AGENT_NAMES[seat]} in CREAO and set ${ENV[seat]}`);
+  const env = FINANCE_AGENT_ENV[seat];
+  log(`WAITING FOR HUMAN: create ${FINANCE_AGENT_NAMES[seat]} in CREAO and set ${env.appId} + ${env.apiKey}`);
   return { seat, status: error ? 'rejected' : 'unavailable', mode: 'mock', label: 'Simulated (agent not connected)', ...(valid.output ? { output: valid.output } : {}), ...(error ? { error } : {}), durationMs: Date.now() - started };
 }
 
@@ -138,32 +139,32 @@ function findReplay(seat: FinanceSeat, input: unknown) {
 
 export type FinanceRunStarted = { runId: string; runUrl: string; agentId: string };
 
-async function liveRun(seat: FinanceSeat, input: unknown, agentId: string, onStarted?: (run: FinanceRunStarted) => Promise<void> | void) {
-  const key = process.env.CREAO_API_KEY?.trim();
-  if (!key) throw new Error('CREAO_API_KEY is not set in the worker environment');
-  const base = (process.env.CREAO_ACCOUNT_BASE || 'https://developer.creao.ai/v1').replace(/\/$/, '');
-  const started = await fetch(`${base}/runs`, { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'content-type': 'application/json' }, body: JSON.stringify({ agent_id: agentId, input: { case: JSON.stringify(input) } }) });
-  if (!started.ok) throw new Error(`CREAO start failed (${started.status})`);
-  const body = await started.json() as { run_id?: string; share_url?: string };
-  if (!body.run_id) throw new Error('CREAO response did not include run_id');
-  const run = { runId: body.run_id, runUrl: body.share_url ?? '', agentId };
+const apiBase = () => (process.env.CREAO_API_BASE || 'https://agent.creao.ai/api/v1').replace(/\/$/, '');
+
+async function liveRun(input: unknown, appId: string, key: string, onStarted?: (run: FinanceRunStarted) => Promise<void> | void) {
+  const started = await fetch(`${apiBase()}/apps/${encodeURIComponent(appId)}/runs`, { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'content-type': 'application/json' }, body: JSON.stringify({ inputs: { case: JSON.stringify(input) } }) });
+  if (!started.ok) throw new Error(`CREAO start failed (${started.status}): ${(await started.text()).slice(0, 500)}`);
+  const body = await started.json() as { id?: string; run_id?: string; threadId?: string; share_url?: string; run_url?: string };
+  const runId = body.id ?? body.run_id;
+  if (!runId) throw new Error('CREAO app response did not include id or run_id');
+  const run = { runId, runUrl: body.share_url ?? body.run_url ?? '', agentId: appId };
   await onStarted?.(run);
-  return { ...run, raw: await waitForLiveRun(run.runId) };
+  return { ...run, raw: await waitForLiveRun(appId, key, run.runId) };
 }
 
-async function waitForLiveRun(runId: string) {
-  const key = process.env.CREAO_API_KEY?.trim();
-  if (!key) throw new Error('CREAO_API_KEY is not set in the worker environment');
-  const base = (process.env.CREAO_ACCOUNT_BASE || 'https://developer.creao.ai/v1').replace(/\/$/, '');
+async function waitForLiveRun(appId: string, key: string, runId: string) {
   const deadline = Date.now() + Number(process.env.FINANCE_CREAO_TIMEOUT_MS || 15 * 60_000);
   while (Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, Number(process.env.CREAO_POLL_MS || 15_000)));
-    const response = await fetch(`${base}/runs/${runId}`, { headers: { Authorization: `Bearer ${key}` } });
-    if (!response.ok) continue;
-    const result = await response.json() as { status?: string; result?: { text?: string }; output?: string };
+    const response = await fetch(`${apiBase()}/runs/${encodeURIComponent(runId)}`, { headers: { Authorization: `Bearer ${key}` } });
+    if (!response.ok) {
+      if (response.status >= 500) continue;
+      throw new Error(`CREAO poll failed (${response.status}): ${(await response.text()).slice(0, 500)}`);
+    }
+    const result = await response.json() as { status?: string; result?: { text?: string; chatText?: string } | string; output?: string };
     if (result.status === 'failed' || result.status === 'cancelled') throw new Error(`CREAO run ${result.status}`);
     if (result.status !== 'completed') continue;
-    const text = result.result?.text ?? result.output;
+    const text = typeof result.result === 'string' ? result.result : result.result?.text ?? result.result?.chatText ?? result.output;
     if (!text) throw new Error('CREAO completed without output text');
     const trimmed = text.replace(/```(?:json)?/g, '');
     const start = trimmed.indexOf('{'); const end = trimmed.lastIndexOf('}');
@@ -176,7 +177,9 @@ async function waitForLiveRun(runId: string) {
 export async function resumeFinanceAgentRun(seat: FinanceSeat, input: unknown, run: FinanceRunStarted): Promise<FinanceAgentResult> {
   const startedAt = Date.now();
   try {
-    const raw = await waitForLiveRun(run.runId);
+    const { appId, apiKey } = financeCredentials(seat);
+    if (!appId || !apiKey) throw new Error('finance CREAO app ID or API key is missing');
+    const raw = await waitForLiveRun(appId, apiKey, run.runId);
     const checked = validate(seat, input, raw);
     if (checked.error) return { seat, status: 'rejected', mode: 'live', label: 'Live', error: checked.error, ...run, durationMs: Date.now() - startedAt };
     if (process.env.RECORD_FINANCE_CREAO === '1') {
@@ -192,7 +195,7 @@ export async function resumeFinanceAgentRun(seat: FinanceSeat, input: unknown, r
 export async function runFinanceAgent(seat: FinanceSeat, input: unknown, onStarted?: (run: FinanceRunStarted) => Promise<void> | void): Promise<FinanceAgentResult> {
   const startedAt = Date.now();
   const mode = (process.env.FINANCE_CREAO_MODE || 'mock').toLowerCase();
-  const agentId = process.env[ENV[seat]]?.trim() || '';
+  const { appId, apiKey } = financeCredentials(seat);
   if (mode === 'replay') {
     const replay = findReplay(seat, input);
     if (!replay) return mock(input, seat, startedAt, 'no recorded output matches this input');
@@ -200,39 +203,38 @@ export async function runFinanceAgent(seat: FinanceSeat, input: unknown, onStart
     return checked.error ? { seat, status: 'rejected', mode: 'replay', label: 'Replay of real run', error: checked.error, runId: replay.runId, runUrl: replay.runUrl, agentId: replay.agentId, durationMs: Date.now() - startedAt }
       : { seat, status: 'completed', mode: 'replay', label: 'Replay of real run', output: checked.output, runId: replay.runId, runUrl: replay.runUrl, agentId: replay.agentId, durationMs: Date.now() - startedAt };
   }
-  if (mode !== 'live' || !agentId || !process.env.CREAO_API_KEY?.trim()) return mock(input, seat, startedAt);
+  if (mode !== 'live' || !appId || !apiKey) return mock(input, seat, startedAt);
   try {
-    const run = await liveRun(seat, input, agentId, onStarted);
+    const run = await liveRun(input, appId, apiKey, onStarted);
     const checked = validate(seat, input, run.raw);
-    if (checked.error) return { seat, status: 'rejected', mode: 'live', label: 'Live', error: checked.error, runId: run.runId, runUrl: run.runUrl, agentId, durationMs: Date.now() - startedAt };
-    const result: FinanceAgentResult = { seat, status: 'completed', mode: 'live', label: 'Live', output: checked.output, runId: run.runId, runUrl: run.runUrl, agentId, durationMs: Date.now() - startedAt };
+    if (checked.error) return { seat, status: 'rejected', mode: 'live', label: 'Live', error: checked.error, runId: run.runId, runUrl: run.runUrl, agentId: appId, durationMs: Date.now() - startedAt };
+    const result: FinanceAgentResult = { seat, status: 'completed', mode: 'live', label: 'Live', output: checked.output, runId: run.runId, runUrl: run.runUrl, agentId: appId, durationMs: Date.now() - startedAt };
     if (process.env.RECORD_FINANCE_CREAO === '1') {
       mkdirSync(financeDir, { recursive: true });
-      appendFileSync(replayFile(seat), `${JSON.stringify({ inputHash: hash(input), input, output: checked.output, runId: run.runId, runUrl: run.runUrl, agentId })}\n`);
+      appendFileSync(replayFile(seat), `${JSON.stringify({ inputHash: hash(input), input, output: checked.output, runId: run.runId, runUrl: run.runUrl, agentId: appId })}\n`);
     }
     return result;
   } catch (e) {
-    return { seat, status: 'rejected', mode: 'live', label: 'Live', error: (e as Error).message, agentId, durationMs: Date.now() - startedAt };
+    return { seat, status: 'rejected', mode: 'live', label: 'Live', error: (e as Error).message, agentId: appId, durationMs: Date.now() - startedAt };
   }
 }
 
+function financeCredentials(seat: FinanceSeat) {
+  const names = FINANCE_AGENT_ENV[seat];
+  return { appId: process.env[names.appId]?.trim() || '', apiKey: process.env[names.apiKey]?.trim() || '' };
+}
+
 export function financeCreaoEnvStatus() {
-  return (Object.keys(FINANCE_AGENT_NAMES) as FinanceSeat[]).map((seat) => ({ seat, name: FINANCE_AGENT_NAMES[seat], env: ENV[seat], configured: !!process.env[ENV[seat]]?.trim(), keyConfigured: !!process.env.CREAO_API_KEY?.trim() }));
+  return (Object.keys(FINANCE_AGENT_NAMES) as FinanceSeat[]).map((seat) => {
+    const names = FINANCE_AGENT_ENV[seat];
+    const appIdConfigured = !!process.env[names.appId]?.trim();
+    const apiKeyConfigured = !!process.env[names.apiKey]?.trim();
+    return { seat, name: FINANCE_AGENT_NAMES[seat], appIdEnv: names.appId, apiKeyEnv: names.apiKey, appIdConfigured, apiKeyConfigured, configured: appIdConfigured && apiKeyConfigured };
+  });
 }
 
 export async function checkFinanceCreaoAgents() {
-  const status = financeCreaoEnvStatus();
-  const accountKey = process.env.CREAO_API_KEY?.trim();
-  if (!accountKey) return status.map((s) => ({ ...s, found: false, nameMatches: false, checked: false }));
-  const base = (process.env.CREAO_ACCOUNT_BASE || 'https://developer.creao.ai/v1').replace(/\/$/, '');
-  const response = await fetch(`${base}/agents`, { headers: { Authorization: `Bearer ${accountKey}` }, signal: AbortSignal.timeout(10_000) });
-  if (!response.ok) throw new Error(`CREAO GET /v1/agents failed (${response.status})`);
-  const body = await response.json() as unknown;
-  const list = Array.isArray(body) ? body : (body as { agents?: unknown[]; data?: unknown[] }).agents ?? (body as { data?: unknown[] }).data ?? [];
-  const agents = (list as { agent_id?: string; id?: string; name?: string }[]).map((a) => ({ id: a.agent_id ?? a.id ?? '', name: a.name ?? '' }));
-  return status.map((s) => {
-    const id = process.env[s.env]?.trim() ?? '';
-    const found = agents.find((a) => id ? a.id === id : a.name.trim().toLowerCase() === s.name.toLowerCase());
-    return { ...s, found: !!found, nameMatches: !!found && found.name.trim().toLowerCase() === s.name.toLowerCase(), checked: true };
-  });
+  // CREAO app-scoped credentials do not provide the account-level GET /agents
+  // permission. Configuration is reported here; the first live run verifies it.
+  return financeCreaoEnvStatus().map((s) => ({ ...s, found: false, nameMatches: false, checked: false }));
 }

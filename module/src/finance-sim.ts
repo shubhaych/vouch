@@ -115,7 +115,7 @@ export function seedPortfolioImpl(ctx: Ctx, seed: bigint) {
   for (const e of [...ctx.db.financeSimEvent.iter()]) ctx.db.financeSimEvent.id.delete(e.id);
   plantScripted(ctx, rng);
   const s = {
-    id: 1, running: false, hoursPerTick: 1, seed, simHour: 0, rngState: rng.state, ticks: 0n, seeded: true, epochMs: BigInt(SIM.epochMs),
+    id: 1, running: false, hoursPerTick: 24, seed, simHour: 0, rngState: rng.state, ticks: 0n, seeded: true, epochMs: BigInt(SIM.epochMs),
     lastTickMs: 0n, rowsLastTick: 0, msLastTick: 0,
   };
   if (ctx.db.financeSimState.id.find(1)) ctx.db.financeSimState.id.update(s);
@@ -124,8 +124,8 @@ export function seedPortfolioImpl(ctx: Ctx, seed: bigint) {
 
 // ---------------------------------------------------------------- one simulated hour
 
-interface Hour { orders: number; orderCents: number; claims: number; claimCents: number; flags: number; investigations: number; verifiedFraud: number; contradicted: number; ringCents: number; cross: number; scoreSum: number; scoreN: number }
-const emptyHour = (): Hour => ({ orders: 0, orderCents: 0, claims: 0, claimCents: 0, flags: 0, investigations: 0, verifiedFraud: 0, contradicted: 0, ringCents: 0, cross: 0, scoreSum: 0, scoreN: 0 });
+interface Hour { orders: number; orderCents: number; refundOutCents: number; claims: number; claimCents: number; flags: number; investigations: number; verifiedFraud: number; contradicted: number; ringCents: number; cross: number; scoreSum: number; scoreN: number }
+const emptyHour = (): Hour => ({ orders: 0, orderCents: 0, refundOutCents: 0, claims: 0, claimCents: 0, flags: 0, investigations: 0, verifiedFraud: 0, contradicted: 0, ringCents: 0, cross: 0, scoreSum: 0, scoreN: 0 });
 
 function activeEvents(ctx: Ctx, h: number): ActiveEvent[] {
   const out: ActiveEvent[] = [];
@@ -183,11 +183,11 @@ function fileClaim(ctx: Ctx, rng: Rng, seed: bigint, c: CompanyDef, d: Draft, h:
     crossCompanyCatches: st.crossCompanyCatches + (crossCompany && flagged ? 1 : 0),
     delayedByPause: st.delayedByPause + (rung === 'pause' ? 1 : 0), delayHoursSum: st.delayHoursSum + BigInt(rung === 'pause' ? 48 : 0),
   });
-  if (outcome === 'pending' && !resolveHour) pay(ctx, rng, claim.id, h, d.fraud);
+  if (outcome === 'pending' && !resolveHour) pay(ctx, rng, claim.id, h, d.fraud, hour);
 }
 
 /** A claim the business pays: the tier sets the legs; a split or return-first refund opens an obligation. */
-function pay(ctx: Ctx, rng: Rng, claimId: bigint, h: number, fraud: boolean) {
+function pay(ctx: Ctx, rng: Rng, claimId: bigint, h: number, fraud: boolean, hour: Hour) {
   const cl = ctx.db.financeSimClaim.id.find(claimId)!;
   const c = companyById(cl.companyId)!;
   const st = ctx.db.financeCompanyState.companyId.find(c.id)!;
@@ -197,6 +197,7 @@ function pay(ctx: Ctx, rng: Rng, claimId: bigint, h: number, fraud: boolean) {
   const share = rung === 'hedge' ? POLICY.exposure.hedgeLeg1ShareBp : SIM.leg1ShareBp;
   const leg1 = tier === 'T1' ? cl.cents : tier === 'T2' ? Math.floor((cl.cents * share) / 10_000) : 0;
   const leg2 = cl.cents - leg1;
+  hour.refundOutCents += leg1;
   const period = hourPeriod(SIM.epochMs, h);
   const post = c.id !== FEATURED; // the featured company's book lives in the worker (DuckDB); its sim claims count, they do not post here
   const base = { companyId: c.id, period, sourceRef: `sim:${claimId}`, decisionRef: `sim-decision:${claimId}`, formulaVersion: `sim-${tier}`, evidenceIds: '', processorRef: `ch_sim_${claimId}` };
@@ -233,12 +234,13 @@ function planReturn(ctx: Ctx, rng: Rng, obligationId: bigint, h: number, fraud: 
   ctx.db.financeReturnPlan.insert({ obligationId, hour: Math.min(at, due), outcome: at > due ? 'lapsed' : outcome });
 }
 
-function closeObligation(ctx: Ctx, obligationId: bigint, outcome: ReturnOutcome, h: number) {
+function closeObligation(ctx: Ctx, obligationId: bigint, outcome: ReturnOutcome, h: number, hourFor: (companyId: number) => Hour) {
   const o = ctx.db.financeObligation.id.find(obligationId);
   if (!o || o.status !== 'open') return;
   applyReturnImpl(ctx, obligationId, outcome, h, SIM.epochMs, ACCOUNTANT);
   const st = ctx.db.financeCompanyState.companyId.find(o.companyId)!;
   const paid = outcome === 'intact' ? o.leg2Cents : 0;
+  hourFor(o.companyId).refundOutCents += paid;
   ctx.db.financeCompanyState.companyId.update({
     ...st, openObligations: Math.max(0, st.openObligations - 1), openLeg2Cents: st.openLeg2Cents - BigInt(Math.min(Number(st.openLeg2Cents), o.leg2Cents)),
     unrecoveredLeg1Cents: st.unrecoveredLeg1Cents - BigInt(Math.min(Number(st.unrecoveredLeg1Cents), o.leg1Cents)),
@@ -271,7 +273,7 @@ function resolveClaim(ctx: Ctx, rng: Rng, seed: bigint, claimId: bigint, h: numb
     ctx.db.financeCompanyState.companyId.update({ ...st, falseFlags: st.falseFlags + 1 });
     ctx.db.financeVouchLedger.insert({ id: 0n, shopperHash: `s${hashStr(`${seed}:shopper:${cl.agentId}`)}`, companyId: cl.companyId, outcome: 'cleared', scoreDelta: 0, evidenceHash: `e${hashStr(`${seed}:claim:${claimId}`)}`, simHour: h });
   }
-  pay(ctx, rng, claimId, h, fraud);
+  pay(ctx, rng, claimId, h, fraud, hourOf(cl.companyId));
 }
 
 function salesSummary(ctx: Ctx, c: CompanyDef, h: number) {
@@ -355,8 +357,8 @@ function hourStep(ctx: Ctx, rng: Rng, seed: bigint, h: number): number {
   const hours = new Map<number, Hour>();
   const hourOf = (id: number) => { let x = hours.get(id); if (!x) { x = emptyHour(); hours.set(id, x); } return x; };
   // 1. returns arriving now, and clocks running out
-  for (const p of [...ctx.db.financeReturnPlan.hour.filter(h)]) { closeObligation(ctx, p.obligationId, p.outcome as ReturnOutcome, h); ctx.db.financeReturnPlan.obligationId.delete(p.obligationId); rows += 3; }
-  for (const o of [...ctx.db.financeObligation.dueHour.filter(h)]) if (o.status === 'open') { closeObligation(ctx, o.id, 'lapsed', h); rows++; }
+  for (const p of [...ctx.db.financeReturnPlan.hour.filter(h)]) { closeObligation(ctx, p.obligationId, p.outcome as ReturnOutcome, h, hourOf); ctx.db.financeReturnPlan.obligationId.delete(p.obligationId); rows += 3; }
+  for (const o of [...ctx.db.financeObligation.dueHour.filter(h)]) if (o.status === 'open') { closeObligation(ctx, o.id, 'lapsed', h, hourOf); rows++; }
   // 2. claims whose investigation, evidence request or pause hold ends now
   for (const cl of [...ctx.db.financeSimClaim.resolveHour.filter(h)]) { resolveClaim(ctx, rng, seed, cl.id, h, hourOf); rows += 2; }
   // 3. new orders and claims
@@ -413,7 +415,7 @@ function hourStep(ctx: Ctx, rng: Rng, seed: bigint, h: number): number {
   // 4. hourly rows, rollups, and the 7-day window
   for (const [companyId, x] of hours) {
     ctx.db.financeStatsHourly.insert({
-      id: 0n, companyId, simHour: h, orders: x.orders, orderCents: BigInt(x.orderCents), claims: x.claims, claimCents: BigInt(x.claimCents), flags: x.flags,
+      id: 0n, companyId, simHour: h, orders: x.orders, orderCents: BigInt(x.orderCents), refundOutCents: BigInt(x.refundOutCents), claims: x.claims, claimCents: BigInt(x.claimCents), flags: x.flags,
       investigations: x.investigations, verifiedFraud: x.verifiedFraud, contradicted: x.contradicted, ringCents: BigInt(x.ringCents), crossCompanyCatches: x.cross,
       scoreSum: x.scoreSum, scoreN: x.scoreN,
     });

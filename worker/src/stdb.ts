@@ -64,7 +64,11 @@ export function connect(label: Label, queries: string[], timeoutMs = 30_000): Pr
             log(`${label} subscription error`, event ?? '');
             // A missing table means the database still runs an older module than this worker was built against.
             if (/no such table/.test(String((event as { message?: string })?.message ?? event))) {
-              log(`${label}: ${config.stdbUri}/${config.stdbDb} runs an older module; publish module/ to it first (local: npm run stdb:publish; Maincloud: STDB_SERVER=maincloud STDB_DB=vouch-world npm run stdb:publish)`);
+              const message = `${label}: ${config.stdbUri}/${config.stdbDb} does not have the current Vouch schema. Publish module/ to this exact database, or point STDB_URI/STDB_DB at the database you published.`;
+              log(message);
+              clearTimeout(timer);
+              conn.disconnect();
+              fail(new Error(message));
             }
           })
           .subscribe(['SELECT * FROM role', ...queries]);
@@ -73,7 +77,7 @@ export function connect(label: Label, queries: string[], timeoutMs = 30_000): Pr
         clearTimeout(timer);
         fail(err);
       })
-      .onDisconnect(() => log(`${label} disconnected from SpacetimeDB; reconnecting`))
+      .onDisconnect(() => log(`${label} SpacetimeDB connection closed`))
       .build();
   });
 }

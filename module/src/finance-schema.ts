@@ -270,6 +270,8 @@ export const financeStatsHourly = table({ name: 'finance_stats_hourly', public: 
   crossCompanyCatches: t.u32(),
   scoreSum: t.u32(),
   scoreN: t.u32(),
+  // Appended with a default so existing Maincloud hourly rows migrate in place.
+  refundOutCents: t.u64().default(0n),
 });
 
 /** One row per company: rolling totals, cash, the shoppers' average Vouch score, the rung. The screens subscribe here. */

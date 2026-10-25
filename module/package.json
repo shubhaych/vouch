@@ -15,6 +15,7 @@
     "./review-score": "./src/review-score.ts",
     "./review-types": "./src/review-types.ts",
     "./finance/accounts": "./src/finance/accounts.ts",
+    "./finance/companies": "./src/finance/companies.ts",
     "./finance/ledger": "./src/finance/ledger.ts",
     "./finance/policy": "./src/finance/policy.ts",
     "./finance/reserve": "./src/finance/reserve.ts",

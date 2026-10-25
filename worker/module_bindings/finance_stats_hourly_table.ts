@@ -26,4 +26,5 @@ export default __t.row({
   crossCompanyCatches: __t.u32().name("cross_company_catches"),
   scoreSum: __t.u32().name("score_sum"),
   scoreN: __t.u32().name("score_n"),
+  refundOutCents: __t.u64().name("refund_out_cents"),
 });

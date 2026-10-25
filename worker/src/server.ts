@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
+import { createServer as createNetServer } from 'node:net';
 import { config, log } from './env';
 import { connect } from './stdb';
 import { handleWebhook, resolveAgents } from './creao';
@@ -20,7 +21,7 @@ import { mirrorOf } from './mirror';
 import { ReviewRunner } from './review/runner';
 import { generateBook } from './finance/book';
 import { closeBookPeriod } from './finance/close';
-import { checkFinanceCreaoAgents, resumeFinanceAgentRun, runFinanceAgent, type FinanceSeat } from './finance/creao';
+import { checkFinanceCreaoAgents, financeCreaoEnvStatus, resumeFinanceAgentRun, runFinanceAgent, type FinanceSeat } from './finance/creao';
 import type { DbConnection } from '../module_bindings';
 import { POLICY } from '../../module/src/finance/policy';
 import { allowedRungs as allowedFinanceRungs, zeroSignals, type Signals } from '../../module/src/finance/exposure';
@@ -44,6 +45,21 @@ const CASE_TYPES: Record<string, string> = {
 };
 
 const activeFinanceCases = new Set<string>();
+
+/** Check the public port before connecting identities or starting any workers. */
+function assertWorkerPortAvailable(port: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const probe = createNetServer();
+    probe.once('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'EADDRINUSE') {
+        reject(new Error(`Worker port ${port} is already in use. Stop the existing worker before starting another against the same SpacetimeDB database.`));
+      } else reject(error);
+    });
+    probe.listen(port, '0.0.0.0', () => {
+      probe.close((error) => error ? reject(error) : resolve());
+    });
+  });
+}
 
 async function persistFinanceAgentRun(conn: DbConnection, seat: FinanceSeat, caseRef: string, input: unknown, companyId = 1) {
   const inputJson = JSON.stringify(input);
@@ -168,7 +184,7 @@ async function runClaimImpactAgents(conn: DbConnection, claimId: bigint, impact:
 }
 
 async function resumeFinanceAgentRuns(conn: DbConnection) {
-  if (process.env.FINANCE_CREAO_MODE !== 'live' || !process.env.CREAO_API_KEY?.trim()) return;
+  if (process.env.FINANCE_CREAO_MODE !== 'live' || !financeCreaoEnvStatus().some((row) => row.configured)) return;
   const pending = [...conn.db.financeAgentRun.iter()].filter((row) => row.status === 'running' && row.mode === 'live');
   const queue = [...pending];
   const resumeOne = async () => {
@@ -260,6 +276,7 @@ async function runGuardianForCompany(conn: DbConnection, companyId: number, even
 }
 
 async function main() {
+  await assertWorkerPortAvailable(config.port);
   log(`connecting to ${config.stdbUri}/${config.stdbDb}`);
   const { conn } = await connect('worker', config.financeDeskEnabled ? [...WORKER_QUERIES, ...FINANCE_WORKER_QUERIES] : WORKER_QUERIES, 120_000);
   mirrorOf(conn); // index purchase, refund and agent before anything reads them
@@ -279,7 +296,7 @@ async function main() {
   // catalog and rows only when enabled; it never changes the refund path.
   if (config.financeDeskEnabled) {
     void checkFinanceCreaoAgents().then((rows) => {
-      for (const row of rows) log(`Finance CREAO ${row.name}: ${row.env}=${row.configured ? 'set' : 'missing'}; found=${row.checked ? (row.found ? 'yes' : 'no') : 'not checked'}; name matches=${row.checked ? (row.nameMatches ? 'yes' : 'no') : 'not checked'}`);
+      for (const row of rows) log(`Finance CREAO ${row.name}: ${row.appIdEnv}=${row.appIdConfigured ? 'set' : 'missing'}; ${row.apiKeyEnv}=${row.apiKeyConfigured ? 'set' : 'missing'}; live run=${row.configured ? 'not verified' : 'not configured'}`);
     }).catch((e) => log('Finance CREAO startup check failed:', (e as Error).message));
     try {
       const [, reconciler] = await Promise.all([connect('accountant', []), connect('reconciler', []), connect('analyst', [])]);
@@ -333,6 +350,27 @@ async function main() {
     app.get('/finance/creao/status', async (_req, reply) => {
       try { return (await checkFinanceCreaoAgents()).map(({ seat, name, configured, found, nameMatches, checked }) => ({ seat, name, configured, found, nameMatches, checked })); }
       catch (e) { return reply.code(503).send({ error: `CREAO agent check failed: ${(e as Error).message}` }); }
+    });
+    app.post<{ Body: { code?: string; running?: boolean; hoursPerTick?: number } }>('/finance/simulation', async (req, reply) => {
+      if (req.body?.code !== config.demoControllerCode) return reply.code(403).send({ error: 'controller code required' });
+      const running = req.body.running;
+      const hoursPerTick = req.body.hoursPerTick ?? 1;
+      if (typeof running !== 'boolean' || ![1, 5, 24].includes(hoursPerTick)) return reply.code(400).send({ error: 'running must be boolean and hoursPerTick must be 1, 5, or 24' });
+      try {
+        await conn.reducers.financeSetRunning({ running, hoursPerTick });
+        return { ok: true, running, hoursPerTick };
+      } catch (e) { return reply.code(409).send({ error: (e as Error).message }); }
+    });
+    app.post<{ Body: { code?: string; companyId?: number; kind?: string; hours?: number } }>('/finance/scenario', async (req, reply) => {
+      if (req.body?.code !== config.demoControllerCode) return reply.code(403).send({ error: 'controller code required' });
+      const { companyId, kind, hours = 24 } = req.body;
+      if (!Number.isInteger(companyId) || companyId! < 1 || companyId! > 100 || !['ring', 'sale_day', 'defect_batch'].includes(kind ?? '') || !Number.isInteger(hours) || hours! < 6 || hours! > 72) {
+        return reply.code(400).send({ error: 'choose a company from 1–100, a supported scenario, and a duration from 6–72 hours' });
+      }
+      try {
+        await conn.reducers.financeInjectEvent({ companyId: companyId!, kind: kind!, hours: hours! });
+        return { ok: true, companyId, kind, hours };
+      } catch (e) { return reply.code(409).send({ error: (e as Error).message }); }
     });
     app.post<{ Params: { claimId: string } }>('/finance/claim/:claimId/analyze', async (req, reply) => {
       if (!/^\d+$/.test(req.params.claimId)) return reply.code(400).send({ error: 'claim id must be numeric' });

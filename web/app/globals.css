@@ -579,3 +579,7 @@ a { color: inherit; text-decoration: none; }
     transition-duration: 0.01ms !important; scroll-behavior: auto !important;
   }
 }
+
+.finance-flow { animation: finance-flow-dash 2.2s linear infinite; }
+.finance-flow--out { animation-direction: reverse; }
+@keyframes finance-flow-dash { to { stroke-dashoffset: -24; } }

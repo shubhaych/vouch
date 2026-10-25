@@ -46,7 +46,7 @@ CREAO_MODE=live npx tsx scripts/hello-creao.ts --record   # T0.5: one run per ag
 # install the droid CLI (docs/SETUP.md) and set FACTORY_API_KEY
 npx tsx scripts/hello-droid.ts           # T0.6: prints one sentence and "[result] success=true"
 ```
-- **T4.3:** on `/lab`, ask Droid with one of the five preset goals. With the worker running, the job streams its plan, tool calls (each allowed or cancelled with the reason), the diff and the evaluator's scores live. The recording is saved to `worker/fixtures/lab/job-<n>.json`. Put that path in the README's "A lab job's recorded events".
+- **T4.3:** the lab page is hidden; verify a queued worker job records its plan, individually fenced tool calls, diff and evaluator scores in SpacetimeDB. The recording is saved to `worker/fixtures/lab/job-<n>.json`.
 - **T4.4 live:** press Promote on a job whose scores beat the live detector. `detectors/live/<id>.ts` gets the next version. At the next detector run (every 5 simulated days), pattern cards show the new version.
 
 ## 3b. The video reviewer (Factory Droid + CREAO Refund Reviewer)

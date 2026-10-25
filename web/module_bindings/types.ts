@@ -628,6 +628,7 @@ export const FinanceStatsHourly = __t.object("FinanceStatsHourly", {
   crossCompanyCatches: __t.u32(),
   scoreSum: __t.u32(),
   scoreN: __t.u32(),
+  refundOutCents: __t.u64(),
 });
 export type FinanceStatsHourly = __Infer<typeof FinanceStatsHourly>;
 
