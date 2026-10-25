@@ -65,6 +65,19 @@ if (!process.env.FACTORY_API_KEY) add('Factory Droid', 'missing', `FACTORY_API_K
 else if (!droid) add('Factory Droid', 'failed', 'FACTORY_API_KEY set but the droid CLI is not on PATH', 'install the droid CLI');
 else add('Factory Droid', 'live', `droid ${droid}`, 'npx tsx scripts/hello-droid.ts');
 
+// CRS: a login is harmless (no screening, no persona data sent).
+if (process.env.CRS_MODE !== 'sandbox') add('CRS', 'missing', `CRS_MODE=${process.env.CRS_MODE || 'fixture'}`, 'set CRS_MODE=sandbox, CRS_USERNAME, CRS_PASSWORD (docs/CRS.md)');
+else if (!process.env.CRS_USERNAME || !process.env.CRS_PASSWORD) add('CRS', 'missing', 'CRS_USERNAME / CRS_PASSWORD not set', 'add the sandbox credentials to .env');
+else {
+  const base = process.env.CRS_BASE_URL || 'https://api-sandbox.stitchcredit.com/api';
+  try {
+    const r = await fetch(`${base}/users/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: process.env.CRS_USERNAME, password: process.env.CRS_PASSWORD }), signal: AbortSignal.timeout(15_000) });
+    add('CRS', r.ok ? 'live' : 'failed', `${base}: login answered ${r.status}`, r.ok ? 'npx tsx scripts/hello-crs.ts' : 'check CRS_USERNAME / CRS_PASSWORD (repeated failures can lock the account)');
+  } catch (e) {
+    add('CRS', 'failed', `${base}: ${(e as Error).message}`, 'check network access to the CRS sandbox');
+  }
+}
+
 // ffmpeg for the video pipeline.
 try { add('ffmpeg', 'live', execFileSync('ffmpeg', ['-version'], { encoding: 'utf8' }).split('\n')[0]!); } catch { add('ffmpeg', 'missing', 'not installed', 'apt-get install ffmpeg'); }
 

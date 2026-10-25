@@ -62,6 +62,21 @@ npx tsx scripts/claim-flow.ts qa/videos/S02-fresh.mp4   # or a phone video; prin
 - **Reviewer live:** create `Vouch Refund Reviewer` and `Vouch Customer Liaison` on agent.creao.ai ([CREAO.md](CREAO.md)), restart with `CREAO_MODE=live`; the report's Reviewer block turns from Fixture to Live with the run id.
 - Done so far on the laptop (2026-10-24): fixture-mode pipeline end to end on S01 (lanes only, T4 proposal in 2 s); live Droid sessions on S02–S05 (claims extraction, Case Analyst with the fence and nudges, MCP tools, findings; on S05 → C-6 the Report Auditor verified every hash and clip and passed all three findings, 150 s end to end with 3 sessions). The QA videos have no audio and show synthetic footage, so every live run ended in T4 "more evidence". Still to do: a run with faster-whisper installed, a real phone video, the Reviewer live.
 
+## 3c. CRS identity step-up (sandbox)
+
+1. In `.env`: `CRS_MODE=sandbox`, `CRS_USERNAME=…`, `CRS_PASSWORD='…'`. Create `worker/.keys/crs-personas.json` from `worker/crs-personas.example.json` with the four personas' request values (CRS Postman collection, or `dist/test-data/personas.json` in `@crscreditapi/crs-calhacks-mcp-server`).
+2. Run these commands:
+   ```bash
+   npx tsx scripts/env-check.ts                 # CRS: live (login only)
+   npx tsx scripts/hello-crs.ts --record        # health + the four personas; saves worker/fixtures/crs/recorded.json
+   ```
+3. Restart `npm run worker`. File a claim on `/shop`; `/business` shows the Identity step-up card with a **Live** badge.
+4. Re-screen as each persona to show every route. Use the refund id from the claim:
+   ```bash
+   curl -s -X POST localhost:8787/identity/screen-refund -H 'content-type: application/json' -d '{"code":"vouch-controller","refundId":"<id>","personaId":"P16"}'
+   ```
+5. After a few minutes of the sim running, `npx tsx scripts/crs-usage.ts` shows requests by product, claim screenings and simulated refunds routed. These are the README's usage numbers.
+
 ## 4. Phone and screens (T2.1, T1.5, videos)
 
 - **T2.1:** the phone needs HTTPS for the camera and must reach both the web app and the worker. With no account: `brew install cloudflared`, then in two terminals `cloudflared tunnel --url http://localhost:3000` and `cloudflared tunnel --url http://localhost:8787`; each prints an `https://<words>.trycloudflare.com` URL. Start the web app and the worker with `NEXT_PUBLIC_WORKER_URL=<worker tunnel URL>` (the worker reuses it for the proof-clip links). Open `/shop` on the laptop **through the web tunnel URL** (the QR encodes the page's own origin), buy, fast-forward and request a refund. Scan the QR with the phone; `/claim/<id>` opens and records with the rear camera. The database must be reachable from the phone too: Maincloud is, a local server is not.

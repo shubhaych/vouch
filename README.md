@@ -96,16 +96,37 @@ The finance desk adds five more seats with the same adapter (impact analyst, imp
 
 **Why it matters.** The fraud that costs most is not one bad video; it is synthetic or borrowed identities filing many claims. A behaviour-only detector sees that late. An identity check sees it at the first claim. Keeping CRS behind one function also makes the method general: any screening provider can sit behind `screen()` and the agents still read the same three-value context (supports / neutral / caution).
 
-**How it is used today (honest status).** CRS is backend-only and is not yet in the claim flow. The worker can screen the four sandbox personas (`P01`, `P12`, `P13`, `P16`) live against the CRS sandbox or from fixtures, singly or in a batch, through three routes. The Risk Scorecard and the score panel already receive an `identity` field; today it is sent as `not_run` and the agents treat it as neutral, never as evidence against the shopper. Wiring it into claims is the next step and needs consent and real identity data, which the simulated shoppers do not have.
+**The use case: identity before trust.** A refund paid before the item comes back is an advance, and the riskiest shoppers to advance to are the ones Vouch knows least about. So every claim from a shopper with a thin history (under 3 completed purchases or 30 days), without a verified Vouch credential, or above the store's auto-approve limit gets a CRS identity step-up at intake, before any investigator runs:
+
+| CRS result | What Vouch does |
+| --- | --- |
+| Clean (TruValidate: no discrepancies, Fraud Finder contact risk < 70) | The shopper counts as a **verified identity**: the video reviewer's legitimacy formula (`pLegit`) treats it like a verified credential, so an honest first-time shopper is not held back for having no history |
+| Discrepancy, or contact risk ≥ 70 | A person checks identity, separately from the item; the Investigator's confidence drops, its action does not |
+| Fraud alert on file (code 2401) | Step-up proof is requested; never treated as guilt (the alert may be one the shopper placed) |
+
+CRS never approves or declines a refund. Simulated shoppers have no identity data of their own: each is mapped deterministically onto one of CRS's four scripted sandbox personas (`P01`, `P12`, `P13`, `P16`).
+
+**Where it is used (macro).** The video reviewer (every live claim with a video), the Desk Lead (simulated and video-less claims), the Score Reviewer panel, the simulation (each new investigation-path refund is routed through its persona's cached screening: thousands of refunds, at most four CRS requests per ten minutes), `/business` (Identity step-up card on each claim) and `/system` (CRS panel: requests by product, failures, latency, routes, health).
+
+**How it is built (micro).**
+- **Client:** single-flight login, refresh-token renewal, a 401 retry, a 5-minute back-off after a failed login, a 10-minute persona cache and a `GET /sys/health` probe.
+- **Metering:** every request is recorded in SpacetimeDB (`crs_call`: product, HTTP status, latency, never the payload).
+- **Storage:** redacted `identity_screening` rows and `crs_stat` totals, written only by worker reducers that refuse anything that is not a scripted persona id, a known route or a short message code.
+
+**Status.** Wired end to end and tested against a stand-in CRS server. It runs in fixture mode until `CRS_MODE=sandbox` and the sandbox credentials are set; `npx tsx scripts/hello-crs.ts --record` then saves a real run, and `npx tsx scripts/crs-usage.ts` prints the usage totals from the database.
 
 **Where to find the proof**
 
 | Claim | Location |
 | --- | --- |
-| Screening, sandbox and fixture paths | `worker/src/crs.ts` → `screen`, `sandboxScreening`, `fixtureScreening`, `normalize`, `PERSONA_IDS` |
-| HTTP routes | `worker/src/server.ts` → `/identity/status`, `/identity/check`, `/identity/batch` |
-| Tests | `worker/test/crs.test.ts` |
-| Identity passed to the agents as context | `worker/src/orchestrator.ts` and `worker/src/review/score-review.ts` (`identity` in the Risk Scorecard case) |
+| Sandbox client, normaliser, persona mapping, metering | `worker/src/crs.ts` → `screen`, `screenWithMeta`, `normalize`, `personaFor`, `setCrsMeter`, `health` |
+| When a claim is screened, and what the agents read | `worker/src/identity.ts` → `stepUpTrigger`, `IdentityDesk.stepUp`, `caseIdentity`, `screenSimulated` |
+| In the claim flow | `worker/src/review/runner.ts` (verified identity in the formula and the case file), `worker/src/orchestrator.ts`, `worker/src/review/score-review.ts`, `worker/src/fixtures.ts` (cites `identity:crs`) |
+| Database (redacted) | `module/src/schema.ts` → `identity_screening`, `crs_call`, `crs_stat`; `module/src/identity.ts` reducers |
+| UI | `web/components/business/identity-card.tsx`, `web/components/system/crs-panel.tsx` |
+| HTTP routes | `worker/src/server.ts` → `/identity/status`, `/identity/check`, `/identity/batch`, `/identity/screen-refund`, `/identity/usage` |
+| Scripts | `scripts/hello-crs.ts`, `scripts/crs-usage.ts`, `scripts/env-check.ts` (CRS login check) |
+| Tests | `worker/test/crs.test.ts`, `worker/test/crs-client.test.ts`, `worker/test/identity.test.ts`, `module/src/identity.test.ts` |
 | Rules and limits | `docs/CRS.md` |
 
 ## Factory: the Droid SDK is the refund investigator

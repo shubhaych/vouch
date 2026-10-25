@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { agentLabel, businessLabel, money, titleCase } from "@/lib/format";
 import { businessDef, catalogItem } from "@vouch/module/world";
 import { CredentialStepper } from "./credential-stepper";
+import { IdentityCard } from "./identity-card";
 import { mediaUrl } from "@/lib/stdb/config";
 import { AgentCards, AgentLanes, MetricGrid, SafeVideo, hms, seatFlow, type Moment } from "./agent-flow";
 
@@ -148,6 +149,7 @@ export function Investigation({ claim, refund, purchase, evidence, frame, onFram
         <AgentMini agentId={refund.agentId} />
       </div>
 
+      <IdentityCard refundId={refund.id} />
       <CredentialStepper refundId={refund.id} />
     </div>
   );

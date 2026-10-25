@@ -1,6 +1,6 @@
 # AGENTS.md: Vouch World (Cal Hacks 13.0, deadline Sun 9:00 AM PT)
 
-The full build spec is "Vouch World: Agent Build Spec" (Oct 24). This file is the short version an agent needs every session. It replaces the earlier "Vouch Refunds" brief: Threadline, the refund ladder, CRS and Nessie are gone (CRS has since returned as a backend-only identity check, see below); Factory Droid and `/lab` are in.
+The full build spec is "Vouch World: Agent Build Spec" (Oct 24). This file is the short version an agent needs every session. It replaces the earlier "Vouch Refunds" brief: Threadline, the refund ladder, CRS and Nessie are gone (CRS has since returned as the identity step-up in the claim flow, see below); Factory Droid and `/lab` are in.
 
 ## One sentence
 Vouch is trust infrastructure for shopping when consumers and AI agents buy on people's behalf: CREAO agents investigate refunds, a SpacetimeDB economy of 10,000 simulated shoppers shows the effect live on a globe, and Factory Droid improves the fraud detectors inside the running product.
@@ -21,7 +21,7 @@ An agent buys something → asks for a refund with a video → CREAO agents anal
 - `web/` Next.js 16 App Router + Tailwind 4 + motion + react-globe.gl + Recharts. Routes: `/ /world /shop /claim/[id] /business /lab /system`.
 - `detectors/` live detectors, `candidates/` (the only folder Droid may write), `eval.ts` (fixed evaluator).
 - Not in the stack: Convex, Fetch, Coinbase/x402, Nessie, any second database.
-- CRS (identity and contact-risk screening) is backend-only and not yet in the claim flow: the worker can call the CRS sandbox (`worker/src/crs.ts`). Read [docs/CRS.md](docs/CRS.md) before using or extending it.
+- CRS (identity and contact-risk screening) is the identity step-up in the claim flow: thin-history, uncredentialed and over-limit claims are screened at intake (`worker/src/identity.ts` over `worker/src/crs.ts`), redacted rows go to `identity_screening`/`crs_call`/`crs_stat`. It never approves or declines a refund. Read [docs/CRS.md](docs/CRS.md) before using or extending it.
 
 ## Hard rules
 - Scraped data says so on screen: a chip reads "via Bright Data" with the fetch time when it was fetched live and "fixture" otherwise. Return signals are context for a person, never a rate and never evidence against a shopper.

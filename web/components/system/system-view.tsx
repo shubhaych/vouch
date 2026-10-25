@@ -12,6 +12,7 @@ import { WORKER_URL } from "@/lib/stdb/config";
 import { int } from "@/lib/format";
 import { toast } from "@/components/ui/toast";
 import { ArchitectureDiagram } from "./architecture";
+import { CrsPanel } from "./crs-panel";
 
 interface Sample { t: number; steps: number; day: number; seq: number }
 
@@ -123,6 +124,8 @@ export function SystemView() {
           </div>
         </div>
       </section>
+
+      <CrsPanel />
 
       <section className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1.4fr]">
         <div className="glass p-4">
