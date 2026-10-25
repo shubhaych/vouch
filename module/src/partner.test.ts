@@ -15,11 +15,11 @@ describe('partner products', () => {
     k.as(worker, (ctx) => ctx.db.role.insert({ who: ctx.sender, role: 'worker', label: 'w', businessId: 0 }));
     k.as(worker, (ctx) => seedWorldImpl(ctx, 11n, 600, false));
     k.as(shopper, (ctx) => joinImpl(ctx, 'Judge'));
-    const p = k.as(shopper, (ctx) => buyPartnerFor(ctx, myAgentId(ctx), 2, 'manazon-1'));
+    const p = k.as(shopper, (ctx) => buyPartnerFor(ctx, myAgentId(ctx), 2, 'corner-current-2'));
     k.as(shopper, (ctx) => {
-      expect(ctx.db.purchase.id.find(p.id)?.amount).toBe(3999);
+      expect(ctx.db.purchase.id.find(p.id)?.amount).toBe(8999);
       const o = ctx.db.partnerOrder.purchaseId.find(p.id)!;
-      expect([o.companyName, o.name, o.description]).toEqual(['Manazon', 'Wireless earbuds', 'Bluetooth earbuds with charging case.']);
+      expect([o.companyName, o.name, o.description]).toEqual(['Corner Current', 'Full-size mechanical keyboard', 'Full-size 104-key mechanical keyboard with number pad, black, wired USB-C.']);
       fastForwardFor(ctx, myAgentId(ctx), p.id);
       requestRefundFor(ctx, myAgentId(ctx), p.id, 'not_as_described', 'Wrong colour');
       expect([...ctx.db.claim.iter()].some((c) => [...ctx.db.refund.iter()].some((r) => r.purchaseId === p.id && r.id === c.refundId))).toBe(true);

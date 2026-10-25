@@ -39,8 +39,12 @@ export function assessRefund(draft: AssessmentDraft | undefined, findings: Findi
   });
   const forRefund = reasons(draft.forRefund, 'supports');
   const againstRefund = reasons(draft.againstRefund, 'contradicts');
+  // A statement about something that is not a claim (e.g. "written_reason") is extra commentary, not a
+  // failed check: it once turned a fully supported accept into a person review. Drop it with a note.
+  const notes: string[] = [];
   const statements = draft.statements.filter((s) => {
-    if (claims.some((c) => c.id === s.claimId) && s.findingIds.every((id) => passed(id) && byId.get(id)?.spokenClaimId === s.claimId)) return true;
+    if (!claims.some((c) => c.id === s.claimId)) { notes.push(`Statement ${s.claimId} is not one of the claims and was left out.`); return false; }
+    if (s.findingIds.every((id) => passed(id) && byId.get(id)?.spokenClaimId === s.claimId)) return true;
     issues.push(`Statement ${s.claimId} cites unverified or unrelated findings.`);
     return false;
   });
@@ -66,7 +70,7 @@ export function assessRefund(draft: AssessmentDraft | undefined, findings: Findi
   return {
     ...rest, forRefund, againstRefund, statements, requestedCents, ...(nextStep ? { nextStep } : {}),
     ...(issues.length ? { action: 'more_evidence' as const, amountCents: 0, rationale: 'A person must review this case because the proposed recommendation did not pass its evidence checks. ' + draft.rationale } : {}),
-    status: issues.length ? 'needs_review' : 'validated', guardNotes: [...new Set(issues)],
+    status: issues.length ? 'needs_review' : 'validated', guardNotes: [...new Set([...issues, ...notes])],
   };
 }
 

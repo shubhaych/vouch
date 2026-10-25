@@ -94,7 +94,7 @@ export function TryClaim() {
             Observed &amp; described
           </span>
           <p className="evidence-example__line evidence-example__line--flag">
-            Different colour and size in the box
+            Not as described, shown on video
           </p>
         </div>
         <p className="evidence-example__note">
@@ -242,7 +242,7 @@ function LiveHandoff() {
           purchaseId,
           reasonCode: "not_as_described",
           reasonText: item
-            ? `Ordered ${item.name}; the box contains a different colour and size`
+            ? `Ordered ${item.name}; what arrived is not as described (shown in the video)`
             : "Item not as described",
         }),
       );

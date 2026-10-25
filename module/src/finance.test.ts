@@ -46,7 +46,7 @@ describe('the ledger as reducers', () => {
       requestImpl(ctx, { ...base, kind: 'leg1_settled', cents: 104_00, period: sept, memo: 'Leg 1 settled', sourceRef: 'order:1000001' }, workerActor),
     ]);
     k.as(accountant, (ctx) => { for (const r of reqs) expect(prepareImpl(ctx, r, actor(ctx, 'accountant'))).toBeGreaterThan(0n); });
-    const oblId = k.as(worker, (ctx) => openObligationImpl(ctx, { companyId: COMPANY, orderRef: 'order:1000001', claimRef: 'claim:C-1', decisionRef: 'D-1', tier: 'T2', category: 'MKT', sku: 'manazon-1', leg1Cents: 104_00, leg2Cents: 45_00, costCents: 62_00, openedHour: 2_000 }, workerActor));
+    const oblId = k.as(worker, (ctx) => openObligationImpl(ctx, { companyId: COMPANY, orderRef: 'order:1000001', claimRef: 'claim:C-1', decisionRef: 'D-1', tier: 'T2', category: 'MKT', sku: 'corner-current-1', leg1Cents: 104_00, leg2Cents: 45_00, costCents: 62_00, openedHour: 2_000 }, workerActor));
     k.as(accountant, (ctx) => {
       accrueImpl(ctx, COMPANY, sept, workerActor, actor(ctx, 'accountant'));
       reverseImpl(ctx, COMPANY, '2026-10', workerActor, actor(ctx, 'accountant'));

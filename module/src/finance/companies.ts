@@ -129,36 +129,36 @@ export const COMPANIES: readonly CompanyDef[] = [
  },
  {
   "id": 2,
-  "slug": "manazon",
-  "name": "Manazon",
+  "slug": "corner-current",
+  "name": "Corner Current",
   "category": "MKT",
   "size": 5,
   "featured": false,
-  "tagline": "Everything, delivered fast.",
+  "tagline": "Everyday essentials, delivered fast.",
   "products": [
    {
-    "sku": "manazon-1",
-    "name": "Wireless earbuds",
-    "description": "Bluetooth earbuds with charging case.",
-    "priceCents": 3999
+    "sku": "corner-current-1",
+    "name": "Red Bull Zero Sugar",
+    "description": "One 250 ml (8.4 fl oz) can of Red Bull Zero Sugar energy drink, silver and blue can.",
+    "priceCents": 299
    },
    {
-    "sku": "manazon-2",
-    "name": "Smart plug 4-pack",
-    "description": "Wi-Fi plugs you control from your phone.",
-    "priceCents": 2499
+    "sku": "corner-current-2",
+    "name": "Full-size mechanical keyboard",
+    "description": "Full-size 104-key mechanical keyboard with number pad, black, wired USB-C.",
+    "priceCents": 8999
    },
    {
-    "sku": "manazon-3",
-    "name": "Stainless water bottle",
-    "description": "Insulated 32 oz bottle that keeps drinks cold.",
-    "priceCents": 2200
-   },
-   {
-    "sku": "manazon-4",
-    "name": "USB-C cable 3-pack",
-    "description": "Braided fast-charging cables, 6 ft.",
+    "sku": "corner-current-3",
+    "name": "USB-C charging cable",
+    "description": "White USB-C to USB-C cable, 1 m long.",
     "priceCents": 1299
+   },
+   {
+    "sku": "corner-current-4",
+    "name": "Steel water bottle",
+    "description": "Matte green stainless steel bottle, 750 ml, screw cap.",
+    "priceCents": 2499
    }
   ]
  },

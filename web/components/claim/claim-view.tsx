@@ -45,6 +45,7 @@ export function ClaimView({ idParam, hint: hintProps }: { idParam: string; hint:
   const partner = partnerRow ? { name: partnerRow.name, store: partnerRow.companyName } : partnerProduct && partnerDef ? { name: partnerProduct.name, store: partnerDef.name } : null;
   const sku = purchase?.item ?? hint?.sku;
   const item = partner ? { name: partner.name } : sku !== undefined ? catalogItem(sku) : undefined;
+  const ordered = partner ? partnerProduct?.description : sku !== undefined ? catalogItem(sku)?.description : undefined;
   const businessId = purchase?.business ?? hint?.business;
 
   // Until the live rows arrive, the link's values stand in; the recorder sits at the same place either way,
@@ -83,6 +84,7 @@ export function ClaimView({ idParam, hint: hintProps }: { idParam: string; hint:
       <div className="space-y-1">
         <div className="text-xs font-semibold uppercase tracking-wider text-ink-soft">Claim C-{id.toString()} {early ? <span className="normal-case tracking-normal" data-testid="claim-connecting">· connecting for live progress…</span> : <Badge kind="live" />}</div>
         <h1 className="text-xl font-bold">{item?.name ?? "Your item"}</h1>
+        {ordered ? <p className="text-sm" data-testid="claim-ordered"><span className="text-ink-soft">You ordered:</span> {ordered}</p> : null}
         <p className="text-sm text-ink-soft">{[reason ? titleCase(reason) : "", amount !== undefined ? money(amount) : "", partner ? partner.store : businessId !== undefined ? businessDef(businessId)?.name : ""].filter(Boolean).join(" · ")}</p>
         {agentId ? <p className="text-xs text-ink-soft" data-testid="claim-agent">Your agent {agentLabel(agentId)}{agent ? <> · score <span className="font-mono">{agent.score}</span></> : null}</p> : null}
       </div>

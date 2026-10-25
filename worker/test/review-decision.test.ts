@@ -48,6 +48,17 @@ describe('assessment next step', () => {
     expect(a.nextStep).toBe('human_review');
     expect(nextMove(a, 'passed', false, false)).toBe('person');
   });
+
+  it('a stray statement about the written reason does not veto a supported accept', () => {
+    const a = assessed(draft({ statements: [
+      { claimId: 'c1', findingIds: ['1'], analysis: 'The footage shows a cable of about 1 m.' },
+      { claimId: 'written_reason', findingIds: ['1'], analysis: 'The written reason matches the footage.' },
+    ] }));
+    expect(a.status).toBe('validated');
+    expect(a.action).toBe('accept');
+    expect(a.statements.map((s) => s.claimId)).toEqual(['c1']);
+    expect(nextMove(a, 'passed', false, false)).toBe('verdict');
+  });
 });
 
 describe('finger challenge retry', () => {

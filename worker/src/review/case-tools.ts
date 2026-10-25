@@ -94,6 +94,9 @@ export async function buildCaseServer(sdk: Sdk, role: Role, ctx: CaseContext): P
         const draft = AssessmentDraftSchema.parse(input);
         const ids = [...draft.forRefund, ...draft.againstRefund].map((x) => x.findingId).concat(draft.statements.flatMap((s) => s.findingIds));
         if (ids.some((id) => !state.findings.has(BigInt(id)))) return 'recommend_refund refused: cite only IDs from list_findings.';
+        const known = ctx.claims.map((c) => c.id);
+        const stray = draft.statements.filter((s) => !known.includes(s.claimId)).map((s) => s.claimId);
+        if (stray.length) return `recommend_refund refused: statements use claimId ${known.join(', ')} only (not ${stray.join(', ')}); cover the written reason inside the matching claim's analysis.`;
         if (ctx.claims.some((c) => draft.statements.filter((s) => s.claimId === c.id).length !== 1)) return 'recommend_refund refused: analyse each claim exactly once.';
         state.assessment = draft;
         state.log(`Factory recommendation: ${draft.action}, ${draft.amountCents} cents (pending audit)`);

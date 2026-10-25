@@ -37,6 +37,8 @@ export function ShopView() {
   );
 }
 
+const FIRST_STORE = "corner-current";
+
 function PartnerDirectory() {
   const [companies] = useTable(tables.financeCompany);
   const [products] = useTable(tables.financeProduct);
@@ -46,7 +48,7 @@ function PartnerDirectory() {
   const categories = useMemo(() => [...new Set(companies.map((c) => c.category))].sort(), [companies]);
   const visible = useMemo(() => [...companies]
     .filter((c) => category === "all" || c.category === category)
-    .sort((a, b) => a.id - b.id), [companies, category]);
+    .sort((a, b) => Number(b.slug === FIRST_STORE) - Number(a.slug === FIRST_STORE) || a.id - b.id), [companies, category]);
 
   return (
     <section className="space-y-4" data-testid="partner-directory">
