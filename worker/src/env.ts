@@ -60,6 +60,10 @@ export const config = {
       pattern_analyst: str('CREAO_PATTERN_ANALYST_AGENT_ID'),
       refund_reviewer: str('CREAO_REFUND_REVIEWER_AGENT_ID'),
       customer_liaison: str('CREAO_CUSTOMER_LIAISON_AGENT_ID'),
+      listing_matcher: str('CREAO_LISTING_MATCHER_AGENT_ID'),
+      returns_monitor: str('CREAO_RETURNS_MONITOR_AGENT_ID'),
+      policy_checker: str('CREAO_POLICY_CHECKER_AGENT_ID'),
+      risk_scorecard: str('CREAO_RISK_SCORECARD_AGENT_ID'),
     },
     // App path only: per-seat app id and key (capi_ keys are scoped to one agent).
     appIds: {
@@ -68,6 +72,10 @@ export const config = {
       pattern_analyst: str('CREAO_PATTERN_ANALYST_APP_ID'),
       refund_reviewer: str('CREAO_REFUND_REVIEWER_APP_ID'),
       customer_liaison: str('CREAO_CUSTOMER_LIAISON_APP_ID'),
+      listing_matcher: str('CREAO_LISTING_MATCHER_APP_ID'),
+      returns_monitor: str('CREAO_RETURNS_MONITOR_APP_ID'),
+      policy_checker: str('CREAO_POLICY_CHECKER_APP_ID'),
+      risk_scorecard: str('CREAO_RISK_SCORECARD_APP_ID'),
     },
     appKeys: {
       evidence_analyst: str('CREAO_EVIDENCE_ANALYST_KEY'),
@@ -75,6 +83,10 @@ export const config = {
       pattern_analyst: str('CREAO_PATTERN_ANALYST_KEY'),
       refund_reviewer: str('CREAO_REFUND_REVIEWER_KEY'),
       customer_liaison: str('CREAO_CUSTOMER_LIAISON_KEY'),
+      listing_matcher: str('CREAO_LISTING_MATCHER_KEY'),
+      returns_monitor: str('CREAO_RETURNS_MONITOR_KEY'),
+      policy_checker: str('CREAO_POLICY_CHECKER_KEY'),
+      risk_scorecard: str('CREAO_RISK_SCORECARD_KEY'),
     },
     pollMs: Number(str('CREAO_POLL_MS', '15000')),
   },
@@ -87,14 +99,28 @@ export const config = {
     // True once sandbox credentials are set; the video reviewer reads this to know identity can be checked.
     configured: str('CRS_MODE') === 'sandbox' && !!str('CRS_USERNAME') && !!str('CRS_PASSWORD'),
   },
+  // Bright Data: the worker scrapes listings and return signals and hands them to the agents (docs/BRIGHTDATA.md).
+  brightdata: {
+    mode: (str('BRIGHTDATA_MODE', 'fixture') === 'live' ? 'live' : 'fixture') as 'live' | 'fixture',
+    token: str('BRIGHTDATA_API_TOKEN'),
+    serpZone: str('BRIGHTDATA_SERP_ZONE', 'serp_api'),
+    unlockerZone: str('BRIGHTDATA_UNLOCKER_ZONE', 'web_unlocker'),
+    dailyLimit: Number(str('BRIGHTDATA_DAILY_LIMIT', '60')),
+    cacheDir: resolve(REPO_ROOT, 'worker/.cache/brightdata'),
+    cacheHours: Number(str('BRIGHTDATA_CACHE_HOURS', '24')),
+  },
+  returnsMonitor: {
+    everyMinutes: Number(str('RETURNS_MONITOR_EVERY_MIN', '15')),
+    spikeFactor: Number(str('RETURNS_SPIKE_FACTOR', '3')),
+  },
   factoryKey: str('FACTORY_API_KEY'),
   seed: BigInt(str('SIM_SEED', '11')),
   population: Number(str('SIM_POPULATION', '10000')),
 };
 
 export type Seat = keyof typeof config.creao.agentIds;
-export const SEATS: Seat[] = ['evidence_analyst', 'refund_investigator', 'pattern_analyst', 'refund_reviewer', 'customer_liaison'];
-/** The video reviewer's seats are optional: when the saved agent is missing, the report says "Reviewer offline" and a person decides. */
-export const OPTIONAL_SEATS: Seat[] = ['refund_reviewer', 'customer_liaison'];
+export const SEATS: Seat[] = ['evidence_analyst', 'refund_investigator', 'pattern_analyst', 'refund_reviewer', 'customer_liaison', 'listing_matcher', 'returns_monitor', 'policy_checker', 'risk_scorecard'];
+/** Optional seats fail soft when the saved agent is missing: the reviewer says "Reviewer offline", the claim flow skips the Listing Matcher, and no monitor note is written. */
+export const OPTIONAL_SEATS: Seat[] = ['refund_reviewer', 'customer_liaison', 'listing_matcher', 'returns_monitor', 'policy_checker', 'risk_scorecard'];
 
 export const log = (...xs: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...xs);

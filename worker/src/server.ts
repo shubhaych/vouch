@@ -19,6 +19,8 @@ import { Showcase } from './showcase';
 import { mirrorOf } from './mirror';
 import { ReviewRunner } from './review/runner';
 import { isPersonaId, sandboxReady, screen, type PersonaId } from './crs';
+import { PulseRunner } from './pulse';
+import { brightdataReady, scrapesUsedToday } from './brightdata';
 
 const WORKER_QUERIES = [
   'SELECT * FROM sim_run', 'SELECT * FROM metrics', 'SELECT * FROM control', 'SELECT * FROM agent', 'SELECT * FROM business',
@@ -66,6 +68,9 @@ async function main() {
   }
   orchestrator.start();
   new DetectorRunner(conn).start();
+  const pulse = new PulseRunner(conn, { creaoOn: () => conn.db.control.key.find('creao_enabled')?.value === 'true', takeBudget: () => orchestrator.takeBudget() });
+  pulse.start();
+  orchestrator.pulseFor = (sku) => pulse.latest?.items.find((i) => i.sku === sku) ?? null;
   new Poster(poster.conn).start();
   const lab = new LabRunner(conn);
   lab.start();
@@ -157,6 +162,13 @@ async function main() {
       for (const r of rows) routes[r.result.route]! += r.returns;
       return { total, crsCalls: rows.length, routes, rows };
     } catch (e) { return reply.code(502).send({ error: (e as Error).message }); }
+  });
+  // Bright Data and the Returns Monitor: status for /system, and a manual monitor run for the demo (spends a CREAO run).
+  app.get('/scrape/status', async () => ({ mode: config.brightdata.mode, notReady: brightdataReady(), usedToday: scrapesUsedToday(), dailyLimit: config.brightdata.dailyLimit, pulse: pulse.latest }));
+  app.post<{ Body: { code?: string } }>('/monitor/run', async (req, reply) => {
+    if (req.body?.code !== config.demoControllerCode && req.body?.code !== config.demoBusinessCode) return reply.code(403).send({ error: 'seat code required' });
+    const started = await pulse.runMonitor('manual');
+    return { ok: started, message: started ? 'Returns Monitor note written' : 'The Returns Monitor could not run: no pulse yet, the kill switch is off, the seat is missing, the budget is spent, or a run is in progress' };
   });
   app.post('/bench', async () => ({ message: 'Run `npx tsx scripts/bench.ts` on the worker machine: it publishes throwaway databases and writes results to bench_result.' }));
 

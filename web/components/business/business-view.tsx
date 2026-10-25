@@ -15,6 +15,7 @@ import { ReportPanel, ReviewingPanel, shortVerdict } from "./report-panel";
 import { parse } from "./investigation";
 import type { Report } from "@vouch/module/review-types";
 import { OrgChart } from "./org-chart";
+import { ReturnsPulse } from "./returns-pulse";
 
 export function BusinessView() {
   return (
@@ -72,6 +73,7 @@ function BusinessInner() {
       </header>
 
       <OrgChart canToggle={!!seat} />
+      <ReturnsPulse canRun={!!seat} />
 
       <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[14rem_minmax(0,1fr)] xl:grid-cols-[14rem_minmax(0,1fr)_20rem] 2xl:grid-cols-[16rem_minmax(0,1fr)_22rem]">
         <aside className="glass flex max-h-[80vh] flex-col lg:sticky lg:top-4 lg:row-span-2 xl:row-span-1" data-testid="queue">

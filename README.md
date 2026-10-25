@@ -24,6 +24,10 @@ Three saved agents, built on agent.creao.ai, fill the investigation seats. The w
 | Evidence Analyst | `<fill in>` | `<fill in>` | Reads the claim's video frames and the deterministic checks. Returns findings with boxes and a verdict: consistent, inconsistent or unable_to_verify. |
 | Refund Investigator | `<fill in>` | `<fill in>` | Reads the findings, the shopper's history, any credential check and the store's policy. Proposes accept, store credit, more evidence or decline, citing reasons. |
 | Pattern Analyst | `<fill in>` | `<fill in>` | Reads a flagged pattern's events and the agents' histories. Returns confirm, dismiss or needs_review, with each agent's role and a narrative. |
+| Listing Matcher (optional) | `<fill in>` | `<fill in>` | Matches the frames to product listings the worker scraped through Bright Data, says whether they show the ordered item, and checks the return against the policy. |
+| Policy Checker (optional) | `<fill in>` | `<fill in>` | Reads the store policy rule by rule (window, reason, video, category note, fee, item identity) and returns eligible, conditional, needs_person or not_eligible. |
+| Risk Scorecard (optional) | `<fill in>` | `<fill in>` | Reads history, credential, patterns, identity screening, the item's return pulse and the video checks as supports, neutral or caution. Context, never a decision. |
+| Returns Monitor (optional) | `<fill in>` | `<fill in>` | Reads one window of the returns pulse and web return signals scraped for the busiest items; notes spikes and the innocent explanation. Never names a shopper. |
 
 **Remove the agents and no claim is investigated and no fraud pattern is confirmed.**
 
@@ -32,7 +36,7 @@ Three saved agents, built on agent.creao.ai, fill the investigation seats. The w
 - Flagged patterns wait in `awaiting_review`.
 - The worker checks the switch before every run and again before every proposal. Click it again to turn the agents back on.
 
-The agents' instructions and setup steps are in [docs/CREAO.md](docs/CREAO.md). In this repository's test runs the agents were replaced by hand-written fixtures in `worker/fixtures/`, labelled Fixture on screen. See [docs/LIVE_CHECKLIST.md](docs/LIVE_CHECKLIST.md) for the live runs still to do.
+The agents' instructions and setup steps are in [docs/CREAO.md](docs/CREAO.md); the indicators the eligibility layer reads are listed there too. The scrapers behind the Listing Matcher and the Returns Monitor are in [docs/BRIGHTDATA.md](docs/BRIGHTDATA.md): the worker scrapes through Bright Data, caches, and hands the results to the agents; no agent holds a key. In this repository's test runs the agents were replaced by hand-written fixtures in `worker/fixtures/`, labelled Fixture on screen. See [docs/LIVE_CHECKLIST.md](docs/LIVE_CHECKLIST.md) for the live runs still to do.
 
 ## Factory: the video reviewer
 
@@ -128,6 +132,8 @@ These numbers are measured on a simulated economy we designed. They show the met
 | The shopper's purchase and payment | Simulated payment; the claim and the video are real |
 | Video frames, hashes, freshness, blank-frame, little-motion and reuse checks | Live (ffmpeg and dHash in the worker) |
 | CREAO findings, recommendations and pattern reviews | Fixture in this build (`CREAO_MODE=fixture`); live runs wait for the agents (see the checklist) |
+| The returns pulse on `/business` (returns per second, by item) | Live: counted from refund rows as they arrive; the band breakdown is Simulated |
+| Scraped listings and web return signals | Fixture in this build (`BRIGHTDATA_MODE=fixture`, built from the catalogue); Bright Data SERP API when live, shown with the fetch time |
 | The video reviewer's ingest, integrity checks, findings, proof clips, audit and score | Live (ffmpeg, the probes and the formula run in the worker; findings come from a live Droid session when `FACTORY_API_KEY` is set, otherwise the report says "Automated checks only") |
 | The CREAO Refund Reviewer's opinion | Fixture until the saved agent exists (labelled Fixture; "Reviewer offline" when neither is available) |
 | Detector scores | Measured on fresh simulated worlds against the simulation's ground truth |

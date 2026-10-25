@@ -23,7 +23,7 @@ for (const f of files('web/app')) if (/\bscam/i.test(readFileSync(f, 'utf8'))) f
 for (const f of files('web/components')) if (/\bscam/i.test(readFileSync(f, 'utf8'))) fail(`${f}: the word "scam" must not appear in the UI`);
 
 // 2. Keys stay server-side: nothing secret-looking in web/ or a client bundle.
-const SECRET = /capi_[A-Za-z0-9]|cr_sk_[A-Za-z0-9]|FACTORY_API_KEY|CREAO_API_KEY|CREAO_CAPI_KEY|MEDIA_SIGNING_SECRET|DEMO_(BUSINESS|CONTROLLER)_CODE|STDB_(WORKER_)?TOKEN|ISSUER_KEYS|privateKey|BEGIN PRIVATE KEY/;
+const SECRET = /capi_[A-Za-z0-9]|cr_sk_[A-Za-z0-9]|FACTORY_API_KEY|BRIGHTDATA_API_TOKEN|CREAO_API_KEY|CREAO_CAPI_KEY|MEDIA_SIGNING_SECRET|DEMO_(BUSINESS|CONTROLLER)_CODE|STDB_(WORKER_)?TOKEN|ISSUER_KEYS|privateKey|BEGIN PRIVATE KEY/;
 for (const f of files('web', /\.(tsx?|mjs|js|json|css|md)$/)) {
   if (f.endsWith('package.json')) continue;
   if (SECRET.test(readFileSync(f, 'utf8'))) fail(`${f}: secret-looking name in web/ (keys belong in the worker)`);

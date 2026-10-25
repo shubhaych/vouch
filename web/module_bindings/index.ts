@@ -61,6 +61,7 @@ import PostReducer from "./post_reducer";
 import ProposeReducer from "./propose_reducer";
 import RecordBenchReducer from "./record_bench_reducer";
 import RecordEvidenceReducer from "./record_evidence_reducer";
+import RecordMonitorNoteReducer from "./record_monitor_note_reducer";
 import RecordRunReducer from "./record_run_reducer";
 import RecordVerificationReducer from "./record_verification_reducer";
 import RequestRefundReducer from "./request_refund_reducer";
@@ -81,6 +82,7 @@ import StartAnalysisReducer from "./start_analysis_reducer";
 import StartLabJobReducer from "./start_lab_job_reducer";
 import SwitchBusinessReducer from "./switch_business_reducer";
 import TakeBusinessSeatReducer from "./take_business_seat_reducer";
+import WritePulseReducer from "./write_pulse_reducer";
 import WriteRecommendationReducer from "./write_recommendation_reducer";
 import WriteReportReducer from "./write_report_reducer";
 import WriteScoreReducer from "./write_score_reducer";
@@ -112,6 +114,7 @@ import LabEventRow from "./lab_event_table";
 import LabJobRow from "./lab_job_table";
 import LatencyPingRow from "./latency_ping_table";
 import MetricsRow from "./metrics_table";
+import MonitorNoteRow from "./monitor_note_table";
 import MyAgentRow from "./my_agent_table";
 import PatternEventRow from "./pattern_event_table";
 import PurchaseRow from "./purchase_table";
@@ -119,6 +122,7 @@ import RecommendationRow from "./recommendation_table";
 import RefundRow from "./refund_table";
 import RegionStatRow from "./region_stat_table";
 import ReportRow from "./report_table";
+import ReturnsPulseRow from "./returns_pulse_table";
 import RoleRow from "./role_table";
 import SimRunRow from "./sim_run_table";
 import VerificationRow from "./verification_table";
@@ -420,6 +424,17 @@ const tablesSchema = __schema({
       { name: 'metrics_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, MetricsRow),
+  monitorNote: __table({
+    name: 'monitor_note',
+    indexes: [
+      { accessor: 'id', name: 'monitor_note_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'monitor_note_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, MonitorNoteRow),
   patternEvent: __table({
     name: 'pattern_event',
     indexes: [
@@ -522,6 +537,17 @@ const tablesSchema = __schema({
       { name: 'report_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ReportRow),
+  returnsPulse: __table({
+    name: 'returns_pulse',
+    indexes: [
+      { accessor: 'id', name: 'returns_pulse_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'returns_pulse_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ReturnsPulseRow),
   role: __table({
     name: 'role',
     indexes: [
@@ -593,6 +619,7 @@ const reducersSchema = __reducers(
   __reducerSchema("propose", ProposeReducer),
   __reducerSchema("record_bench", RecordBenchReducer),
   __reducerSchema("record_evidence", RecordEvidenceReducer),
+  __reducerSchema("record_monitor_note", RecordMonitorNoteReducer),
   __reducerSchema("record_run", RecordRunReducer),
   __reducerSchema("record_verification", RecordVerificationReducer),
   __reducerSchema("request_refund", RequestRefundReducer),
@@ -613,6 +640,7 @@ const reducersSchema = __reducers(
   __reducerSchema("start_lab_job", StartLabJobReducer),
   __reducerSchema("switch_business", SwitchBusinessReducer),
   __reducerSchema("take_business_seat", TakeBusinessSeatReducer),
+  __reducerSchema("write_pulse", WritePulseReducer),
   __reducerSchema("write_recommendation", WriteRecommendationReducer),
   __reducerSchema("write_report", WriteReportReducer),
   __reducerSchema("write_score", WriteScoreReducer),

@@ -1,0 +1,16 @@
+{
+  "_fixture": "Hand-written to the Listing Matcher schema in docs/CREAO.md (Agent 6). Chosen when the scraped listings include the ordered item and the claim is inside the window.",
+  "claim_id": "{{claim_id}}",
+  "matched_listing": { "index": "{{index}}", "title": "{{title}}", "seller": "{{seller}}", "price": "{{price}}", "url": "{{url}}" },
+  "same_as_ordered": "{{same_as_ordered}}",
+  "confidence": "{{confidence}}",
+  "differences": "{{differences}}",
+  "eligibility": {
+    "within_window": "{{within_window}}",
+    "policy_rule": "ok",
+    "condition_consistent": "{{condition_consistent}}",
+    "verdict": "{{verdict}}",
+    "reasons": "{{reasons}}"
+  },
+  "summary": "{{summary}}"
+}

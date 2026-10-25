@@ -7,7 +7,7 @@ import type { DbConnection } from '../../module_bindings/index';
 import type { Report } from '@vouch/module/review-types';
 import { TIER_LABEL } from '@vouch/module/review-score';
 import { config, log, type Seat } from '../env';
-import { parseVerdict, seatAvailable, startRun, waitForRun } from '../creao';
+import { fillFromChat, parseVerdict, seatAvailable, startRun, waitForRun } from '../creao';
 import { call } from '../stdb';
 
 export type CreaoReview = NonNullable<Report['creaoReview']>;
@@ -35,7 +35,7 @@ async function runSeat<T extends object>(conn: DbConnection, seat: Seat, caseRef
   const step = (s: string) => { onStep(s); void call('runStep', conn.reducers.runStep({ runId: handle.runId, step: s })); };
   step('report sent');
   const result = await waitForRun(handle, caseJson, step);
-  const parsed = parseVerdict(result.text, fallback, valid);
+  const parsed = parseVerdict(result.text, fallback, valid, (v) => fillFromChat(seat, v, result.chat));
   step(result.status !== 'completed' ? `run ${result.status}` : parsed.ok ? 'result received' : 'result unparseable: failed closed');
   await call('finishRun', conn.reducers.finishRun({ runId: handle.runId, status: result.status === 'completed' ? 'completed' : 'failed', runUrl: handle.runUrl }));
   return { ...parsed, handle };

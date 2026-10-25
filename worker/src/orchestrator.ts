@@ -1,6 +1,6 @@
 // The Desk Lead: worker code, not an agent, so the org chart stays honest.
 // It watches SpacetimeDB and hands work between the three saved CREAO agents:
-//   claim frames_ready → Evidence Analyst → Refund Investigator → propose()
+//   claim frames_ready → Evidence Analyst → [Listing Matcher → Policy Checker → Risk Scorecard] (optional) → Refund Investigator → propose()
 //   fraud_pattern detected → Pattern Analyst → confirmPattern()
 // Agents only return JSON; the worker validates it and writes through reducers.
 // Fail closed: the kill switch is checked before every run, unparseable
@@ -10,7 +10,8 @@ import type { Claim, FraudPattern } from '../module_bindings/types';
 import { catalogItem } from '@vouch/module/world';
 import { config, log, type Seat } from './env';
 import { call } from './stdb';
-import { parseVerdict, startRun, waitForRun, type RunHandle } from './creao';
+import { fillFromChat, parseVerdict, seatAvailable, startRun, waitForRun, type RunHandle } from './creao';
+import { searchListings } from './brightdata';
 import { historySummary, label } from './history';
 import { mirrorOf } from './mirror';
 
@@ -24,6 +25,67 @@ export type CredentialChecker = (agentId: number, refundId: bigint, verifier: nu
 
 interface EvidenceJson {
   unable_to_verify?: boolean; offline?: boolean; no_video?: boolean; challenge?: { passed?: boolean }; capture_flags?: string[]; [k: string]: unknown;
+}
+
+export interface PolicyCheckJson {
+  outcome?: 'eligible' | 'conditional' | 'needs_person' | 'not_eligible' | string;
+  rules?: { rule: string; result: string; detail: string; cites: string }[];
+  refund_shape?: { max_amount?: number; restocking_fee_pct?: number; store_credit_only?: boolean };
+  exception_note?: string; summary?: string; [k: string]: unknown;
+}
+const RULES = new Set(['window', 'reason', 'video_required', 'category_note', 'restocking_fee', 'item_identity', 'condition']);
+
+/** Only the deterministic window and reason checks can make a claim not eligible; everything else is a person's call. */
+export function guardPolicyCheck(v: PolicyCheckJson, ctx: { withinWindow: boolean; reasonAllowed: boolean; amountRequested: number }): PolicyCheckJson {
+  let outcome = ['eligible', 'conditional', 'needs_person', 'not_eligible'].includes(String(v.outcome)) ? String(v.outcome) : 'needs_person';
+  if (outcome === 'not_eligible' && ctx.withinWindow && ctx.reasonAllowed) outcome = 'needs_person';
+  if (outcome === 'eligible' && (!ctx.withinWindow || !ctx.reasonAllowed)) outcome = 'needs_person';
+  const rules = (Array.isArray(v.rules) ? v.rules : []).filter((r) => r && RULES.has(String(r.rule)) && ['pass', 'fail', 'unclear', 'not_applicable'].includes(String(r.result))).slice(0, 12);
+  const shape = v.refund_shape ?? {};
+  const max = typeof shape.max_amount === 'number' ? Math.min(ctx.amountRequested, Math.max(0, shape.max_amount)) : ctx.amountRequested;
+  return { ...v, outcome, rules, refund_shape: { ...shape, max_amount: max } };
+}
+
+export interface ScorecardJson {
+  caution?: 'low' | 'medium' | 'high' | 'unknown' | string;
+  indicators?: { name: string; value: unknown; reading: string; weight: number; why: string; cites: string }[];
+  strongest_support?: string; strongest_caution?: string; innocent_explanation_considered?: string; signals_not_used?: string; summary?: string; [k: string]: unknown;
+}
+const INDICATORS = new Set(['account_age', 'purchases_completed', 'refund_ratio_90d', 'refunds_declined', 'score_band', 'credential', 'confirmed_pattern', 'detected_pattern', 'identity', 'item_spike', 'defective_batch_context', 'frame_reuse', 'challenge', 'still_image', 'capture_flags', 'evidence_unverifiable', 'amount_vs_history']);
+
+/** The scorecard is context: unknown indicators are dropped, and a "high" caution that did not disclaim region and business is lowered to medium. */
+export function guardScorecard(v: ScorecardJson): ScorecardJson {
+  let caution = ['low', 'medium', 'high', 'unknown'].includes(String(v.caution)) ? String(v.caution) : 'unknown';
+  if (caution === 'high' && !/region/i.test(String(v.signals_not_used ?? ''))) caution = 'medium';
+  const indicators = (Array.isArray(v.indicators) ? v.indicators : []).filter((i) => i && INDICATORS.has(String(i.name)) && ['supports', 'neutral', 'caution'].includes(String(i.reading))).slice(0, 16)
+    .map((i) => ({ ...i, weight: Math.min(1, Math.max(0, Number(i.weight) || 0)), why: String(i.why ?? '').slice(0, 300) }));
+  return { ...v, caution, indicators };
+}
+
+export interface ListingMatchJson {
+  matched_listing?: { index?: number; title?: string; seller?: string; price?: number | null; url?: string } | null;
+  same_as_ordered?: 'true' | 'false' | 'uncertain' | string;
+  confidence?: number;
+  differences?: string[];
+  eligibility?: { within_window?: boolean; policy_rule?: string; condition_consistent?: string; verdict?: 'eligible' | 'needs_person' | 'ineligible' | string; reasons?: { text: string; cites: string }[] };
+  summary?: string;
+  [k: string]: unknown;
+}
+
+/**
+ * The Listing Matcher can send a claim to a person, but it can only call it
+ * ineligible for a hard reason: outside the window, or clearly a different
+ * item. Unverifiable frames or no listings never make a claim eligible either.
+ */
+export function guardListingMatch(v: ListingMatchJson, ctx: { withinWindow: boolean; unableToVerify: boolean; listings: number }): ListingMatchJson {
+  const e = { ...(v.eligibility ?? {}) };
+  const same = ['true', 'false', 'uncertain'].includes(String(v.same_as_ordered)) ? String(v.same_as_ordered) : 'uncertain';
+  const conf = typeof v.confidence === 'number' ? Math.min(1, Math.max(0, v.confidence)) : 0;
+  let verdict = ['eligible', 'needs_person', 'ineligible'].includes(String(e.verdict)) ? String(e.verdict) : 'needs_person';
+  const hardReason = ctx.withinWindow === false || (same === 'false' && conf >= 0.8);
+  if (verdict === 'ineligible' && !hardReason) verdict = 'needs_person';
+  if (verdict === 'eligible' && (ctx.unableToVerify || ctx.listings === 0 || same !== 'true')) verdict = 'needs_person';
+  return { ...v, same_as_ordered: same, confidence: conf, eligibility: { ...e, within_window: ctx.withinWindow, verdict, reasons: Array.isArray(e.reasons) ? e.reasons.slice(0, 8) : [] } };
 }
 
 /**
@@ -46,6 +108,8 @@ export class Orchestrator {
   readonly liveShowcaseClaims = new Set<bigint>();
   /** When the video reviewer is on, it owns every claim with a video; the Desk Lead keeps the simulated and video-less ones. */
   handledByReviewer: ((c: Claim) => boolean) | null = null;
+  /** The latest returns-pulse line for an item, from the PulseRunner, for the Risk Scorecard's item context. */
+  pulseFor: ((sku: number) => { count: number; perSecond: number; baselinePerSecond: number; spike: boolean } | null) | null = null;
 
   constructor(private conn: DbConnection, private checkCredential: CredentialChecker) {}
 
@@ -95,12 +159,41 @@ export class Orchestrator {
     const handle = await startRun(seat, caseJson, caseRef);
     await call('recordRun', this.conn.reducers.recordRun({ runId: handle.runId, seat, caseRef, runUrl: handle.runUrl, conversationId: handle.conversationId, mode: handle.path === 'fixture' ? 'fixture' : 'live' }));
     const step = (s: string) => void call('runStep', this.conn.reducers.runStep({ runId: handle.runId, step: s }));
-    step(seat === 'evidence_analyst' ? 'frames sent' : seat === 'pattern_analyst' ? 'events and histories sent' : 'evidence and history sent');
+    const first: Partial<Record<Seat, string>> = { evidence_analyst: 'frames sent', pattern_analyst: 'events and histories sent', listing_matcher: 'frames and scraped listings sent', policy_checker: 'policy and checks sent', risk_scorecard: 'history, patterns and item context sent' };
+    step(first[seat] ?? 'evidence and history sent');
     const result = await waitForRun(handle, caseJson, step);
-    const parsed = parseVerdict(result.text, fallback, valid);
+    const parsed = parseVerdict(result.text, fallback, valid, (v) => fillFromChat(seat, v, result.chat));
     step(result.status !== 'completed' ? `run ${result.status}` : parsed.ok ? 'result received' : 'result unparseable: failed closed');
     await call('finishRun', this.conn.reducers.finishRun({ runId: handle.runId, status: result.status === 'completed' ? 'completed' : 'failed', runUrl: handle.runUrl }));
     return { ...parsed, handle };
+  }
+
+  /**
+   * Runs an optional seat for a claim, reusing a recorded result after a restart, skipping when the saved agent is
+   * missing or the budget is spent, and recording the guarded JSON as evidence under the seat's name.
+   */
+  private async optionalSeat<T extends object>(c: Claim, seat: Seat, caseRef: string, buildCase: () => unknown, fallback: T, valid: (v: Record<string, unknown>) => boolean, guard: (v: T) => T): Promise<T | { skipped: true; reason: string }> {
+    const existing = [...this.conn.db.evidence.iter()].find((e) => e.claimId === c.id && e.seat === seat);
+    if (existing) return JSON.parse(existing.json) as T;
+    if (!seatAvailable(seat)) return { skipped: true, reason: `no saved CREAO agent "${seat.replace('_', ' ')}"` };
+    if (!this.takeBudget()) return { skipped: true, reason: `daily CREAO run limit (${config.creao.dailyRunLimit}) reached` };
+    const r = await this.runSeat<T>(seat, caseRef, buildCase(), fallback, valid);
+    const value = guard(r.value);
+    await call('recordEvidence', this.conn.reducers.recordEvidence({ claimId: c.id, seat, runId: r.handle.runId, runUrl: r.handle.runUrl, json: JSON.stringify(value), provenance: r.handle.path === 'fixture' ? 'fixture' : 'live' }));
+    log(`${caseRef}: ${seat.replace('_', ' ')} done (${r.handle.path})`);
+    return value;
+  }
+
+  /** Claims against units sold for one SKU at one business in the last 30 days: the "defective batch" context. */
+  private skuContext(business: number, sku: number, day: number) {
+    const m = mirrorOf(this.conn);
+    let units = 0; let claims = 0;
+    for (const pur of m.purchases.values()) {
+      if (pur.business !== business || pur.item !== sku || pur.day < day - 30) continue;
+      units++;
+      if (pur.status === 'refund_requested' || pur.status === 'refunded') claims++;
+    }
+    return { claims_last_30d: claims, units_sold_last_30d: units };
   }
 
   private async runClaim(c: Claim) {
@@ -150,13 +243,90 @@ export class Orchestrator {
 
     // The kill switch can be flipped while a run is in flight: check again before the next hand-off.
     if (!this.agentsOn()) return this.offline(c, 'creao_enabled was turned off mid-investigation');
-    if (!this.takeBudget()) return this.offline(c, `daily CREAO run limit (${config.creao.dailyRunLimit}) reached`);
 
-    // 2. Refund Investigator
+    // 1b. Listing Matcher (optional seat): the worker scrapes listings that look like the ordered item (Bright Data,
+    // cached), the agent says whether the frames show that item and whether the return is eligible under the policy.
+    let listingMatch: ListingMatchJson | { skipped: true; reason: string };
+    const existingMatch = [...db.evidence.iter()].find((e) => e.claimId === c.id && e.seat === 'listing_matcher');
+    if (existingMatch) {
+      listingMatch = JSON.parse(existingMatch.json) as ListingMatchJson;
+    } else if (!seatAvailable('listing_matcher')) {
+      listingMatch = { skipped: true, reason: 'no saved CREAO agent "Vouch Listing Matcher"' };
+    } else if (evidence.no_video) {
+      listingMatch = { skipped: true, reason: 'no video to compare with a listing' };
+    } else if (!this.takeBudget()) {
+      listingMatch = { skipped: true, reason: `daily CREAO run limit (${config.creao.dailyRunLimit}) reached` };
+    } else {
+      const scraped = await searchListings(item?.name ?? 'item');
+      const matchCase = {
+        claim_id: caseRef,
+        order: { item: item?.name ?? 'item', sku: `SKU-${purchase.item}`, category: purchase.category, amount: purchase.amount / 100, description: item?.description ?? '', parts: item?.parts ?? [] },
+        claim: { reason_code: refund.reasonCode, reason_text: refund.reasonText },
+        evidence: {
+          unable_to_verify: evidence.unable_to_verify ?? false, item_matches_reference: evidence.item_matches_reference ?? null, defect_consistent_with_claim: evidence.defect_consistent_with_claim ?? null,
+          frames: ((evidence.frames as { index: number; t?: number; observation?: string }[] | undefined) ?? []).map((f) => ({ index: f.index, t: f.t, observation: f.observation ?? '' })),
+          frame_urls: c.frameUrls,
+        },
+        scraped_listings: { source: scraped.source === 'brightdata' ? 'bright_data_serp' : 'fixture', query: scraped.query, fetched_at: scraped.fetchedAt, cached: scraped.cached, error: scraped.error, items: scraped.items },
+        policy: { window_days: policy.windowDays, notes: policy.notes, store_credit_allowed: policy.storeCreditAllowed },
+        deterministic_checks: { within_window: withinWindow, days_since_delivery: Math.max(0, refund.day - purchase.deliverDay) },
+      };
+      const matchFallback: ListingMatchJson = { same_as_ordered: 'uncertain', confidence: 0, eligibility: { verdict: 'needs_person', reasons: [{ text: 'The Listing Matcher output could not be read, so the item question goes to a person.', cites: 'check:unparseable' }] }, summary: 'Unreadable Listing Matcher output.' };
+      const lm = await this.runSeat<ListingMatchJson>('listing_matcher', caseRef, matchCase, matchFallback, (v) => typeof v.same_as_ordered === 'string' && typeof v.eligibility === 'object' && v.eligibility !== null);
+      const guarded = guardListingMatch(lm.value, { withinWindow, unableToVerify: evidence.unable_to_verify === true, listings: scraped.items.length });
+      // Fill the matched listing's details from what was scraped when the agent only gave its index.
+      const idx = guarded.matched_listing?.index;
+      const hit = typeof idx === 'number' ? scraped.items[idx] : undefined;
+      if (hit && !guarded.matched_listing?.title) guarded.matched_listing = { index: idx, title: hit.title, seller: hit.seller, price: hit.price, url: hit.url };
+      listingMatch = { ...guarded, scraped_listings: matchCase.scraped_listings };
+      await call('recordEvidence', this.conn.reducers.recordEvidence({ claimId: c.id, seat: 'listing_matcher', runId: lm.handle.runId, runUrl: lm.handle.runUrl, json: JSON.stringify(listingMatch), provenance: lm.handle.path === 'fixture' ? 'fixture' : 'live' }));
+      log(`${caseRef}: Listing Matcher says ${String((listingMatch as ListingMatchJson).same_as_ordered)} / ${String((listingMatch as ListingMatchJson).eligibility?.verdict)} over ${scraped.items.length} ${scraped.source} listing(s)`);
+      if (!this.agentsOn()) return this.offline(c, 'creao_enabled was turned off mid-investigation');
+    }
     const credential = await this.checkCredential(refund.agentId, refund.id, refund.businessId).catch(() => null);
     const patterns = [...db.fraudPattern.iter()].filter((p) => p.agentIds.includes(refund.agentId)).map((p) => ({
       id: label.pattern(p.id), status: p.status, role: ((JSON.parse(p.rolesJson || '[]') as { id: string; role: string }[]).find((x) => x.id === label.agent(refund.agentId))?.role) ?? 'unknown',
     }));
+    const history = await historySummary(this.conn, refund.agentId);
+    const reasonAllowed = checks.reason_allowed !== false;
+
+    // 1c. Policy Checker (optional seat): the policy, rule by rule, over the deterministic checks and the listing match.
+    const policyCheck = await this.optionalSeat<PolicyCheckJson>(c, 'policy_checker', caseRef, () => ({
+      claim_id: caseRef,
+      order: { item: item?.name ?? 'item', sku: `SKU-${purchase.item}`, category: purchase.category, amount: purchase.amount / 100, purchased_day: purchase.day, delivered_day: purchase.deliverDay, claim_day: refund.day },
+      claim: { reason_code: refund.reasonCode, reason_text: refund.reasonText, amount_requested: refund.amount / 100 },
+      policy: { window_days: policy.windowDays, restocking_fee_pct: policy.restockingFeePct, store_credit_allowed: policy.storeCreditAllowed, needs_video_over: policy.needsVideoOverCents / 100, notes: policy.notes },
+      checks: {
+        within_window: withinWindow, days_since_delivery: Math.max(0, refund.day - purchase.deliverDay), window_ends_day: purchase.windowEndDay || purchase.deliverDay + policy.windowDays,
+        reason_allowed: reasonAllowed, over_video_threshold: refund.amount > policy.needsVideoOverCents, has_video: c.frameUrls.length > 0,
+        fresh: checks.fresh ?? null, duration_ok: checks.duration_ok ?? null, resolution_ok: checks.resolution_ok ?? null,
+      },
+      listing_match: listingMatch,
+    }), { outcome: 'needs_person', rules: [], summary: 'The Policy Checker output could not be read, so a person reads the policy.' },
+    (v) => typeof v.outcome === 'string' && Array.isArray(v.rules), (v) => guardPolicyCheck(v, { withinWindow, reasonAllowed, amountRequested: refund.amount / 100 }));
+    if (!this.agentsOn()) return this.offline(c, 'creao_enabled was turned off mid-investigation');
+
+    // 1d. Risk Scorecard (optional seat): every behavioural, identity and item indicator read as supports, neutral or caution.
+    const skuContext = this.skuContext(purchase.business, purchase.item, day);
+    const scorecard = await this.optionalSeat<ScorecardJson>(c, 'risk_scorecard', caseRef, () => ({
+      claim_id: caseRef,
+      amount_requested: refund.amount / 100,
+      history,
+      credential: credential ?? { presented: false, verified: false, failed_step: null, issuer: null, claims: {} },
+      patterns,
+      identity: { status: 'not_run', reason: config.crs.configured ? 'no CRS persona is linked to this shopper' : 'CRS is not configured (docs/CRS.md)' },
+      item_context: { sku: `SKU-${purchase.item}`, name: item?.name ?? 'item', pulse: this.pulseFor?.(purchase.item) ?? null, business_context: skuContext },
+      video_checks: {
+        fresh: checks.fresh ?? null, frame_reuse_count: ((checks.frame_reuse as unknown[] | undefined) ?? []).length, still_image: checks.still_image ?? false,
+        challenge_passed: evidence.challenge?.passed ?? null, capture_flags: evidence.capture_flags ?? [], unable_to_verify: evidence.unable_to_verify ?? false,
+      },
+      evidence_summary: String(evidence.summary ?? ''),
+    }), { caution: 'unknown', indicators: [], summary: 'The Risk Scorecard output could not be read; the Investigator weighs the history itself.' },
+    (v) => typeof v.caution === 'string' && Array.isArray(v.indicators), guardScorecard);
+    if (!this.agentsOn()) return this.offline(c, 'creao_enabled was turned off mid-investigation');
+    if (!this.takeBudget()) return this.offline(c, `daily CREAO run limit (${config.creao.dailyRunLimit}) reached`);
+
+    // 2. Refund Investigator
     const invCase = {
       claim_id: caseRef,
       amount_requested: refund.amount / 100,
@@ -166,7 +336,10 @@ export class Orchestrator {
       policy: { window_days: policy.windowDays, restocking_fee_pct: policy.restockingFeePct, store_credit_allowed: policy.storeCreditAllowed, notes: policy.notes },
       evidence,
       deterministic_checks: { fresh: checks.fresh ?? true, duration_s: checks.duration_s ?? null, frame_reuse: checks.frame_reuse ?? [], still_image: checks.still_image ?? false, within_window: withinWindow },
-      history: await historySummary(this.conn, refund.agentId),
+      listing_match: listingMatch,
+      policy_check: policyCheck,
+      risk_scorecard: scorecard,
+      history,
       credential: credential ?? { presented: false, verified: false, failed_step: null, issuer: null, claims: {} },
       patterns,
       today: day,

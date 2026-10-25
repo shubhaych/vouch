@@ -337,6 +337,17 @@ export const Metrics = __t.object("Metrics", {
 });
 export type Metrics = __Infer<typeof Metrics>;
 
+export const MonitorNote = __t.object("MonitorNote", {
+  id: __t.u64(),
+  runId: __t.string(),
+  runUrl: __t.string(),
+  trigger: __t.string(),
+  json: __t.string(),
+  provenance: __t.string(),
+  at: __t.timestamp(),
+});
+export type MonitorNote = __Infer<typeof MonitorNote>;
+
 export const MyAgent = __t.object("MyAgent", {});
 export type MyAgent = __Infer<typeof MyAgent>;
 
@@ -461,6 +472,20 @@ export const Report = __t.object("Report", {
   at: __t.timestamp(),
 });
 export type Report = __Infer<typeof Report>;
+
+export const ReturnsPulse = __t.object("ReturnsPulse", {
+  id: __t.u8(),
+  windowSeconds: __t.u16(),
+  returns: __t.u32(),
+  perSecond: __t.f64(),
+  baselinePerSecond: __t.f64(),
+  itemsJson: __t.string(),
+  businessesJson: __t.string(),
+  cohortsJson: __t.string(),
+  spikes: __t.u16(),
+  computedAt: __t.timestamp(),
+});
+export type ReturnsPulse = __Infer<typeof ReturnsPulse>;
 
 export const Role = __t.object("Role", {
   who: __t.identity(),

@@ -1,12 +1,14 @@
 // CREAO API Trigger adapter. Supports both documented paths and picks one
-// from the key's prefix (shapes from CREAO's API Trigger and API Paths docs,
-// read Oct 24; NOT yet run against a live agent: check with
-// scripts/hello-creao.ts):
+// per seat (shapes from CREAO's API Trigger and API Paths docs, read Oct 24;
+// check with scripts/hello-creao.ts):
 //
+//   app key     capi_   https://agent.creao.ai/api/v1/apps/{appId}   POST /runs {inputs:{case}, webhookUrl}; poll GET /api/v1/runs/{id}
 //   account key cr_sk_  https://developer.creao.ai/v1       POST /runs {agent_id, input:{case}, webhook_url}
-//   app key     capi_   https://agent.creao.ai/api/v1/apps/{appId}   POST /runs {inputs:{case}, webhookUrl}
 //
-// Do not mix them: /v1/runs expects agent_id + input, the app path expects inputs.
+// A seat with CREAO_<SEAT>_APP_ID and a capi_ key (CREAO_<SEAT>_KEY) always runs
+// on its own app, so no account key is needed. Seats without one fall back to
+// the account key if there is one. Do not mix the bodies: /v1/runs expects
+// agent_id + input, the app path expects inputs.
 // Runs take minutes. Polling every 15 s is the primary path (it works from a
 // cloud session); webhooks are a best-effort optimisation on the laptop.
 import { OPTIONAL_SEATS, config, log, type Seat } from './env';
@@ -18,42 +20,66 @@ export const AGENT_NAMES: Record<Seat, string> = {
   pattern_analyst: 'Vouch Pattern Analyst',
   refund_reviewer: 'Vouch Refund Reviewer',
   customer_liaison: 'Vouch Customer Liaison',
+  listing_matcher: 'Vouch Listing Matcher',
+  returns_monitor: 'Vouch Returns Monitor',
+  policy_checker: 'Vouch Policy Checker',
+  risk_scorecard: 'Vouch Risk Scorecard',
 };
 
-/** True when a live run of this seat can start: fixture mode, or the saved agent was found (optional seats may be missing). */
+/** True when a live run of this seat can start: fixture mode, its own app, or the saved agent was found (optional seats may be missing). */
 export function seatAvailable(seat: Seat): boolean {
-  if (config.creao.mode === 'fixture') return true;
-  if (resolvedIds[seat]) return true;
-  return apiPath() === 'app' ? !!config.creao.appIds[seat] : !OPTIONAL_SEATS.includes(seat);
+  const path = seatPath(seat);
+  if (path === 'fixture' || path === 'app') return true;
+  if (path === 'none') return false;
+  return !!resolvedIds[seat] || !OPTIONAL_SEATS.includes(seat);
 }
 
 export type ApiPath = 'account' | 'app' | 'fixture';
 export interface RunHandle { runId: string; seat: Seat; path: ApiPath; conversationId: string; runUrl: string }
-export interface RunResult { status: 'completed' | 'failed' | 'cancelled' | 'running'; text: string | null; raw: unknown }
+/** text is the structured result CREAO returns; chat is the agent's own prose answer (result.chatText), used to fill fields the saved output leaves out. */
+export interface RunResult { status: 'completed' | 'failed' | 'cancelled' | 'running'; text: string | null; raw: unknown; chat?: string | null }
 
 const ACCOUNT_BASE = process.env.CREAO_ACCOUNT_BASE || 'https://developer.creao.ai/v1';
 const APP_BASE = process.env.CREAO_APP_BASE || 'https://agent.creao.ai/api/v1/apps';
+// The hackathon API docs poll every run at GET /api/v1/runs/{id}, whichever route started it.
+const RUNS_BASE = process.env.CREAO_RUNS_BASE || 'https://agent.creao.ai/api/v1/runs';
 
+const hasAccountKey = () => config.creao.apiKey.startsWith('cr_sk_');
+// A cr_sk_ account key is never sent to an app; a shared capi_ key in CREAO_API_KEY is.
+const appKey = (seat: Seat) => config.creao.appKeys[seat] || (config.creao.apiKey.startsWith('capi_') ? config.creao.apiKey : '');
+
+/** How this seat runs: its own app when it has an app id and key, else the account key, else 'none' (not configured). */
+export function seatPath(seat: Seat): ApiPath | 'none' {
+  if (config.creao.mode === 'fixture') return 'fixture';
+  if (config.creao.appIds[seat] && appKey(seat)) return 'app';
+  return hasAccountKey() ? 'account' : 'none';
+}
+
+/** The overall path, for logs: app when any seat has its own app, else account. */
 export function apiPath(): ApiPath {
   if (config.creao.mode === 'fixture') return 'fixture';
-  const k = config.creao.apiKey;
-  if (k.startsWith('cr_sk_')) return 'account';
-  if (k.startsWith('capi_') || Object.values(config.creao.appKeys).some(Boolean)) return 'app';
-  throw new Error('CREAO_MODE=live needs CREAO_API_KEY (cr_sk_ account key) or per-seat capi_ keys and app ids');
+  if ((Object.keys(AGENT_NAMES) as Seat[]).some((s) => seatPath(s) === 'app')) return 'app';
+  if (hasAccountKey()) return 'account';
+  throw new Error('CREAO_MODE=live needs CREAO_<SEAT>_APP_ID + CREAO_<SEAT>_KEY (capi_) per agent, or a cr_sk_ account key in CREAO_API_KEY');
 }
 
 const resolvedIds: Partial<Record<Seat, string>> = {};
 
-/** Account path: find each saved agent by its exact name unless CREAO_<SEAT>_AGENT_ID is set. Fails loudly if one is missing. */
+/** App seats use their app id. Account seats are found by exact name unless CREAO_<SEAT>_AGENT_ID is set. Fails loudly if a core seat has neither. */
 export async function resolveAgents(): Promise<Record<Seat, string>> {
   const out = {} as Record<Seat, string>;
   const missing: Seat[] = [];
   for (const seat of Object.keys(AGENT_NAMES) as Seat[]) {
-    const id = config.creao.agentIds[seat];
-    if (id) out[seat] = id;
+    const path = seatPath(seat);
+    if (path === 'app') out[seat] = config.creao.appIds[seat];
+    else if (path === 'none') {
+      if (OPTIONAL_SEATS.includes(seat)) continue;
+      const S = seat.toUpperCase();
+      throw new Error(`${seat} has no CREAO app: set CREAO_${S}_APP_ID and CREAO_${S}_KEY (capi_)`);
+    } else if (config.creao.agentIds[seat]) out[seat] = config.creao.agentIds[seat];
     else missing.push(seat);
   }
-  if (missing.length && apiPath() === 'account') {
+  if (missing.length && hasAccountKey()) {
     const res = await fetch(`${ACCOUNT_BASE}/agents`, { headers: { Authorization: `Bearer ${config.creao.apiKey}` } });
     if (!res.ok) throw new Error(`GET /v1/agents: ${res.status}`);
     const body = (await res.json()) as unknown;
@@ -67,26 +93,16 @@ export async function resolveAgents(): Promise<Record<Seat, string>> {
       out[seat] = (hit.agent_id ?? hit.id)!;
     }
   }
-  if (apiPath() === 'app') {
-    for (const seat of Object.keys(AGENT_NAMES) as Seat[]) {
-      if (!config.creao.appIds[seat]) {
-        if (OPTIONAL_SEATS.includes(seat)) continue;
-        throw new Error(`app path: set CREAO_${seat.toUpperCase()}_APP_ID (the UUID on the saved agent's page)`);
-      }
-      out[seat] = config.creao.appIds[seat];
-    }
-  }
   Object.assign(resolvedIds, out);
-  log('CREAO agents:', Object.entries(out).map(([s, id]) => `${s}=${id}`).join(' '));
+  log('CREAO agents:', Object.entries(out).map(([s, id]) => `${s}=${seatPath(s as Seat)}:${id}`).join(' '));
   return out;
 }
 
-const appKey = (seat: Seat) => config.creao.appKeys[seat] || config.creao.apiKey;
-
 /** Starts a run. The case is sent as JSON text in one input named "case". */
 export async function startRun(seat: Seat, caseJson: unknown, caseRef: string): Promise<RunHandle> {
-  const path = apiPath();
+  const path = seatPath(seat);
   const text = JSON.stringify(caseJson);
+  if (path === 'none') throw new Error(`CREAO seat ${seat} has no app id and key`);
   if (path === 'fixture') {
     return { runId: `fixture-${seat}-${caseRef}-${Date.now().toString(36)}`, seat, path, conversationId: '', runUrl: '' };
   }
@@ -109,21 +125,27 @@ export async function startRun(seat: Seat, caseJson: unknown, caseRef: string): 
     body: JSON.stringify({ inputs: { case: text }, ...(config.creao.webhookUrl ? { webhookUrl: config.creao.webhookUrl } : {}) }),
   });
   if (!res.ok) throw new Error(`CREAO start ${seat}: ${res.status} ${(await res.text()).slice(0, 200)}`);
-  const j = (await res.json()) as { id: string; threadId?: string };
-  return { runId: j.id, seat, path, conversationId: j.threadId ?? '', runUrl: '' };
+  const j = (await res.json()) as { id?: string; run_id?: string; runId?: string; threadId?: string };
+  const runId = j.id ?? j.runId ?? j.run_id;
+  if (!runId) throw new Error(`CREAO start ${seat}: no run id in ${JSON.stringify(j).slice(0, 200)}`);
+  return { runId, seat, path, conversationId: j.threadId ?? '', runUrl: '' };
 }
 
 /** One poll. Output lives in result.text on the account path; the app path's poll shape is checked defensively. */
 export async function pollRun(h: RunHandle, caseJson: unknown): Promise<RunResult> {
   if (h.path === 'fixture') return { status: 'completed', text: JSON.stringify(fixtureResponse(h.seat, caseJson)), raw: { fixture: true } };
-  const url = h.path === 'account' ? `${ACCOUNT_BASE}/runs/${h.runId}` : `${APP_BASE}/${config.creao.appIds[h.seat]}/runs/${h.runId}`;
+  const url = h.path === 'account' ? `${ACCOUNT_BASE}/runs/${h.runId}` : `${RUNS_BASE}/${h.runId}`;
   const key = h.path === 'account' ? config.creao.apiKey : appKey(h.seat);
   const res = await fetch(url, { headers: { Authorization: `Bearer ${key}` } });
   if (!res.ok) throw new Error(`CREAO poll ${h.seat}: ${res.status}`);
   const raw = (await res.json()) as { status?: string; result?: { text?: string; chatText?: string } | string; output?: string };
-  const status = (raw.status ?? 'running') as RunResult['status'];
+  // The app path's status words are unconfirmed; map the common synonyms so a finished run never polls to the time limit.
+  const s = String(raw.status ?? 'running').toLowerCase();
+  const status: RunResult['status'] = ['completed', 'succeeded', 'success', 'done', 'finished'].includes(s) ? 'completed'
+    : ['failed', 'error', 'errored'].includes(s) ? 'failed' : ['cancelled', 'canceled'].includes(s) ? 'cancelled' : 'running';
   const text = typeof raw.result === 'string' ? raw.result : raw.result?.text ?? raw.result?.chatText ?? raw.output ?? null;
-  return { status: ['completed', 'failed', 'cancelled'].includes(status) ? status : 'running', text, raw };
+  const chat = typeof raw.result === 'object' && raw.result ? raw.result.chatText ?? null : null;
+  return { status, text, raw, chat };
 }
 
 /** Polls until a terminal status or the time limit. Never holds an HTTP request open: this runs in the worker's own loop. */
@@ -162,7 +184,7 @@ export function handleWebhook(deliveryId: string | undefined, body: { runId?: st
 }
 
 /** Every agent returns ONE JSON object. Parse defensively and fail closed to the caller's fallback. */
-export function parseVerdict<T extends object>(text: string | null, fallback: T, valid: (v: Record<string, unknown>) => boolean): { value: T; ok: boolean } {
+export function parseVerdict<T extends object>(text: string | null, fallback: T, valid: (v: Record<string, unknown>) => boolean, patch?: (v: Record<string, unknown>) => void): { value: T; ok: boolean } {
   if (!text) return { value: fallback, ok: false };
   const stripped = text.replace(/```(?:json)?/g, '');
   const start = stripped.indexOf('{');
@@ -170,8 +192,72 @@ export function parseVerdict<T extends object>(text: string | null, fallback: T,
   if (start < 0 || end <= start) return { value: fallback, ok: false };
   try {
     const v = JSON.parse(stripped.slice(start, end + 1)) as Record<string, unknown>;
+    patch?.(v);
     return valid(v) ? { value: v as T, ok: true } : { value: fallback, ok: false };
   } catch {
     return { value: fallback, ok: false };
+  }
+}
+
+/** The agent's prose answer as a short plain paragraph: code blocks, markdown and a leading "I'll start by…" line removed. */
+export function summaryOf(chat: string | null | undefined, max = 700): string {
+  if (!chat) return '';
+  const t = chat.replace(/```[\s\S]*?```/g, ' ').replace(/[*_#>`]/g, '').replace(/^\s*I'll [^.]*\.\s*/i, '').replace(/\s+/g, ' ').trim();
+  return t.length > max ? `${t.slice(0, max - 1)}…` : t;
+}
+
+const ACTIONS = ['accept', 'decline', 'more_evidence'];
+const VERDICTS = ['confirm', 'dismiss', 'needs_review'];
+
+/**
+ * Saved CREAO agents can return a trimmed set of fields in result.text (the decision without its reasons),
+ * with the reasoning only in their prose answer. When the decision field itself is there, fill what is missing
+ * from that prose and say so, instead of failing the whole answer. Garbage (no decision field) still fails closed.
+ */
+export function fillFromChat(seat: Seat, v: Record<string, unknown>, chat: string | null | undefined): void {
+  if (typeof v.case === 'string' || (v.case && typeof v.case === 'object')) delete v.case; // some agents echo their input back
+  const sum = summaryOf(chat);
+  const fromSummary = sum ? [{ text: sum, cites: 'agent:summary' }] : [];
+  if (seat === 'refund_investigator' && ACTIONS.includes(String(v.action))) {
+    if (!Array.isArray(v.reasons)) {
+      v.reasons = fromSummary.length ? fromSummary : [{ text: 'The agent gave no reasons with its recommendation.', cites: 'agent:no_reasons' }];
+      v.reasons_from_summary = true;
+      // Uncited reasoning is harder to check, so the recommendation reads as less certain.
+      v.confidence = Math.min(Number(v.confidence) || 0, 0.8);
+    }
+    if (typeof v.needs_controller === 'string') v.needs_controller = v.needs_controller === 'true';
+    v.what_would_change_my_mind ??= '';
+  }
+  if (seat === 'evidence_analyst') {
+    // Saved agents may send booleans as "true"/"false" and flatten {value} objects into plain strings.
+    if (v.unable_to_verify === 'true' || v.unable_to_verify === 'false') v.unable_to_verify = v.unable_to_verify === 'true';
+    for (const k of ['item_matches_reference', 'claimed_defect_visible', 'defect_consistent_with_claim']) if (typeof v[k] === 'string') v[k] = { value: v[k] };
+    if (!v.challenge && ('challenge_seen' in v || 'challenge_passed' in v)) {
+      const seen = Number(v.challenge_seen);
+      v.challenge = { seen: v.challenge_seen === '' || v.challenge_seen == null || Number.isNaN(seen) ? null : seen, passed: v.challenge_passed === 'true' ? true : v.challenge_passed === 'false' ? false : null };
+    }
+    if (typeof v.unable_to_verify === 'boolean' && typeof v.summary !== 'string') v.summary = sum || 'No summary was returned.';
+  }
+  if (seat === 'pattern_analyst' && VERDICTS.includes(String(v.verdict)) && typeof v.narrative !== 'string') v.narrative = sum || 'No narrative was returned.';
+  if (seat === 'refund_reviewer' && typeof v.agrees === 'boolean' && typeof v.businessSummary !== 'string') v.businessSummary = sum || 'No summary was returned.';
+  if (seat === 'listing_matcher' && typeof v.same_as_ordered === 'string') {
+    // Saved agents may put the verdict at the top level and send the matched listing as a bare index.
+    if (!v.eligibility || typeof v.eligibility !== 'object') v.eligibility = { verdict: ['eligible', 'needs_person', 'ineligible'].includes(String(v.verdict)) ? v.verdict : 'needs_person' };
+    if (typeof v.matched_listing === 'number') v.matched_listing = { index: v.matched_listing };
+    const e = v.eligibility as Record<string, unknown>;
+    if (!Array.isArray(e.reasons)) e.reasons = fromSummary;
+    if (typeof v.summary !== 'string') v.summary = sum;
+  }
+  if (seat === 'policy_checker' && typeof v.outcome === 'string') {
+    if (!Array.isArray(v.rules)) v.rules = [];
+    if (typeof v.summary !== 'string') v.summary = sum;
+  }
+  if (seat === 'risk_scorecard' && typeof v.caution === 'string') {
+    if (!Array.isArray(v.indicators)) v.indicators = [];
+    if (typeof v.summary !== 'string') v.summary = sum;
+  }
+  if (seat === 'returns_monitor' && (typeof v.narrative === 'string' || Array.isArray(v.anomalies))) {
+    if (typeof v.narrative !== 'string') v.narrative = sum || 'No narrative was returned.';
+    if (!Array.isArray(v.anomalies)) v.anomalies = [];
   }
 }

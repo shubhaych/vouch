@@ -18,5 +18,6 @@ export { enqueueLab, enqueueLabTrigger, startLabJob, appendLabEvent, finishLabJo
 export {
   startAnalysis, setStep, addArtifact, addFinding, auditFinding, writeReport, writeScore, writeRecommendation, finishAnalysis, autoDecide,
 } from './review';
+export { writePulse, recordMonitorNote } from './pulse';
 export { my_agent } from './views';
 export { exportTruth } from './truth';

@@ -17,7 +17,7 @@ beforeAll(async () => {
       if (req.url === '/v1/runs' && req.method === 'POST') return res.end(JSON.stringify({ run_id: 'run_1', status: 'pending', agent_id: 'ag_ev', conversation_id: 'conv_1' }));
       if (req.url === '/v1/runs/run_1') return res.end(JSON.stringify({ status: 'completed', result: { text: 'Here you go:\n```json\n{"unable_to_verify": false, "summary": "ok"}\n```' } }));
       if (req.url?.startsWith('/apps/app_ri/runs') && req.method === 'POST') return res.end(JSON.stringify({ id: 'r_app', status: 'pending', appId: 'app_ri' }));
-      if (req.url === '/apps/app_ri/runs/r_app') return res.end(JSON.stringify({ status: 'completed', result: { text: 'not json at all' } }));
+      if (req.url === '/runs/r_app') return res.end(JSON.stringify({ status: 'completed', result: { text: 'not json at all' } }));
       res.statusCode = 404;
       res.end('{}');
     });
@@ -28,10 +28,12 @@ afterAll(() => server.close());
 
 async function adapter(env: Record<string, string>) {
   const port = (server.address() as { port: number }).port;
-  Object.assign(process.env, { CREAO_ACCOUNT_BASE: `http://localhost:${port}/v1`, CREAO_APP_BASE: `http://localhost:${port}/apps`, ...env });
+  Object.assign(process.env, { CREAO_ACCOUNT_BASE: `http://localhost:${port}/v1`, CREAO_APP_BASE: `http://localhost:${port}/apps`, CREAO_RUNS_BASE: `http://localhost:${port}/runs`, ...env });
   const { config } = await import('../src/env');
   config.creao.mode = 'live';
   config.creao.apiKey = env.CREAO_API_KEY ?? '';
+  // Start from no ids or app keys, so the developer's real .env cannot leak into these tests.
+  for (const m of [config.creao.agentIds, config.creao.appIds, config.creao.appKeys]) for (const k of Object.keys(m)) (m as Record<string, string>)[k] = '';
   return import('../src/creao');
 }
 
@@ -52,9 +54,9 @@ describe('CREAO adapter', () => {
   });
 
   it('app path: inputs.case on /apps/{appId}/runs; unparseable output fails closed to the fallback', async () => {
+    const c = await adapter({ CREAO_API_KEY: 'capi_test' });
     const { config } = await import('../src/env');
     config.creao.appIds.refund_investigator = 'app_ri';
-    const c = await adapter({ CREAO_API_KEY: 'capi_test' });
     expect(c.apiPath()).toBe('app');
     const h = await c.startRun('refund_investigator', { claim_id: 'C-2' }, 'C-2');
     const start = seen.find((s) => s.url === '/apps/app_ri/runs')!;
@@ -64,6 +66,34 @@ describe('CREAO adapter', () => {
     expect(c.parseVerdict(r.text, fallback, (x) => ['accept', 'decline', 'more_evidence'].includes(String(x.action)))).toEqual({ value: fallback, ok: false });
     expect(c.parseVerdict('{"action":"approve"}', fallback, (x) => ['accept', 'decline', 'more_evidence'].includes(String(x.action))).ok).toBe(false);
     expect(c.parseVerdict(null, fallback, () => true).value).toBe(fallback);
+  });
+
+  it('per-seat apps need no account key: each seat sends its own capi_ key; a core seat with no app fails loudly', async () => {
+    const c = await adapter({ CREAO_API_KEY: '' });
+    const { config } = await import('../src/env');
+    for (const s of ['evidence_analyst', 'refund_investigator', 'pattern_analyst'] as const) { config.creao.appIds[s] = `app_${s}`; config.creao.appKeys[s] = `capi_${s}`; }
+    config.creao.appIds.refund_investigator = 'app_ri';
+    expect(c.apiPath()).toBe('app');
+    expect(c.seatPath('evidence_analyst')).toBe('app');
+    expect(c.seatPath('listing_matcher')).toBe('none');
+    expect(c.seatAvailable('listing_matcher')).toBe(false);
+    const ids = await c.resolveAgents();
+    expect(ids).toMatchObject({ evidence_analyst: 'app_evidence_analyst', refund_investigator: 'app_ri' });
+    expect(seen.some((s) => s.url === '/v1/agents' && s.auth === 'Bearer ')).toBe(false);
+    const n = seen.length;
+    await c.startRun('refund_investigator', { claim_id: 'C-3' }, 'C-3');
+    expect(seen[n]).toMatchObject({ url: '/apps/app_ri/runs', auth: 'Bearer capi_refund_investigator' });
+    config.creao.appKeys.pattern_analyst = '';
+    await expect(c.resolveAgents()).rejects.toThrow(/CREAO_PATTERN_ANALYST_APP_ID and CREAO_PATTERN_ANALYST_KEY/);
+  });
+
+  it('a seat with an app runs there even when an account key is also set', async () => {
+    const c = await adapter({ CREAO_API_KEY: 'cr_sk_test' });
+    const { config } = await import('../src/env');
+    config.creao.appIds.refund_investigator = 'app_ri';
+    config.creao.appKeys.refund_investigator = 'capi_ri';
+    expect(c.seatPath('refund_investigator')).toBe('app');
+    expect(c.seatPath('evidence_analyst')).toBe('account');
   });
 
   it('webhooks are deduplicated on the delivery id', async () => {
@@ -111,5 +141,52 @@ describe('fixtures follow each prompt\'s hard rules', () => {
   it('the Evidence Analyst fixture is unable to verify mostly blank videos', () => {
     const r = fixtureResponse('evidence_analyst', { claim_id: 'C-1', challenge: { fingers: 3 }, frames: [1, 2, 3, 4, 5, 6], deterministic_checks: { blank_frames: 6 } }) as { unable_to_verify: boolean };
     expect(r.unable_to_verify).toBe(true);
+  });
+});
+
+describe('answers with a trimmed output (live CREAO run 278efdc9, 2026-10-25)', () => {
+  // The saved agent returned the decision in result.text and its reasoning only in chatText.
+  const text = '{"case":"C-TEST2 electronics $249 defective","claim_id":"C-TEST2","action":"accept","amount":249,"method":"original_payment","needs_controller":"false","confidence":0.9}';
+  const chat = "I'll start by reading the agent's manifest.**Decision:** accept $249.00.\n\n```json\n{\"action\":\"accept\"}\n```\nThe crack at frames 3–4 is a manufacturing defect inside the window.";
+  const valid = (x: Record<string, unknown>) => ['accept', 'decline', 'more_evidence'].includes(String(x.action)) && Array.isArray(x.reasons);
+  it('fills reasons from the prose, marks them, caps confidence and drops the echoed case', async () => {
+    const { fillFromChat, parseVerdict } = await import('../src/creao');
+    const r = parseVerdict(text, { action: 'more_evidence' }, valid, (v) => fillFromChat('refund_investigator', v, chat));
+    expect(r.ok).toBe(true);
+    const v = r.value as Record<string, unknown>;
+    expect(v.action).toBe('accept');
+    expect(v.reasons).toEqual([{ text: 'Decision: accept $249.00. The crack at frames 3–4 is a manufacturing defect inside the window.', cites: 'agent:summary' }]);
+    expect(v.reasons_from_summary).toBe(true);
+    expect(v.confidence).toBe(0.8);
+    expect(v.needs_controller).toBe(false);
+    expect(v.case).toBeUndefined();
+  });
+  it('still fails closed when the decision field itself is missing or invalid', async () => {
+    const { fillFromChat, parseVerdict } = await import('../src/creao');
+    expect(parseVerdict('{"action":"approve"}', {}, valid, (v) => fillFromChat('refund_investigator', v, chat)).ok).toBe(false);
+    expect(parseVerdict('{"amount":249}', {}, valid, (v) => fillFromChat('refund_investigator', v, chat)).ok).toBe(false);
+  });
+});
+
+describe('Listing Matcher with a trimmed output (live CREAO run df488ad2, 2026-10-25)', () => {
+  it('keeps the top-level verdict and turns a bare matched_listing index into an object', async () => {
+    const { fillFromChat, parseVerdict } = await import('../src/creao');
+    const text = '{"claim_id":"C-TEST6","matched_listing":0,"same_as_ordered":"true","confidence":0.9,"verdict":"eligible"}';
+    const r = parseVerdict(text, {}, (x) => typeof x.same_as_ordered === 'string' && typeof x.eligibility === 'object' && x.eligibility !== null, (v) => fillFromChat('listing_matcher', v, '**Verdict: eligible**, listing 0 matches.'));
+    expect(r.ok).toBe(true);
+    const v = r.value as { matched_listing: { index: number }; eligibility: { verdict: string; reasons: { cites: string }[] } };
+    expect(v.eligibility.verdict).toBe('eligible');
+    expect(v.matched_listing).toEqual({ index: 0 });
+    expect(v.eligibility.reasons[0]!.cites).toBe('agent:summary');
+  });
+});
+
+describe('Evidence Analyst with a flattened output (live CREAO run c0e8688a, 2026-10-25)', () => {
+  it('reads "true" as true, wraps plain values and builds the challenge', async () => {
+    const { fillFromChat, parseVerdict } = await import('../src/creao');
+    const text = '{"claim_id":"C-TEST1","item_matches_reference":"uncertain","claimed_defect_visible":"uncertain","challenge_seen":"","challenge_passed":"","unable_to_verify":"true"}';
+    const r = parseVerdict(text, {}, (x) => typeof x.unable_to_verify === 'boolean' && typeof x.summary === 'string', (v) => fillFromChat('evidence_analyst', v, '**Result: unable to verify — no frames submitted.**'));
+    expect(r.ok).toBe(true);
+    expect(r.value).toMatchObject({ unable_to_verify: true, item_matches_reference: { value: 'uncertain' }, challenge: { seen: null, passed: null }, summary: 'Result: unable to verify — no frames submitted.' });
   });
 });

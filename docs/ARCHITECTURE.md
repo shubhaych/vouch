@@ -4,7 +4,8 @@
  phone /claim ──upload──► worker (Node 22, :8787) ──reducers──► SpacetimeDB module (the only database)
  browser pages ◄──────────── subscriptions ─────────────────────  tables, reducers, scheduled tick
                               worker ◄── subscriptions ──────────  (sim runs inside the module)
-                              worker ──► CREAO (3 saved agents)    worker ──► Droid SDK (lab, laptop)
+                              worker ──► CREAO (9 saved agents)    worker ──► Droid SDK (lab, laptop)
+                              worker ──► Bright Data (listings, return signals)   worker ──► CRS sandbox (identity)
 ```
 
 - **The SpacetimeDB module (`module/`)** holds every row. It runs the simulation as a scheduled reducer, and its reducers enforce who may do what.
@@ -21,12 +22,16 @@
 | `module/src/{world,text,score,rng}.ts` | Regions, businesses and catalog; claim text; the credit score and bands; the deterministic RNG. Pure, shared with web and worker as `@vouch/module/*`. |
 | `module/src/economy.ts` | `init`, `seedWorld`, `tick` (only the database itself may call `tick`). |
 | `module/src/consumer.ts` | The real shopper: `joinAsShopper`, `buy`, `fastForward`, `requestRefund`. |
-| `module/src/claims.ts`, `desk.ts`, `patterns.ts` | Claim lifecycle, the decision desk (segregation of duties), fraud patterns. |
+| `module/src/claims.ts`, `desk.ts`, `patterns.ts`, `pulse.ts` | Claim lifecycle, the decision desk (segregation of duties), fraud patterns, the returns pulse and monitor notes. |
 | `module/src/credentials.ts`, `lab.ts`, `control.ts` | Credential registry and verification requests, the Droid lab queue, seats, controls, the sim speed, pings and bench results. |
-| `worker/src/server.ts` | Fastify routes (`/health`, `/upload/:claimId`, `/media/...` signed, `/creao/webhook`, `/showcase/run`) and service start-up. |
-| `worker/src/orchestrator.ts`, `creao.ts`, `fixtures.ts` | The Desk Lead: claim flow (Evidence Analyst → Investigator → `propose`), the pattern flow (Pattern Analyst → `confirmPattern`), the CREAO adapter, fixture answers. |
+| `worker/src/server.ts` | Fastify routes (`/health`, `/upload/:claimId`, `/media/...` signed, `/creao/webhook`, `/showcase/run`, `/identity/*`, `/scrape/status`, `/monitor/run`) and service start-up. |
+| `worker/src/orchestrator.ts`, `creao.ts`, `fixtures.ts` | The Desk Lead: claim flow (Evidence Analyst → Listing Matcher → Policy Checker → Risk Scorecard → Investigator → `propose`; the three middle seats are optional), the pattern flow (Pattern Analyst → `confirmPattern`), the CREAO adapter, fixture answers. |
 | `worker/src/video.ts` | ffprobe, frame selection, dHash, reuse search, blank frames, signed media URLs, `attachVideo`. |
 | `worker/src/detectors.ts`, `mirror.ts`, `history.ts` | Runs `detectors/live/*` every 5 simulated days on an indexed mirror of the client cache. |
+| `worker/src/brightdata.ts` | The Bright Data client: Google Shopping listings and web return signals through the SERP API, disk cache, daily budget, fixture listings from the catalogue ([BRIGHTDATA.md](BRIGHTDATA.md)). |
+| `worker/src/pulse.ts`, `module/src/pulse.ts` | The returns pulse (refunds per second by item, counted from live rows, written to `returns_pulse`) and the Returns Monitor flow (`monitor_note`). |
+| `worker/src/seat.ts` | Runs one CREAO seat end to end for callers outside the Orchestrator class. |
+| `worker/src/crs.ts` | CRS identity and contact-risk screening ([CRS.md](CRS.md)). |
 | `worker/src/poster.ts`, `credentials.ts`, `lab.ts`, `showcase.ts` | Ledger poster (second identity), Ed25519 issuer and verifier, the Droid lab runner and its permission fence, the A-00421 showcase loop. |
 | `detectors/` | `live/` detectors, `candidates/` (Droid's only writable folder), `test.ts`, `eval.ts` (fresh worlds, ground truth), `LAB.md`. |
 | `web/app/*` | Pages: `/`, `/world`, `/shop`, `/claim/[id]`, `/business`, `/lab`, `/system`. `web/lib/routes.ts` is the nav. |

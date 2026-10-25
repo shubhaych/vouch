@@ -84,6 +84,10 @@ export function fixtureResponse(seat: Seat, c: unknown): unknown {
     accept.reasons = reasons;
     return accept;
   }
+  if (seat === 'listing_matcher') return listingFixture(c);
+  if (seat === 'policy_checker') return policyFixture(c);
+  if (seat === 'risk_scorecard') return scorecardFixture(c);
+  if (seat === 'returns_monitor') return monitorFixture(c);
   if (seat === 'refund_reviewer') return reviewerFixture(c);
   if (seat === 'customer_liaison') return liaisonFixture(c);
   const pattern = get(c, 'pattern') as Obj;
@@ -143,4 +147,137 @@ function liaisonFixture(c: unknown): unknown {
   };
   const [title, message, next] = byTier[tier] ?? byTier.T5!;
   return fill(load('customer_liaison', 'message'), { claim_id: get(c, 'claimId'), title, message, next_steps: next, evidence_request: asks.join(' ') });
+}
+
+// ---- the Listing Matcher: picks the scraped listing closest to the ordered item and checks eligibility against the policy.
+
+function listingFixture(c: unknown): unknown {
+  const claimId = get(c, 'claim_id');
+  const withinWindow = get(c, 'deterministic_checks.within_window') !== false;
+  const listings = (get(c, 'scraped_listings.items') as { title: string; seller: string; price: number | null; url: string }[] | undefined) ?? [];
+  const ordered = String(get(c, 'order.item') ?? '');
+  const frames = (get(c, 'evidence.frames') as unknown[] | undefined) ?? [];
+  const unable = get(c, 'evidence.unable_to_verify') === true;
+  const scrapeError = get(c, 'scraped_listings.error');
+  const uncertain = (reason: string, cites: string) => fill(load('listing_matcher', 'uncertain'), { claim_id: claimId, within_window: withinWindow, reason, cites });
+  if (unable || frames.length === 0) return uncertain('The frames are not clear enough to compare the item with a listing.', 'evidence:unable_to_verify');
+  if (listings.length === 0) return uncertain(scrapeError ? `No listings could be scraped (${String(scrapeError).slice(0, 80)}).` : 'No listings were found for the ordered item.', 'listings:none');
+  const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9 ]/g, '');
+  const at = listings.findIndex((l) => norm(l.title) === norm(ordered));
+  const idx = at >= 0 ? at : 0;
+  const hit = listings[idx]!;
+  const same = at >= 0 ? 'true' : 'uncertain';
+  const analystSays = String(get(c, 'evidence.item_matches_reference.value') ?? 'uncertain');
+  const notes = String(get(c, 'policy.notes') ?? '');
+  const condition = String(get(c, 'evidence.defect_consistent_with_claim.value') ?? 'cannot_tell');
+  const reasons: Obj[] = [
+    { text: `The ordered item "${ordered}" matches listing ${idx} ("${hit.title}" from ${hit.seller || 'an unnamed seller'}${hit.price != null ? ` at $${Number(hit.price).toFixed(2)}` : ''}).`, cites: `listing:${idx}` },
+    { text: analystSays === 'true' ? 'The Evidence Analyst saw the ordered item in the frames.' : `The Evidence Analyst rated the item match "${analystSays}".`, cites: 'evidence:item_matches_reference' },
+    { text: withinWindow ? 'The claim is inside the return window.' : 'The claim is outside the return window; the store can still make an exception.', cites: 'policy:window' },
+  ];
+  if (notes) reasons.push({ text: `Policy note considered: "${notes}".`, cites: 'policy:notes' });
+  const verdict = !withinWindow ? 'needs_person' : same === 'true' && analystSays === 'true' && condition !== 'false' ? 'eligible' : 'needs_person';
+  return fill(load('listing_matcher', 'match'), {
+    claim_id: claimId, index: idx, title: hit.title, seller: hit.seller, price: hit.price, url: hit.url, same_as_ordered: same, confidence: same === 'true' ? 0.85 : 0.5,
+    differences: same === 'true' ? [] : ['The closest listing title differs from the ordered item name.'], within_window: withinWindow,
+    condition_consistent: condition === 'true' ? 'true' : condition === 'false' ? 'false' : 'cannot_tell', verdict, reasons,
+    summary: verdict === 'eligible' ? `Listing ${idx} is the ordered item and the claim is inside the window: eligible for the return process. The video evidence still decides the refund.`
+      : 'The listing match or the window needs a person to look; nothing is declined.',
+  });
+}
+
+// ---- the Returns Monitor: describes the window it was given; a spike with one business and one item is first read as a possible defective batch.
+
+function monitorFixture(c: unknown): unknown {
+  const w = (get(c, 'window') as { returns?: number; per_second?: number; baseline_per_second?: number; seconds?: number }) ?? {};
+  const items = (get(c, 'items') as { sku: string; name: string; count: number; per_second: number; baseline_per_second: number; spike: boolean; real_world?: { signals?: { url: string; title: string }[]; source?: string } | null }[] | undefined) ?? [];
+  const businesses = (get(c, 'businesses') as { id: string; name: string; count: number }[] | undefined) ?? [];
+  const spikes = items.filter((i) => i.spike);
+  const top = items[0];
+  const narrative = `${w.returns ?? 0} returns arrived in the last ${w.seconds ?? 60} s (${w.per_second ?? 0}/s against a baseline of ${w.baseline_per_second ?? 0}/s)` +
+    (top ? `; the busiest item was ${top.name} (${top.sku}) with ${top.count}.` : '.') +
+    (spikes.length ? ` ${spikes.length} item(s) are at or above the spike threshold: ${spikes.map((i) => `${i.name} at ${i.per_second}/s vs ${i.baseline_per_second}/s`).join('; ')}.` : ' No item is above its baseline enough to call a spike.') +
+    (businesses[0] ? ` Most returns reached ${businesses[0].name} (${businesses[0].count}).` : '');
+  const anomalies = spikes.map((i) => ({ sku: i.sku, kind: 'spike', why: `${i.count} returns of ${i.name} in ${w.seconds ?? 60} s, ${i.baseline_per_second ? Math.round(i.per_second / i.baseline_per_second) : 'many'}× its baseline.`, cites: [i.sku] }));
+  const innocent = spikes.length
+    ? 'A defective batch of one item sold by one store would look the same; the pattern detectors and the per-claim video evidence, not this count, decide whether anything is wrong.'
+    : 'Return volume is within its baseline; no explanation is needed.';
+  const real = items.filter((i) => i.real_world?.signals?.length).slice(0, 3).map((i) => ({
+    sku: i.sku, summary: `${i.real_world!.signals!.length} web result(s) about returns of ${i.name}${i.real_world!.source === 'bright_data_serp' ? ' (Bright Data)' : ' (fixture)'}.`, urls: i.real_world!.signals!.map((s) => s.url),
+  }));
+  return fill(load('returns_monitor', 'note'), { narrative, anomalies, items_to_watch: spikes.map((i) => i.sku), innocent, real_world_context: real });
+}
+
+// ---- the Policy Checker: one line per rule, from the deterministic checks the worker sends. Only the window and the reason can make a claim not eligible.
+
+function policyFixture(c: unknown): unknown {
+  const checks = (get(c, 'checks') as Obj) ?? {};
+  const policy = (get(c, 'policy') as Obj) ?? {};
+  const amount = Number(get(c, 'claim.amount_requested') ?? 0);
+  const fee = Number(policy.restocking_fee_pct ?? 0);
+  const notes = String(policy.notes ?? '');
+  const reason = String(get(c, 'claim.reason_code') ?? '');
+  const lm = get(c, 'listing_match') as Obj | undefined;
+  const r = (rule: string, result: string, detail: string, cites: string) => ({ rule, result, detail, cites });
+  const rules = [
+    r('window', checks.within_window === false ? 'fail' : 'pass', `Day ${checks.days_since_delivery ?? '?'} after delivery against a ${policy.window_days ?? '?'}-day window.`, 'policy:window'),
+    r('reason', checks.reason_allowed === false ? 'fail' : 'pass', checks.reason_allowed === false ? `"${reason}" is not accepted under this policy.` : `"${reason}" is an accepted reason.`, 'policy:reason'),
+    r('video_required', checks.over_video_threshold ? (checks.has_video ? 'pass' : 'fail') : 'not_applicable', checks.over_video_threshold ? (checks.has_video ? `A video is required over $${Number(policy.needs_video_over ?? 0).toFixed(0)} and one was provided.` : 'A video is required for this amount and none was provided.') : 'Below the amount that requires a video.', 'policy:video'),
+    r('category_note', notes ? 'unclear' : 'not_applicable', notes ? `"${notes}": whether it applies depends on the damage type the evidence shows.` : 'The policy has no category note.', 'policy:notes'),
+    r('restocking_fee', fee > 0 ? 'pass' : 'not_applicable', fee > 0 ? `A ${fee}% restocking fee applies to non-defective returns.` : 'No restocking fee.', 'policy:restocking_fee'),
+    r('item_identity', !lm || lm.skipped ? 'unclear' : lm.same_as_ordered === 'true' ? 'pass' : lm.same_as_ordered === 'false' ? 'fail' : 'unclear', !lm || lm.skipped ? 'No listing match was run.' : `The Listing Matcher says same as ordered: ${String(lm.same_as_ordered)}.`, 'listing_match:same_as_ordered'),
+  ];
+  const failedHard = rules.some((x) => (x.rule === 'window' || x.rule === 'reason') && x.result === 'fail');
+  const anyUnclear = rules.some((x) => x.result === 'unclear' || (x.rule === 'video_required' && x.result === 'fail') || (x.rule === 'item_identity' && x.result === 'fail'));
+  const outcome = failedHard ? 'not_eligible' : anyUnclear ? (notes || (lm && !lm.skipped && lm.same_as_ordered !== 'true') ? 'needs_person' : 'conditional') : 'eligible';
+  return fill(load('policy_checker', 'result'), {
+    claim_id: get(c, 'claim_id'), outcome, rules,
+    max_amount: Math.round(amount * (1 - (reason === 'changed_mind' ? fee : 0) / 100) * 100) / 100, restocking_fee_pct: reason === 'changed_mind' ? fee : 0,
+    store_credit_only: policy.store_credit_allowed === true && reason === 'changed_mind',
+    exception_note: failedHard ? 'The store can still make an exception; nothing is declined automatically.' : '',
+    summary: outcome === 'eligible' ? 'Every policy rule passes: the return is eligible under the policy. Whether the refund is paid still depends on the evidence.'
+      : outcome === 'conditional' ? 'The policy allows the return once the open rule is settled by the evidence.'
+      : outcome === 'needs_person' ? 'A policy note or the item identity needs a person to read it against the evidence.'
+      : 'The claim falls outside the policy (window or reason); the store can still make an exception.',
+  });
+}
+
+// ---- the Risk Scorecard: reads each indicator as supports, neutral or caution. Context for the Investigator, never a decision.
+
+function scorecardFixture(c: unknown): unknown {
+  const h = (get(c, 'history') as Obj) ?? {};
+  const cred = (get(c, 'credential') as Obj) ?? {};
+  const patterns = (get(c, 'patterns') as Obj[] | undefined) ?? [];
+  const idn = (get(c, 'identity') as Obj) ?? {};
+  const item = (get(c, 'item_context') as Obj) ?? {};
+  const pulse = item.pulse as Obj | null | undefined;
+  const bc = (item.business_context as Obj) ?? {};
+  const v = (get(c, 'video_checks') as Obj) ?? {};
+  const ind: Obj[] = [];
+  const add = (name: string, value: unknown, reading: string, weight: number, why: string, cites: string) => ind.push({ name, value, reading, weight, why, cites });
+  const age = Number(h.account_age_days ?? 0); const ratio = Number(h.refund_ratio_90d ?? 0); const asked = Number(h.refunds_requested_90d ?? 0);
+  add('account_age', age, age >= 90 ? 'supports' : age >= 30 ? 'neutral' : 'caution', age < 30 ? 0.3 : 0.2, age < 30 ? 'A thin history is a reason for care, never for a decline on its own.' : `${age} days of history.`, 'history:account_age_days');
+  add('refund_ratio_90d', ratio, ratio <= 0.15 ? 'supports' : ratio < 0.4 || asked < 3 ? 'neutral' : 'caution', 0.35, `${asked} refund(s) requested in 90 days (${Math.round(ratio * 100)}%); weighed as context, not proof.`, 'history:refund_ratio_90d');
+  add('refunds_declined', h.refunds_declined_total ?? 0, Number(h.refunds_declined_total ?? 0) > 0 ? 'caution' : 'neutral', 0.2, 'Past declines are context; each claim is judged on its own evidence.', 'history:refunds_declined_total');
+  add('score_band', h.band ?? 'neutral', h.band === 'green' ? 'supports' : h.band === 'red' ? 'caution' : 'neutral', 0.15, 'The illustrative shopping score band.', 'history:band');
+  add('credential', cred.verified === true ? `verified by ${String(cred.issuer)}` : cred.presented ? 'presented, failed' : 'none', cred.verified === true ? 'supports' : cred.presented ? 'caution' : 'neutral', 0.3, cred.verified === true ? 'A credential from another store verified in all five steps.' : cred.presented ? `A presented credential failed step ${String(cred.failed_step)}.` : 'No credential was presented; that is normal.', cred.issuer ? `credential:${String(cred.issuer)}` : 'credential:none');
+  const confirmed = patterns.filter((p) => p.status === 'confirmed'); const detected = patterns.filter((p) => p.status === 'detected');
+  add('confirmed_pattern', confirmed.length, confirmed.length ? 'caution' : 'neutral', 0.5, confirmed.length ? `Member of ${confirmed.length} confirmed pattern(s): ${confirmed.map((p) => String(p.id)).join(', ')}.` : 'No confirmed pattern.', confirmed[0] ? `pattern:${String(confirmed[0].id)}` : 'pattern:none');
+  add('detected_pattern', detected.length, detected.length ? 'neutral' : 'neutral', 0.1, detected.length ? 'A detected but unconfirmed pattern is a reason for care, not for decline.' : 'No open pattern flag.', detected[0] ? `pattern:${String(detected[0].id)}` : 'pattern:none');
+  add('identity', idn.status ?? 'not_run', idn.route === 'refund_investigator' ? 'supports' : idn.route ? 'caution' : 'neutral', 0.3, idn.route ? `CRS screening routed this shopper to ${String(idn.route).replaceAll('_', ' ')}.` : 'Identity screening was not run for this claim.', 'identity:crs');
+  if (pulse) add('item_spike', `${pulse.count} in 60 s`, pulse.spike ? 'neutral' : 'neutral', 0.1, pulse.spike ? 'This item is spiking across shoppers right now, which points at the item (a batch), not at this shopper.' : 'Normal return volume for this item.', 'pulse:item');
+  if (bc.units_sold_last_30d) add('defective_batch_context', `${bc.claims_last_30d}/${bc.units_sold_last_30d}`, Number(bc.claims_last_30d) / Math.max(1, Number(bc.units_sold_last_30d)) > 0.1 ? 'supports' : 'neutral', 0.2, 'A high claim rate for this SKU at this store supports an innocent explanation.', 'business_context:sku');
+  add('frame_reuse', Number(v.frame_reuse_count ?? 0), Number(v.frame_reuse_count ?? 0) > 0 ? 'caution' : 'neutral', 0.6, Number(v.frame_reuse_count ?? 0) > 0 ? 'Frames match another claim; a person must compare the videos.' : 'No frame reuse.', 'check:frame_reuse');
+  add('challenge', v.challenge_passed ?? null, v.challenge_passed === false ? 'caution' : v.challenge_passed === true ? 'supports' : 'neutral', 0.3, v.challenge_passed === false ? 'The finger challenge was not passed.' : 'Finger challenge as expected or not checked.', 'check:challenge');
+  add('still_image', v.still_image === true, v.still_image === true ? 'caution' : 'neutral', 0.2, v.still_image === true ? 'The video barely changes between frames; a short handheld clip would settle it.' : 'The video shows motion.', 'check:still_image');
+  const cautions = ind.filter((i) => i.reading === 'caution'); const weight = cautions.reduce((a, i) => a + Number(i.weight), 0);
+  const caution = v.unable_to_verify === true && cautions.length === 0 ? 'unknown' : weight >= 0.8 ? 'high' : weight >= 0.35 ? 'medium' : 'low';
+  const supports = ind.filter((i) => i.reading === 'supports');
+  return fill(load('risk_scorecard', 'card'), {
+    claim_id: get(c, 'claim_id'), caution, indicators: ind,
+    strongest_support: supports.sort((a, b) => Number(b.weight) - Number(a.weight))[0]?.name ?? 'none',
+    strongest_caution: cautions.sort((a, b) => Number(b.weight) - Number(a.weight))[0]?.name ?? 'none',
+    innocent: pulse && (pulse as Obj).spike ? 'Many shoppers are returning this item at once; a defective batch explains that better than this one claim.' : 'Nothing in the context needs explaining away; the video evidence decides.',
+    summary: `Caution ${caution}: ${cautions.length} indicator(s) read as caution, ${supports.length} as support. These are context for the Investigator and a person; none of them decides the claim.`,
+  });
 }

@@ -9,9 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { useCall } from "@/lib/stdb/hooks";
 
 const SEATS = [
-  { seat: "evidence_analyst", name: "Evidence Analyst", job: "Describes the video frames: item match, defect, challenge, capture flags" },
-  { seat: "refund_investigator", name: "Refund Investigator", job: "Recommends accept, decline or more evidence, citing every reason" },
-  { seat: "pattern_analyst", name: "Pattern Analyst", job: "Confirms or dismisses detector flags; only a confirmation changes credit" },
+  { seat: "evidence_analyst", name: "Evidence Analyst", job: "Describes the video frames: item match, defect, challenge, capture flags", standalone: false },
+  { seat: "listing_matcher", name: "Listing Matcher", job: "Matches the frames to listings Bright Data scraped and checks the return against the policy", standalone: false },
+  { seat: "policy_checker", name: "Policy Checker", job: "Reads the store policy rule by rule: window, reason, video, category note, fee, item identity", standalone: false },
+  { seat: "risk_scorecard", name: "Risk Scorecard", job: "Reads history, credential, patterns, identity and item context as supports, neutral or caution", standalone: false },
+  { seat: "refund_investigator", name: "Refund Investigator", job: "Recommends accept, decline or more evidence, citing every reason", standalone: false },
+  { seat: "pattern_analyst", name: "Pattern Analyst", job: "Confirms or dismisses detector flags; only a confirmation changes credit", standalone: true },
+  { seat: "returns_monitor", name: "Returns Monitor", job: "Reads the returns pulse and scraped web signals; notes spikes, never names a shopper", standalone: true },
 ] as const;
 
 const ms = (t?: { microsSinceUnixEpoch: bigint }) => (t ? Number(t.microsSinceUnixEpoch / 1000n) : 0);
@@ -22,7 +26,7 @@ function useNow(every = 1000) {
   return now;
 }
 
-/** The three saved CREAO agents as an org chart, with the Desk Lead (worker code) routing between them, and the kill switch. */
+/** The saved CREAO agents as an org chart, with the Desk Lead (worker code) routing between them, and the kill switch. */
 export function OrgChart({ canToggle }: { canToggle: boolean }) {
   const [runs] = useTable(tables.agentRun);
   const [controls] = useTable(tables.control);
@@ -50,7 +54,7 @@ export function OrgChart({ canToggle }: { canToggle: boolean }) {
           CREAO agents: {on ? "ON" : "OFF"}
         </button>
       </div>
-      <div className="relative grid gap-3 md:grid-cols-[1fr_auto_1fr_auto_1fr]">
+      <div className="relative flex flex-wrap items-stretch gap-3">
         <DeskLead />
         {SEATS.map((s, i) => {
           const r = last(s.seat);
@@ -58,9 +62,9 @@ export function OrgChart({ canToggle }: { canToggle: boolean }) {
           const steps = (() => { try { return JSON.parse(r?.stepsJson || "[]") as { step: string }[]; } catch { return []; } })();
           return (
             <div key={s.seat} className="contents">
-              {i > 0 ? <HandOff active={recentHandOff(SEATS[i - 1]!.seat) && s.seat !== "pattern_analyst"} dashed={s.seat === "pattern_analyst"} /> : null}
+              {i > 0 ? <HandOff active={recentHandOff(SEATS[i - 1]!.seat) && !s.standalone} dashed={s.standalone} /> : null}
               <motion.div
-                className={`rounded-xl border p-3 ${running ? "border-accent/70 bg-accent/5" : "border-line-dark bg-white/[0.02]"} ${!on ? "opacity-50" : ""}`}
+                className={`min-w-[13rem] flex-1 basis-[14rem] rounded-xl border p-3 ${running ? "border-accent/70 bg-accent/5" : "border-line-dark bg-white/[0.02]"} ${!on ? "opacity-50" : ""}`}
                 animate={running ? { boxShadow: ["0 0 0 0 rgba(34,211,238,0)", "0 0 0 6px rgba(34,211,238,0.18)", "0 0 0 0 rgba(34,211,238,0)"] } : {}}
                 transition={{ repeat: running ? Infinity : 0, duration: 1.6 }} data-testid={`seat-${s.seat}`}>
                 <div className="flex items-center justify-between">
@@ -97,9 +101,9 @@ export function OrgChart({ canToggle }: { canToggle: boolean }) {
 
 function DeskLead() {
   return (
-    <div className="col-span-full -mb-1 flex items-center gap-2 text-[0.7rem] text-ink-soft-dark">
+    <div className="-mb-1 flex w-full items-center gap-2 text-[0.7rem] text-ink-soft-dark">
       <span className="rounded border border-line-dark px-1.5 py-0.5 font-mono">Desk Lead</span>
-      worker code, not an agent: routes each claim Evidence Analyst → Refund Investigator → a person, and each flagged pattern to the Pattern Analyst.
+      worker code, not an agent: routes each claim Evidence Analyst → Listing Matcher → Policy Checker → Risk Scorecard → Refund Investigator → a person, each flagged pattern to the Pattern Analyst, and each returns-pulse window to the Returns Monitor.
     </div>
   );
 }

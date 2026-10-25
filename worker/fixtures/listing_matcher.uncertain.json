@@ -1,0 +1,16 @@
+{
+  "_fixture": "Hand-written to the Listing Matcher schema in docs/CREAO.md (Agent 6). Chosen when there are no listings, no readable frames or the match cannot be made: a person looks, nothing is declined.",
+  "claim_id": "{{claim_id}}",
+  "matched_listing": null,
+  "same_as_ordered": "uncertain",
+  "confidence": 0.3,
+  "differences": [],
+  "eligibility": {
+    "within_window": "{{within_window}}",
+    "policy_rule": "unclear",
+    "condition_consistent": "cannot_tell",
+    "verdict": "needs_person",
+    "reasons": [ { "text": "{{reason}}", "cites": "{{cites}}" } ]
+  },
+  "summary": "{{reason}} The item question goes to a person; the return is not declined."
+}
