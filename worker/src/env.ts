@@ -9,8 +9,9 @@ function loadDotEnv() {
   const p = resolve(REPO_ROOT, '.env');
   if (!existsSync(p)) return;
   for (const line of readFileSync(p, 'utf8').split('\n')) {
-    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*([^#\n]*?)\s*(?:#.*)?$/);
-    if (m && !(m[1]! in process.env)) process.env[m[1]!] = m[2]!;
+    // Quoted values may contain '#' (passwords do); unquoted ones end at a comment.
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^#\n]*?))\s*(?:#.*)?$/);
+    if (m && !(m[1]! in process.env)) process.env[m[1]!] = m[2] ?? m[3] ?? m[4] ?? '';
   }
 }
 loadDotEnv();
@@ -43,7 +44,6 @@ export const config = {
     model: str('REVIEW_DROID_MODEL'),
   },
   anthropicKey: str('ANTHROPIC_API_KEY'),
-  crs: { apiKey: str('CRS_API_KEY'), baseUrl: str('CRS_BASE_URL') },
   mediaSecret: str('MEDIA_SIGNING_SECRET'),
   demoBusinessCode: str('DEMO_BUSINESS_CODE', 'vouch-business'),
   demoControllerCode: str('DEMO_CONTROLLER_CODE', 'vouch-controller'),
@@ -77,6 +77,15 @@ export const config = {
       customer_liaison: str('CREAO_CUSTOMER_LIAISON_KEY'),
     },
     pollMs: Number(str('CREAO_POLL_MS', '15000')),
+  },
+  // CRS sandbox: identity and contact-risk screening only (see worker/src/crs.ts).
+  crs: {
+    mode: (str('CRS_MODE', 'fixture') === 'sandbox' ? 'sandbox' : 'fixture') as 'sandbox' | 'fixture',
+    baseUrl: str('CRS_BASE_URL', 'https://api-sandbox.stitchcredit.com/api'),
+    username: str('CRS_USERNAME'),
+    password: str('CRS_PASSWORD'),
+    // True once sandbox credentials are set; the video reviewer reads this to know identity can be checked.
+    configured: str('CRS_MODE') === 'sandbox' && !!str('CRS_USERNAME') && !!str('CRS_PASSWORD'),
   },
   factoryKey: str('FACTORY_API_KEY'),
   seed: BigInt(str('SIM_SEED', '11')),
