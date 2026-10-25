@@ -224,7 +224,7 @@ export class ReviewRunner {
       const policy = JSON.parse(business.policy) as Policy & { autoApproveLimitCents?: number };
       const credential = await this.checkCredential(refund.agentId, refund.id, refund.businessId).catch(() => null);
       const verified: VerifiedIdentity = credential?.verified ? 'verified' : credential?.presented ? 'unverified' : 'unknown';
-      if (!config.crs.apiKey) limits.push('Identity verification (CRS) is not configured; a verified Vouch credential from another store counts instead.');
+      if (!config.crs.configured) limits.push('Identity verification (CRS) is not configured; a verified Vouch credential from another store counts instead.');
       const hist = historyFor(this.conn, purchase, refund, policy.windowDays, verified);
       const facts: CaseFacts = {
         caseRef,
