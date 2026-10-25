@@ -252,6 +252,7 @@ export function AgentAcrossMerchants({ agentId, agent, businesses, day, onBack }
   const maxN = Math.max(1, ...lanes.map((l) => l.marks.length));
   const step = Math.min(44, span / maxN);
   const showLabels = step >= 26;
+  const [hover, setHover] = useState<{ x: number; y: number; text: string } | null>(null);
 
   return (
     <div className="live-flow live-flow--agent" data-testid="agent-merchants">
@@ -280,10 +281,12 @@ export function AgentAcrossMerchants({ agentId, agent, businesses, day, onBack }
                       initial={reduced ? false : { opacity: 0, scale: 0.4 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.5, delay: Math.min(0.6, j * 0.04) }}
-                      style={{ transformOrigin: `${x}px ${y}px` }}
                       data-testid="agent-merchants-mark"
+                      onMouseEnter={() => setHover({ x, y, text: `Day ${m.day} · score ${m.after}${m.delta ? ` (${m.delta > 0 ? "+" : ""}${m.delta})` : ""}` })}
+                      onMouseLeave={() => setHover(null)}
+                      style={{ transformOrigin: `${x}px ${y}px`, cursor: "default" }}
                     >
-                      <title>Day {m.day} · {lane.name} · score {m.after}{m.delta ? ` (${m.delta > 0 ? "+" : ""}${m.delta})` : ""}</title>
+                      <circle cx={x} cy={y} r={11} fill="transparent" />
                       {m.delta === 0 ? <circle cx={x} cy={y} r={4.5} fill={color} /> : (
                         <path d={up ? `M${x},${y - 7} L${x + 5.5},${y + 3} L${x - 5.5},${y + 3} Z` : `M${x},${y + 7} L${x + 5.5},${y - 3} L${x - 5.5},${y - 3} Z`} fill={color} />
                       )}
@@ -297,6 +300,17 @@ export function AgentAcrossMerchants({ agentId, agent, businesses, day, onBack }
           <text x={x0} y={height - 2} fontSize={8} fill="#6b4a66">oldest</text>
           <text x={W - 8} y={height - 2} fontSize={8} fill="#6b4a66" textAnchor="end">newest · hover an arrow for its day</text>
           <text x={W / 2} y={12} fontSize={9} textAnchor="middle" fill="#6b4a66">Every merchant that decided one of this shopper&apos;s refunds, newest first</text>
+          {hover ? (() => {
+            const w = hover.text.length * 5.4 + 12;
+            const tx = Math.min(W - w - 4, Math.max(4, hover.x - w / 2));
+            const ty = hover.y - 10 < 18 ? hover.y + 10 : hover.y - 26;
+            return (
+              <g pointerEvents="none" data-testid="agent-merchants-tip">
+                <rect x={tx} y={ty} width={w} height={16} rx={4} fill="#3a0f34" />
+                <text x={tx + w / 2} y={ty + 11} fontSize={9} fontWeight={650} textAnchor="middle" fill="#fff">{hover.text}</text>
+              </g>
+            );
+          })() : null}
         </svg>
       )}
     </div>

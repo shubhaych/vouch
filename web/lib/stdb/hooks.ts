@@ -31,6 +31,13 @@ export function useTableVersion(table: TableName, sql: string | null, throttleMs
   const [version, setVersion] = useState(0);
   const [ready, setReady] = useState(false);
   const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Subscriptions whose SQL was replaced but whose successor has not applied yet.
+  const retiring = useRef<{ unsubscribe(): void }[]>([]);
+
+  useEffect(() => () => {
+    for (const h of retiring.current) { try { h.unsubscribe(); } catch { /* already gone */ } }
+    retiring.current = [];
+  }, []);
 
   useEffect(() => {
     if (!conn || !sql) return;
@@ -42,7 +49,14 @@ export function useTableVersion(table: TableName, sql: string | null, throttleMs
         if (alive) setVersion((v) => v + 1);
       }, throttleMs);
     };
-    const handle = conn.subscriptionBuilder().onApplied(() => { if (alive) { setReady(true); setVersion((v) => v + 1); } }).subscribe(sql);
+    // A query that changes with the sim day (e.g. "day >= from") resubscribes often. Dropping the
+    // old subscription first emptied the cache and flashed a skeleton, so it stays until this one applies.
+    const handle = conn.subscriptionBuilder().onApplied(() => {
+      const old = retiring.current;
+      retiring.current = [];
+      for (const h of old) { try { h.unsubscribe(); } catch { /* already gone */ } }
+      if (alive) { setReady(true); setVersion((v) => v + 1); }
+    }).subscribe(sql);
     const t = conn.db[table] as unknown as {
       onInsert(cb: () => void): void; onDelete(cb: () => void): void; onUpdate?(cb: () => void): void;
       removeOnInsert(cb: () => void): void; removeOnDelete(cb: () => void): void; removeOnUpdate?(cb: () => void): void;
@@ -52,13 +66,12 @@ export function useTableVersion(table: TableName, sql: string | null, throttleMs
     t.onUpdate?.(bump);
     return () => {
       alive = false;
-      setReady(false);
       t.removeOnInsert(bump);
       t.removeOnDelete(bump);
       t.removeOnUpdate?.(bump);
       if (pending.current) clearTimeout(pending.current);
       pending.current = null;
-      try { handle.unsubscribe(); } catch { /* already gone */ }
+      retiring.current.push(handle);
     };
   }, [conn, sql, table, throttleMs]);
 
