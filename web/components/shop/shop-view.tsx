@@ -59,7 +59,7 @@ function PartnerDirectory() {
           <p className="mt-1 text-sm text-ink-soft">Every shop has a four-product catalog and live portfolio activity. Click a product to mock-buy it or start a return.</p>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-ink-soft"><Badge kind="simulated" /> {companies.length} stores · {products.length} products</span>
+          <span className="text-xs text-ink-soft"><Badge kind="simulated" /> {companies.length} stores · {products.filter((p) => p.active).length} products</span>
           <select aria-label="Filter shops by category" className="rounded-lg border border-line bg-white px-3 py-2 text-sm" value={category} onChange={(e) => setCategory(e.target.value)}>
             <option value="all">All categories</option>
             {categories.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -69,7 +69,7 @@ function PartnerDirectory() {
       {companies.length === 0 ? <div className="card-light p-4 text-sm text-ink-soft">Partner catalog is loading. Start the worker with FINANCE_DESK=1 to seed the 100 shops.</div> : null}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {visible.map((company) => {
-          const catalog = products.filter((p) => p.companyId === company.id);
+          const catalog = products.filter((p) => p.companyId === company.id && p.active);
           const state = states.find((s) => s.companyId === company.id);
           return (
             <article className="card-light flex flex-col gap-3 p-4" key={company.id} data-testid={`partner-${company.slug}`}>

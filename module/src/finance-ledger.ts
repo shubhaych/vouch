@@ -53,6 +53,9 @@ export function seedFinanceCatalogImpl(ctx: Ctx) {
       else ctx.db.financeProduct.insert(prow);
     }
   }
+  // A product dropped from the catalogue stays for order history but is no longer sold.
+  const current = new Set(COMPANIES.flatMap((c) => c.products.map((p) => p.sku)));
+  for (const p of [...ctx.db.financeProduct.iter()]) if (p.active && !current.has(p.sku)) ctx.db.financeProduct.sku.update({ ...p, active: false });
   for (const a of ACCOUNTS) {
     const row = { code: a.code, name: a.name, type: a.type, note: a.note };
     if (ctx.db.financeAccount.code.find(a.code)) ctx.db.financeAccount.code.update(row);
