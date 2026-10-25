@@ -8,6 +8,7 @@ import { decideImpl, postImpl, proposeImpl } from './desk';
 import { confirmPatternImpl, flagPatternImpl } from './patterns';
 import { openInvestigationImpl } from './claims';
 import { LAB_CAP_PER_RUN, enqueueLabJob } from './lab';
+import { applyScoreReviewImpl } from './review';
 import type { Ctx } from './ctx';
 
 const worker = who('worker');
@@ -87,13 +88,18 @@ describe('T2.9 segregation of duties', () => {
     expect(k.db.refund.id.find(refundId)!.status).toBe('accepted');
   });
 
-  it('T2.8 accept pays +12, and only a balanced entry by the poster is posted', () => {
+  it('T2.8 accept leaves the score to the Score Reviewer, and only a balanced entry by the poster is posted', () => {
     const k = world();
     const { refundId, agentId } = liveClaim(k, 1);
     const before = k.db.agent.id.find(agentId)!.score;
     k.as(worker, (ctx) => proposeImpl(ctx, proposal(refundId, 24_900)));
     k.as(biz, (ctx) => decideImpl(ctx, refundId, 'accept', 24_900, ''));
-    expect(k.db.agent.id.find(agentId)!.score).toBe(before + 12);
+    // A real claim's score is not changed by the decision itself: the CREAO Score Reviewer judges it afterwards.
+    expect(k.db.agent.id.find(agentId)!.score).toBe(before);
+    k.as(worker, (ctx) => applyScoreReviewImpl(ctx, { refundId, direction: 'gain', delta: 50, reason: 'Defect shown clearly on video', runId: 'r1', provenance: 'fixture' }));
+    expect(k.db.agent.id.find(agentId)!.score).toBe(before + 15); // bounded: a gain is at most +15
+    expect(k.db.scoreReview.refundId.find(refundId)?.reason).toBe('Defect shown clearly on video');
+    expect(() => k.as(worker, (ctx) => applyScoreReviewImpl(ctx, { refundId, direction: 'gain', delta: 5, reason: 'again', runId: 'r2', provenance: 'fixture' }))).toThrow(/already/);
     const d = [...k.db.decision.refundId.filter(refundId)][0]!;
     const lines = [{ account: 'Refunds expense', cents: 24_900n }, { account: 'Cash', cents: -24_900n }];
     expect(() => k.as(worker, (ctx) => postImpl(ctx, d.id, 'refund', lines))).toThrow(/only the ledger poster/);
@@ -103,12 +109,15 @@ describe('T2.9 segregation of duties', () => {
     expect(k.db.journalLine.count()).toBe(2n);
   });
 
-  it('a decline costs 40 points and only a person can decline', () => {
+  it('a decline is reviewed for the score afterwards, and only a person can decline', () => {
     const k = world();
     const { refundId, agentId } = liveClaim(k, 1);
     const before = k.db.agent.id.find(agentId)!.score;
     k.as(worker, (ctx) => proposeImpl(ctx, proposal(refundId, 0, 'decline')));
+    expect(() => k.as(worker, (ctx) => applyScoreReviewImpl(ctx, { refundId, direction: 'loss', delta: -40, reason: 'x', runId: 'r', provenance: 'rule' }))).toThrow(/after the decision/);
     k.as(biz, (ctx) => decideImpl(ctx, refundId, 'decline', 0, 'item intact'));
+    expect(k.db.agent.id.find(agentId)!.score).toBe(before);
+    k.as(worker, (ctx) => applyScoreReviewImpl(ctx, { refundId, direction: 'loss', delta: -40, reason: 'Video shows the item intact', runId: 'r', provenance: 'rule' }));
     expect(k.db.agent.id.find(agentId)!.score).toBe(before - 40);
   });
 });

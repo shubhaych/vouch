@@ -99,7 +99,7 @@ describe('autoDecide', () => {
     expect(k.db.refund.id.find(refundId)!.status).toBe('accepted');
     expect(k.db.claim.id.find(claim.id)!.status).toBe('decided');
     expect(k.db.recommendation.claimId.find(claim.id)!.autoDecided).toBe(true);
-    expect(k.db.agent.id.find(agentId)!.score).toBeGreaterThan(before);
+    expect(k.db.agent.id.find(agentId)!.score).toBe(before); // the Score Reviewer changes it afterwards, not the payout
     const d = [...k.db.decision.refundId.filter(refundId)][0]!;
     expect(d.status).toBe('decided');
     expect(d.finalAmount).toBe(8_000);

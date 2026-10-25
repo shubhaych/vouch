@@ -64,6 +64,7 @@ export const config = {
       returns_monitor: str('CREAO_RETURNS_MONITOR_AGENT_ID'),
       policy_checker: str('CREAO_POLICY_CHECKER_AGENT_ID'),
       risk_scorecard: str('CREAO_RISK_SCORECARD_AGENT_ID'),
+      score_reviewer: str('CREAO_SCORE_REVIEWER_AGENT_ID'),
     },
     // App path only: per-seat app id and key (capi_ keys are scoped to one agent).
     appIds: {
@@ -76,6 +77,7 @@ export const config = {
       returns_monitor: str('CREAO_RETURNS_MONITOR_APP_ID'),
       policy_checker: str('CREAO_POLICY_CHECKER_APP_ID'),
       risk_scorecard: str('CREAO_RISK_SCORECARD_APP_ID'),
+      score_reviewer: str('CREAO_SCORE_REVIEWER_APP_ID'),
     },
     appKeys: {
       evidence_analyst: str('CREAO_EVIDENCE_ANALYST_KEY'),
@@ -87,6 +89,7 @@ export const config = {
       returns_monitor: str('CREAO_RETURNS_MONITOR_KEY'),
       policy_checker: str('CREAO_POLICY_CHECKER_KEY'),
       risk_scorecard: str('CREAO_RISK_SCORECARD_KEY'),
+      score_reviewer: str('CREAO_SCORE_REVIEWER_KEY'),
     },
     pollMs: Number(str('CREAO_POLL_MS', '15000')),
   },
@@ -122,8 +125,8 @@ export const config = {
 };
 
 export type Seat = keyof typeof config.creao.agentIds;
-export const SEATS: Seat[] = ['evidence_analyst', 'refund_investigator', 'pattern_analyst', 'refund_reviewer', 'customer_liaison', 'listing_matcher', 'returns_monitor', 'policy_checker', 'risk_scorecard'];
+export const SEATS: Seat[] = ['evidence_analyst', 'refund_investigator', 'pattern_analyst', 'refund_reviewer', 'customer_liaison', 'listing_matcher', 'returns_monitor', 'policy_checker', 'risk_scorecard', 'score_reviewer'];
 /** Optional seats fail soft when the saved agent is missing: the reviewer says "Reviewer offline", the claim flow skips the Listing Matcher, and no monitor note is written. */
-export const OPTIONAL_SEATS: Seat[] = ['refund_reviewer', 'customer_liaison', 'listing_matcher', 'returns_monitor', 'policy_checker', 'risk_scorecard'];
+export const OPTIONAL_SEATS: Seat[] = ['refund_reviewer', 'customer_liaison', 'listing_matcher', 'returns_monitor', 'policy_checker', 'risk_scorecard', 'score_reviewer'];
 
 export const log = (...xs: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...xs);

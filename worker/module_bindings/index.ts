@@ -37,6 +37,7 @@ import {
 import AddArtifactReducer from "./add_artifact_reducer";
 import AddFindingReducer from "./add_finding_reducer";
 import AppendLabEventReducer from "./append_lab_event_reducer";
+import ApplyScoreReviewReducer from "./apply_score_review_reducer";
 import AttachVideoReducer from "./attach_video_reducer";
 import AuditFindingReducer from "./audit_finding_reducer";
 import AutoDecideReducer from "./auto_decide_reducer";
@@ -175,6 +176,7 @@ import RegionStatRow from "./region_stat_table";
 import ReportRow from "./report_table";
 import ReturnsPulseRow from "./returns_pulse_table";
 import RoleRow from "./role_table";
+import ScoreReviewRow from "./score_review_table";
 import SimRunRow from "./sim_run_table";
 import VerificationRow from "./verification_table";
 
@@ -1004,6 +1006,20 @@ const tablesSchema = __schema({
       { name: 'role_who_key', constraint: 'unique', columns: ['who'] },
     ],
   }, RoleRow),
+  scoreReview: __table({
+    name: 'score_review',
+    indexes: [
+      { accessor: 'agentId', name: 'score_review_agent_id_idx_btree', algorithm: 'btree', columns: [
+        'agentId',
+      ] },
+      { accessor: 'refundId', name: 'score_review_refund_id_idx_btree', algorithm: 'btree', columns: [
+        'refundId',
+      ] },
+    ],
+    constraints: [
+      { name: 'score_review_refund_id_key', constraint: 'unique', columns: ['refundId'] },
+    ],
+  }, ScoreReviewRow),
   simRun: __table({
     name: 'sim_run',
     indexes: [
@@ -1040,6 +1056,7 @@ const reducersSchema = __reducers(
   __reducerSchema("add_artifact", AddArtifactReducer),
   __reducerSchema("add_finding", AddFindingReducer),
   __reducerSchema("append_lab_event", AppendLabEventReducer),
+  __reducerSchema("apply_score_review", ApplyScoreReviewReducer),
   __reducerSchema("attach_video", AttachVideoReducer),
   __reducerSchema("audit_finding", AuditFindingReducer),
   __reducerSchema("auto_decide", AutoDecideReducer),

@@ -16,7 +16,7 @@ export { flagPattern, setPatternStatus, confirmPattern } from './patterns';
 export { setIssuerKey, issueCredential, revokeCredential, requestVerification, recordVerification } from './credentials';
 export { enqueueLab, enqueueLabTrigger, startLabJob, appendLabEvent, finishLabJob, reviewCandidate, markPromoted } from './lab';
 export {
-  startAnalysis, setStep, addArtifact, addFinding, auditFinding, writeReport, writeScore, writeRecommendation, finishAnalysis, autoDecide,
+  startAnalysis, setStep, addArtifact, addFinding, auditFinding, writeReport, writeScore, writeRecommendation, finishAnalysis, autoDecide, applyScoreReview,
 } from './review';
 export { writePulse, recordMonitorNote } from './pulse';
 export { my_agent } from './views';

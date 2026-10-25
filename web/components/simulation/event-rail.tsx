@@ -4,6 +4,8 @@ import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import type { FeedEvent } from "@/components/world/use-world";
 
+const LIVE_KINDS = new Set(["claim", "decision", "pattern"]);
+
 const KIND_CLASS: Record<string, string> = {
   purchase: "is-inflow",
   refund: "is-request",
@@ -41,7 +43,9 @@ export function EventRail({
   }, [events, chainAgentId]);
 
   const chainSeqs = useMemo(() => new Set(chain.map((e) => e.seq.toString())), [chain]);
-  const shown = useMemo(() => events.slice(0, 36), [events]);
+  // The economy commits hundreds of rows a minute; show about one in twelve so a person can read
+  // along, plus every live claim, decision and pattern.
+  const shown = useMemo(() => events.filter((e) => e.seq % 12n === 0n || LIVE_KINDS.has(e.kind)).slice(0, 36), [events]);
 
   return (
     <div className="sim-rail" data-testid="sim-event-rail">
@@ -54,7 +58,7 @@ export function EventRail({
           {running === false ? <span className="chip chip--review-light">Paused — no fake updates</span> : null}
         </div>
         <p className="sim-rail__blurb">
-          One committed event updates the globe, trust timeline, and merchant flow together.
+          About 1 in 12 committed events. Each one updates the globe, trust timeline and merchant flow together.
         </p>
       </div>
       <ol className="sim-rail__list" data-lenis-prevent>

@@ -8,10 +8,11 @@ import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import { createServer as createNetServer } from 'node:net';
 import { config, log } from './env';
-import { connect } from './stdb';
+import { call, connect, type Conn } from './stdb';
 import { handleWebhook, resolveAgents } from './creao';
 import { Orchestrator } from './orchestrator';
 import { DetectorRunner } from './detectors';
+import { ScoreReviewer } from './review/score-review';
 import { Poster } from './poster';
 import { Credentials } from './credentials';
 import { MAX_UPLOAD_BYTES, UploadError, checkSignature, processUpload } from './video';
@@ -35,7 +36,7 @@ const WORKER_QUERIES = [
   'SELECT * FROM decision', 'SELECT * FROM fraud_pattern', 'SELECT * FROM pattern_event', 'SELECT * FROM credential',
   'SELECT * FROM verification', 'SELECT * FROM lab_job', 'SELECT * FROM partner_order',
   'SELECT * FROM analysis_job', 'SELECT * FROM analysis_step', 'SELECT * FROM artifact', 'SELECT * FROM finding', 'SELECT * FROM report',
-  'SELECT * FROM claim_score', 'SELECT * FROM recommendation',
+  'SELECT * FROM claim_score', 'SELECT * FROM recommendation', 'SELECT * FROM score_review',
 ];
 const FINANCE_WORKER_QUERIES = [
   'SELECT * FROM finance_agent_run', 'SELECT * FROM finance_sim_state', 'SELECT * FROM finance_company_state',
@@ -334,6 +335,8 @@ async function main() {
     orchestrator.handledByReviewer = (c) => reviewer.handles(c);
     reviewer.start();
   }
+  new ScoreReviewer(conn).start();
+  keepSimRunning(conn);
   orchestrator.start();
   new DetectorRunner(conn).start();
   const pulse = new PulseRunner(conn, { creaoOn: () => conn.db.control.key.find('creao_enabled')?.value === 'true', takeBudget: () => orchestrator.takeBudget() });
@@ -503,3 +506,15 @@ main().catch((e) => {
   console.error(e);
   process.exit(1);
 });
+
+// The judge page should never show a frozen world: if the run reached its last day, extend it
+// at a slow, watchable pace (about 20 s a simulated day). SIM_KEEP_RUNNING=0 leaves it paused.
+function keepSimRunning(conn: Conn) {
+  if (process.env.SIM_KEEP_RUNNING === '0') return;
+  const run = conn.db.simRun.id.find(1);
+  if (!run) return;
+  // Called on every start, not only when paused: setSim also adds merchants the world lacks.
+  const maxDay = Math.max(run.maxDay, run.day + 3650);
+  void call('setSim', conn.reducers.setSim({ running: true, agentsPerTick: 250, tickMicros: 500_000n, maxDay }))
+    .then(() => log(`simulation resumed at day ${run.day}: 250 agents per 0.5 s tick`));
+}

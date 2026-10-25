@@ -944,6 +944,21 @@ export const Role = __t.object("Role", {
 });
 export type Role = __Infer<typeof Role>;
 
+export const ScoreReview = __t.object("ScoreReview", {
+  refundId: __t.u64(),
+  agentId: __t.u32(),
+  direction: __t.string(),
+  delta: __t.i32(),
+  before: __t.u16(),
+  after: __t.u16(),
+  reason: __t.string(),
+  decision: __t.string(),
+  runId: __t.string(),
+  provenance: __t.string(),
+  at: __t.timestamp(),
+});
+export type ScoreReview = __Infer<typeof ScoreReview>;
+
 export const SeatCode = __t.object("SeatCode", {
   role: __t.string(),
   code: __t.string(),

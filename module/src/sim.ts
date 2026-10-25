@@ -230,13 +230,7 @@ export function seedWorld(db: SimDb, opts: SeedOpts): SimRunRow {
     });
   }
 
-  for (const b of BUSINESSES) {
-    const r = regionById(b.regionId)!;
-    db.business.insert({
-      id: b.id, name: b.name, region: r.id, lat: r.lat + (unitHash(b.id, 'lat') - 0.5) * 0.6, lng: r.lng + (unitHash(b.id, 'lng') - 0.5) * 0.6,
-      category: b.category, balance: 5_000_000n, inventory: 5_000, policy: JSON.stringify(b.policy), issuerPublicKey: '', sales: 0, refundsPaid: 0,
-    });
-  }
+  ensureBusinesses(db);
 
   const regionWeights = REGIONS.map((r) => r.weight);
   const ringMembers: number[] = [];
@@ -502,7 +496,8 @@ export function settleRefund(w: World, r: RefundRow, outcome: 'accepted' | 'decl
     if (w.db.refundIntent.purchaseId.find(r.purchaseId)?.falseClaim) s.lossCents += BigInt(amount);
     const c = basis === 'fast' ? CREDIT.acceptedFast : CREDIT.acceptedEvidence;
     const before = a.score;
-    applyCredit(w, r.agentId, c.kind, c.delta, 'refund', r.id, false);
+    // A real claim's score change is judged after the decision by the CREAO Score Reviewer (applyScoreReview); simulated ones use the rule.
+    if (r.source === 'sim') applyCredit(w, r.agentId, c.kind, c.delta, 'refund', r.id, false);
     // One line per outcome, carrying the business so the globe can draw the return arc.
     w.feed('refund_accepted', r.agentId, r.businessId, amount, r.id,
       `[Refund] ${businessLabel(r.businessId)} accepted ${agentLabel(r.agentId)} ${dollars(amount)}${basis === 'fast' ? ' (fast path)' : ''} · credit ${before} → ${w.agent(r.agentId).score}`);
@@ -511,7 +506,7 @@ export function settleRefund(w: World, r: RefundRow, outcome: 'accepted' | 'decl
     s.declined += 1;
     if (!w.db.refundIntent.purchaseId.find(r.purchaseId)?.falseClaim && w.kind(r.agentId) !== 'live') s.honestDeclines += 1;
     const before = a.score;
-    applyCredit(w, r.agentId, CREDIT.declined.kind, CREDIT.declined.delta, 'refund', r.id, false);
+    if (r.source === 'sim') applyCredit(w, r.agentId, CREDIT.declined.kind, CREDIT.declined.delta, 'refund', r.id, false);
     w.feed('refund_declined', r.agentId, r.businessId, r.amount, r.id,
       `[Refund] ${businessLabel(r.businessId)} declined ${agentLabel(r.agentId)} ${dollars(r.amount)} · credit ${before} → ${w.agent(r.agentId).score}`);
   } else if (p) {
@@ -711,3 +706,16 @@ export function deliverNow(w: World, p: PurchaseRow): PurchaseRow {
 
 /** Plain data for UIs that want the catalogue and regions without a table. */
 export const WORLD_STATIC = { regions: REGIONS, businesses: BUSINESSES, catalog: CATALOG };
+
+/** Insert any merchant in BUSINESSES the database lacks: a world seeded before the list grew
+ *  would otherwise crash the tick on the first purchase from a new merchant. */
+export function ensureBusinesses(db: SimDb) {
+  for (const b of BUSINESSES) {
+    if (db.business.id.find(b.id)) continue;
+    const r = regionById(b.regionId)!;
+    db.business.insert({
+      id: b.id, name: b.name, region: r.id, lat: r.lat + (unitHash(b.id, 'lat') - 0.5) * 0.6, lng: r.lng + (unitHash(b.id, 'lng') - 0.5) * 0.6,
+      category: b.category, balance: 5_000_000n, inventory: 5_000, policy: JSON.stringify(b.policy), issuerPublicKey: '', sales: 0, refundsPaid: 0,
+    });
+  }
+}

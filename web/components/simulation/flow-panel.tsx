@@ -90,7 +90,9 @@ export function FlowPanel({
               {selected ? selected.name : "All merchants"}
             </h2>
           </div>
-          {running === false ? (
+          {selected ? (
+            <button type="button" className="merchant-flow__x" onClick={() => onSelectBusiness(null)} aria-label="Back to the globe" data-testid="sim-flow-close">✕</button>
+          ) : running === false ? (
             <span className="chip chip--review-light" data-testid="sim-paused">
               Simulation paused
             </span>
@@ -118,7 +120,18 @@ export function FlowPanel({
               {selected.name}
             </button>
           ) : (
-            <span className="sim-flow__hint">Click a merchant diamond on the globe</span>
+            <select
+              className="sim-flow__pick"
+              value=""
+              onChange={(e) => e.target.value && onSelectBusiness(Number(e.target.value))}
+              aria-label="Open a merchant's flow"
+              data-testid="sim-flow-pick"
+            >
+              <option value="">Open a merchant… (or click a gold dot)</option>
+              {[...businesses].sort((a, b) => a.name.localeCompare(b.name)).map((b) => (
+                <option key={b.id} value={b.id}>{b.name} · {b.category}</option>
+              ))}
+            </select>
           )}
         </div>
       </header>

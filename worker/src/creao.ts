@@ -24,6 +24,7 @@ export const AGENT_NAMES: Record<Seat, string> = {
   returns_monitor: 'Vouch Returns Monitor',
   policy_checker: 'Vouch Policy Checker',
   risk_scorecard: 'Vouch Risk Scorecard',
+  score_reviewer: 'Vouch Score Reviewer',
 };
 
 /** True when a live run of this seat can start: fixture mode, its own app, or the saved agent was found (optional seats may be missing). */

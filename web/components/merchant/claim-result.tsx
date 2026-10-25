@@ -145,15 +145,14 @@ function Selected({
   const [reports] = useTable(tables.report.where((r) => r.claimId.eq(claim.id)));
   const [jobs] = useTable(tables.analysisJob.where((r) => r.claimId.eq(claim.id)));
   const [agents] = useTable(tables.agent.where((r) => r.id.eq(claim.agentId)));
-  const [credits] = useTable(tables.creditEvent.where((r) => r.agentId.eq(claim.agentId)));
+  const [reviews] = useTable(tables.scoreReview.where((r) => r.refundId.eq(claim.refundId)));
+  const review = reviews[0];
+  const [partners] = useTable(tables.partnerOrder.where((r) => r.purchaseId.eq(refund?.purchaseId ?? 0n)), { enabled: !!refund });
+  const partner = partners[0];
   const report = [...reports].sort((a, b) => Number(b.id - a.id))[0];
   const job = [...jobs].sort((a, b) => Number(b.id - a.id))[0];
   const agent = agents[0];
-  const lastCredit = useMemo(
-    () => [...credits].sort((a, b) => Number(b.id - a.id))[0],
-    [credits],
-  );
-  const item = purchase ? catalogItem(purchase.item) : undefined;
+  const item = partner ? { name: partner.name, description: partner.description } : purchase ? catalogItem(purchase.item) : undefined;
   const biz = refund ? businessDef(refund.businessId) : undefined;
 
   if (!refund) return <div className="skeleton h-96" />;
@@ -172,7 +171,7 @@ function Selected({
           <h2 className="mt-1 text-xl font-bold">{item?.name ?? `SKU-${purchase?.item ?? "?"}`}</h2>
           <p className="mt-1 text-sm text-ink-soft-dark">{item?.description}</p>
           <p className="mt-2 text-sm">
-            {biz?.name ?? businessLabel(refund.businessId)} · {money(refund.amount)} · {titleCase(refund.reasonCode)}
+            {partner?.companyName ?? biz?.name ?? businessLabel(refund.businessId)} · {money(refund.amount)} · {titleCase(refund.reasonCode)}
           </p>
           <p className="mt-1 text-xs text-ink-soft-dark">
             Policy: {biz?.policy.windowDays ?? "—"}-day window
@@ -197,12 +196,16 @@ function Selected({
             <p className="mt-2 text-sm text-review">
               Review pending — score unchanged until a confirmed merchant decision.
             </p>
-          ) : lastCredit && lastCredit.causeTable === "refund" && lastCredit.causeId === refund.id ? (
-            <p className="mt-2 text-sm text-honest">
-              Score updated after confirmed outcome: {lastCredit.before} → {lastCredit.after}
-            </p>
+          ) : review ? (
+            <div className="mt-2 text-sm" data-testid="claim-score-review">
+              <p className={review.direction === "gain" ? "text-honest" : review.direction === "loss" ? "text-fraud" : "text-ink-soft-dark"}>
+                {review.direction === "gain" ? "Gained credibility" : review.direction === "loss" ? "Lost credibility" : "No change"}: {review.before} → {review.after} ({review.delta >= 0 ? "+" : ""}{review.delta})
+              </p>
+              <p className="mt-0.5">{review.reason}</p>
+              <p className="mt-0.5 text-xs text-ink-soft-dark">{review.provenance === "rule" ? "Rule (CREAO Score Reviewer not connected)" : `CREAO Score Reviewer${review.provenance === "fixture" ? " (fixture)" : ""}`}</p>
+            </div>
           ) : decided ? (
-            <p className="mt-2 text-sm text-ink-soft-dark">Decision recorded. Score updates only on confirmed outcomes.</p>
+            <p className="mt-2 text-sm text-ink-soft-dark">Decision recorded. The CREAO Score Reviewer is judging the score change…</p>
           ) : (
             <p className="mt-2 text-sm text-ink-soft-dark">No score change yet for this claim.</p>
           )}

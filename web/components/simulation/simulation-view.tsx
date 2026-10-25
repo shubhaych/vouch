@@ -12,6 +12,7 @@ import { useTable } from "spacetimedb/react";
 import { tables } from "@/module_bindings";
 import type { Business } from "@/module_bindings/types";
 import { useRowsThrottled, useStatus } from "@/lib/stdb/hooks";
+import { Badge } from "@/components/ui/badge";
 import { START_SCORE } from "@vouch/module/score";
 import { WorldGlobe, type BusinessPoint, type Pov } from "@/components/world/globe";
 import {
@@ -25,6 +26,7 @@ import {
 import { TrustPanel, type TrustCounts } from "./trust-panel";
 import { FlowPanel } from "./flow-panel";
 import { EventRail } from "./event-rail";
+import { MerchantFlow } from "./merchant-flow";
 
 /**
  * Judge-facing simulation: one Lenis sticky scroll scene.
@@ -53,7 +55,6 @@ function SimulationInner() {
   const rightT = useTransform(scrollYProgress, [0.18, 0.48], [0, 1]);
   const railT = useTransform(scrollYProgress, [0.38, 0.68], [0, 1]);
   const cueOpacity = useTransform(scrollYProgress, [0, 0.08, 0.18], [1, 0.85, 0]);
-  const chromeOpacity = useTransform(scrollYProgress, [0.04, 0.22], [0, 1]);
 
   const leftWidth = useProgressWidth(leftT, 24, reduced);
   const rightWidth = useProgressWidth(rightT, 28, reduced);
@@ -110,6 +111,7 @@ function SimulationInner() {
   const [layer, setLayer] = useState<"purchases" | "refunds" | "scores">("purchases");
 
   const selected = selectedId !== null ? agents.byId.get(selectedId) ?? null : null;
+  const focusBiz = selectedBiz !== null ? businessRows.find((b) => b.id === selectedBiz) ?? null : null;
 
   const selectAgent = useCallback(
     (id: number | null) => {
@@ -126,7 +128,6 @@ function SimulationInner() {
     (e: FeedEvent) => {
       setSelectedSeq(e.seq);
       if (e.agentId) selectAgent(e.agentId);
-      if (e.businessId) setSelectedBiz(e.businessId);
       if (e.kind === "refund" || e.kind === "refund_accepted" || e.kind === "refund_declined") {
         setHighlightRefundId(e.refId);
       } else {
@@ -168,27 +169,33 @@ function SimulationInner() {
   const globeRings = useStableById(liveRings);
 
   const onGlobe = (lat: number, lng: number) => {
+    // Merchant dots are small and moving; a click near one opens it rather than a shopper.
+    let near: { id: number; d: number } | null = null;
+    for (const b of businessRows) {
+      const dLng = ((b.lng - lng + 540) % 360) - 180;
+      const d = Math.hypot(b.lat - lat, dLng * Math.cos((lat * Math.PI) / 180));
+      if (d < 2.5 && (!near || d < near.d)) near = { id: b.id, d };
+    }
+    if (near) return setSelectedBiz(near.id);
     const a = agents.nearest(lat, lng);
     if (a) selectAgent(a.id);
   };
 
   return (
-    <main className="sim-scene light" data-testid="simulation" ref={trackRef}>
+    <main className={`sim-scene light ${focusBiz ? "is-merchant" : ""}`} data-testid="simulation" ref={trackRef}>
       <div className="sim-scene__sticky">
         <div className="sim-scene__atmosphere" aria-hidden />
 
-        <motion.div
-          className="sim-scene__chrome"
-          style={{ opacity: reduced ? 1 : chromeOpacity }}
-        >
+        <div className="sim-scene__chrome" data-testid="sim-scale-band">
           <div className="sim-scene__intro">
-            <p className="section__eyebrow">Simulation</p>
+            <p className="section__eyebrow" style={{ margin: 0 }}>Vouch at scale</p>
+            <span className="sim-scene__stat"><b>{counts.agents.toLocaleString()}</b> shoppers</span>
+            <span className="sim-scene__stat"><b>{counts.merchants}</b> merchants</span>
+            <span className="sim-scene__stat"><b>{counts.purchases.toLocaleString()}</b> purchases</span>
+            <span className="sim-scene__stat"><b>{counts.refundRequests.toLocaleString()}</b> refund requests</span>
+            <span className="sim-scene__stat" data-testid="sim-day">{running ? <span className="sim-scene__live" /> : null}Day <b>{run?.day ?? "…"}</b>{running === false ? " · paused" : ""}</span>
+            <Badge kind="simulated" />
             <p className="sim-scene__honesty">Simulated agents. Vouch does not track real locations.</p>
-            {running === false ? (
-              <span className="chip chip--review-light" data-testid="sim-paused-banner">
-                Simulation paused
-              </span>
-            ) : null}
           </div>
           <div className="sim-scene__layers" aria-label="Event layer">
             {(
@@ -209,7 +216,7 @@ function SimulationInner() {
               </button>
             ))}
           </div>
-        </motion.div>
+        </div>
 
         <div className="sim-scene__stage">
           <motion.div
@@ -225,6 +232,11 @@ function SimulationInner() {
           </motion.div>
 
           <div className="sim-scene__globe">
+            {focusBiz ? (
+              <div className="sim-scene__merchant">
+                <MerchantFlow business={focusBiz} day={run?.day ?? 0} agents={agents.byId} onClose={() => setSelectedBiz(null)} />
+              </div>
+            ) : null}
             <WorldGlobe
               byBand={agents.byBand}
               live={agents.live}
@@ -237,7 +249,7 @@ function SimulationInner() {
               hexPoints={null}
               hexMax={1}
               pov={pov}
-              autoRotate={!selected}
+              autoRotate={!focusBiz}
               look="ice"
               onAgent={(id) => selectAgent(id)}
               onGlobe={onGlobe}

@@ -2,6 +2,8 @@ import { ScheduleAt, SenderError, t } from 'spacetimedb/server';
 import { spacetimedb } from './schema';
 import { requireRole, roleOf, setControlValue, type Ctx } from './ctx';
 import { BUSINESS_A, BUSINESS_B } from './world';
+import { ensureBusinesses } from './sim';
+import type { SimDb } from './simdb';
 
 // Roles, seats, the kill switch, simulation speed and the latency probe.
 
@@ -78,6 +80,7 @@ export const setSim = spacetimedb.reducer(
     if (!run) throw new SenderError('simulation not initialised');
     if (a.agentsPerTick < 1 || a.agentsPerTick > 20_000) throw new SenderError('agentsPerTick must be 1 to 20,000');
     if (a.tickMicros < 20_000n) throw new SenderError('tickMicros must be at least 20,000 (50 ticks a second)');
+    if (a.running) ensureBusinesses(ctx.db as unknown as SimDb);
     ctx.db.simRun.id.update({ ...run, running: a.running, agentsPerTick: a.agentsPerTick, tickMicros: a.tickMicros, maxDay: a.maxDay || run.maxDay });
     if (a.tickMicros !== run.tickMicros || !ctx.db.simTick.count()) scheduleTick(ctx, a.tickMicros);
   },

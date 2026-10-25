@@ -118,10 +118,12 @@ export function DecisionActions({ claim, refund, decisions, seatRole, seatBusine
   };
 
   if (!open) return (
-    <div className="text-sm" data-testid="decided">
-      Decided: <b>{titleCase(refund.status)}</b>{refund.status === "accepted" ? ` ${money(refund.amount)}` : ""}
-      {entries[0] ? <span className="text-xs text-ink-soft-dark"> · journal entry #{entries[0].id.toString()} posted</span> : null}
-      {credits[0] ? <span className="text-xs text-ink-soft-dark"> · credit {credits[0].before} → {credits[0].after}</span> : null}
+    <div className="space-y-2 text-sm" data-testid="decided">
+      <div>
+        Decided: <b>{titleCase(refund.status)}</b>{refund.status === "accepted" ? ` ${money(refund.amount)}` : ""}
+        {entries[0] ? <span className="text-xs text-ink-soft-dark"> · journal entry #{entries[0].id.toString()} posted</span> : null}
+      </div>
+      <ScoreChange refundId={refund.id} />
     </div>
   );
   return (
@@ -135,6 +137,32 @@ export function DecisionActions({ claim, refund, decisions, seatRole, seatBusine
         <button className="btn btn--fraud btn--sm" disabled={busy || !seatRole || wrongBusiness || !proposal} onClick={() => void decide("decline")} data-testid="decide-decline">Decline</button>
         <button className="btn btn--review btn--sm" disabled={busy || !seatRole || wrongBusiness || extraUsed || extraPending} title={extraUsed ? "The customer has already sent their one extra clip" : extraPending ? "An extra clip is already requested" : undefined} onClick={() => void decide("more_evidence")} data-testid="decide-more">{extraUsed ? "Extra clip already used" : "Request an extra clip"}</button>
       </div>
+    </div>
+  );
+}
+
+const DIRECTION = {
+  gain: { label: "Gained credibility", cls: "text-honest", sign: "+" },
+  loss: { label: "Lost credibility", cls: "text-fraud", sign: "" },
+  same: { label: "No change", cls: "text-ink-soft-dark", sign: "±" },
+} as const;
+const JUDGE: Record<string, string> = { live: "CREAO Score Reviewer", fixture: "CREAO Score Reviewer (fixture)", rule: "Rule (Score Reviewer agent not connected)" };
+
+/** The shopper's Vouch score after this claim, as the CREAO Score Reviewer judged it, with its one-line reason. */
+function ScoreChange({ refundId }: { refundId: bigint }) {
+  const [rows] = useTable(tables.scoreReview.where((r) => r.refundId.eq(refundId)));
+  const r = rows[0];
+  if (!r) return <p className="text-xs text-ink-soft-dark" data-testid="score-pending">Vouch score: waiting for the CREAO Score Reviewer…</p>;
+  const d = DIRECTION[r.direction as keyof typeof DIRECTION] ?? DIRECTION.same;
+  return (
+    <div className="rounded-lg border border-line-dark p-2.5" data-testid="score-change">
+      <div className="flex flex-wrap items-baseline gap-2">
+        <span className="text-xs text-ink-soft-dark">Shopper Vouch score</span>
+        <span className="font-mono">{r.before} → <b>{r.after}</b></span>
+        <span className={`font-semibold ${d.cls}`}>{d.label} ({d.sign}{r.delta})</span>
+      </div>
+      <p className="mt-1 text-sm">{r.reason}</p>
+      <p className="mt-0.5 text-[0.7rem] text-ink-soft-dark">Judged by {JUDGE[r.provenance] ?? r.provenance}{r.runId ? ` · run ${r.runId.slice(0, 14)}` : ""}</p>
     </div>
   );
 }

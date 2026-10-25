@@ -480,6 +480,24 @@ const partnerOrder = table({ name: 'partner_order', public: true }, {
   priceCents: t.u32(),
 });
 
+/**
+ * How a real claim changed the shopper's Vouch score, judged after the decision by the CREAO Score
+ * Reviewer and bounded by code. One row per refund; the business side shows it with its reason.
+ */
+const scoreReview = table({ name: 'score_review', public: true }, {
+  refundId: t.u64().primaryKey(),
+  agentId: t.u32().index(),
+  direction: t.string(), // gain | loss | same
+  delta: t.i32(),
+  before: t.u16(),
+  after: t.u16(),
+  reason: t.string(),
+  decision: t.string(), // accepted | declined
+  runId: t.string(),
+  provenance: t.string(), // live | fixture | rule
+  at: t.timestamp(),
+});
+
 const recommendation = table({ name: 'recommendation', public: true }, {
   claimId: t.u64().primaryKey(),
   jobId: t.u64(),
@@ -523,7 +541,7 @@ export const spacetimedb = schema({
   role, seatCode, counter, simRun, simTick, agent, agentTruth, shopperLink, business, purchase, refundIntent, refund,
   creditEvent, eventFeed, regionStat, merchantFlowDay, fraudPattern, patternEvent, claim, evidence, agentRun, control, decision,
   journalEntry, journalLine, credential, verification, labJob, labEvent, metrics, latencyPing, benchResult,
-  analysisJob, analysisStep, artifact, finding, report, claimScore, recommendation, partnerOrder, returnsPulse, monitorNote,
+  analysisJob, analysisStep, artifact, finding, report, claimScore, recommendation, partnerOrder, scoreReview, returnsPulse, monitorNote,
   // The Refund Finance Desk (finance-schema.ts). Nothing above reads these.
   financeCompany, financeProduct, financeAccount, financePeriod, financeRequest, financeEntry, financeLine, financeObligation,
   financeAudit, financeQueue, financePrecedent, financeReserve, financeClose, financeBridge, financeCluster,

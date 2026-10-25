@@ -35,7 +35,8 @@ interface Props {
   onBusiness?: (id: number) => void;
 }
 
-interface ParticleList { key: string; points: AgentPoint[]; color: string; size: number }
+interface ParticleList { key: string; points: (AgentPoint | BizParticle)[]; color: string; size: number }
+interface BizParticle { lat: number; lng: number; bizId: number }
 
 const scoreColor = (s: number) => (s < 450 ? BAND_COLOR.red : s < 600 ? BAND_COLOR.amber : s < 750 ? BAND_COLOR.neutral : BAND_COLOR.green);
 // Accessors live at module level on purpose: react-globe.gl rebuilds a whole layer whenever an
@@ -46,6 +47,13 @@ const NO_HEX: HexPoint[] = [];
 const landColor = () => "rgba(148,163,184,0.28)";
 const arcDash = (d: object) => (d as Arc).dash;
 const arcGap = () => Math.random();
+// Only the globe surface takes the pointer. Hovering a particle cloud made react-globe.gl's
+// tooltip read a label off undefined inside its animation tick, which threw every frame the
+// pointer sat over the busy middle: the globe stalled there. Picking is done by our own tap
+// handler (nearest merchant, then nearest shopper), so nothing needs particle hover.
+const pointerTarget = (obj: object) => (obj as { __globeObjType?: string }).__globeObjType === "globe";
+// Merchants float above the shopper clouds so a click reaches them first.
+const particleAlt = (d: object) => ((d as { bizId?: number }).bizId !== undefined ? 0.03 : 0.008);
 const ringFade = (d: object) => (t: number) => `${(d as Ring).color}${Math.round((1 - t) * 255).toString(16).padStart(2, "0")}`;
 
 export function WorldGlobe(p: Props) {
@@ -54,7 +62,6 @@ export function WorldGlobe(p: Props) {
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [countries, setCountries] = useState<object[]>([]);
   const [ready, setReady] = useState(false);
-  const elements = useRef(new Map<number, HTMLElement>());
 
   useEffect(() => {
     const el = box.current;
@@ -121,6 +128,38 @@ export function WorldGlobe(p: Props) {
     return lists;
   }, [p.byBand, p.live, p.selected, p.dimmed, p.highlight]);
 
+  // Merchants are a WebGL point layer, not HTML markers: react-globe.gl's CSS2D layer left the
+  // marker buttons detached from the page, so merchants could not be clicked at all.
+  const bizKey = p.businesses.map((b) => `${b.id}:${b.size}:${b.dim ? 1 : 0}`).join(",");
+  const bizLists: ParticleList[] = useMemo(() => {
+    const on = p.businesses.filter((b) => !b.dim);
+    const off = p.businesses.filter((b) => b.dim);
+    const pt = (b: BusinessPoint): BizParticle => ({ lat: b.lat, lng: b.lng, bizId: b.id });
+    const big = on.filter((b) => b.size > 10);
+    return [
+      { key: "biz", points: on.filter((b) => b.size <= 10).map(pt), color: ice ? "#eaaa00" : "#fbbf24", size: 12 },
+      { key: "biz-sel", points: big.map(pt), color: "#ff8a00", size: 18 },
+      { key: "biz-dim", points: off.map(pt), color: "#8a7a5a", size: 5 },
+    ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bizKey, ice]);
+
+  // Our own tap detection. react-globe.gl treats any pointer move while the button is down as a
+  // drag and drops the click, so a real mouse's 1 px wobble made the globe ignore most clicks.
+  const down = useRef<{ x: number; y: number; t: number } | null>(null);
+  const onTap = useRef(p.onGlobe);
+  onTap.current = p.onGlobe;
+  const pointerDown = (e: React.PointerEvent) => { down.current = { x: e.clientX, y: e.clientY, t: performance.now() }; };
+  const pointerUp = (e: React.PointerEvent) => {
+    const d = down.current;
+    down.current = null;
+    if (!d || e.button !== 0 || !globe.current || !box.current) return;
+    if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 6 || performance.now() - d.t > 600) return;
+    const r = box.current.getBoundingClientRect();
+    const c = globe.current.toGlobeCoords(e.clientX - r.left, e.clientY - r.top);
+    if (c) onTap.current(c.lat, c.lng);
+  };
+
   const onBusiness = useRef(p.onBusiness);
   onBusiness.current = p.onBusiness;
   // Keep a list object while its points array is unchanged, so one band changing does not
@@ -128,7 +167,7 @@ export function WorldGlobe(p: Props) {
   const lastParticles = useRef(new Map<string, ParticleList>());
   const stableParticles = useMemo(() => {
     const next = new Map<string, ParticleList>();
-    const out = particles.map((l) => {
+    const out = [...particles, ...bizLists].map((l) => {
       const prev = lastParticles.current.get(l.key);
       const kept = prev && prev.points === l.points && prev.color === l.color && prev.size === l.size ? prev : l;
       next.set(l.key, kept);
@@ -136,29 +175,11 @@ export function WorldGlobe(p: Props) {
     });
     lastParticles.current = next;
     return out;
-  }, [particles]);
+  }, [particles, bizLists]);
 
-  const businessEl = useCallback((d: object) => {
-    const b = d as BusinessPoint;
-    let el = elements.current.get(b.id);
-    if (!el) {
-      el = document.createElement("button");
-      el.className = "globe-biz";
-      el.title = `${b.name} · B-${String(b.id).padStart(3, "0")} · ${b.category}`;
-      el.setAttribute("data-testid", `globe-business-${b.id}`);
-      el.onclick = (ev) => { ev.stopPropagation(); onBusiness.current?.(b.id); };
-      elements.current.set(b.id, el);
-    }
-    const px = Math.max(5, Math.min(26, b.size));
-    el.style.width = `${px}px`;
-    el.style.height = `${px}px`;
-    el.style.opacity = b.dim ? "0.15" : "1";
-    return el;
-  }, []);
 
   return (
-    <div ref={box} className="absolute inset-0 isolate z-0" data-testid="globe">
-      <style>{`.globe-biz{display:block;transform:translate(-50%,-50%) rotate(45deg);background:${ice ? "#eaaa00" : "#fbbf24"};border:1px solid ${ice ? "rgba(58,15,52,0.35)" : "#fff8"};box-shadow:${ice ? "0 0 0 1px rgba(234,170,0,0.35)" : "0 0 10px #fbbf2499"};border-radius:2px;cursor:pointer;pointer-events:auto;padding:0}`}</style>
+    <div ref={box} className="absolute inset-0 isolate z-0" data-testid="globe" onPointerDown={pointerDown} onPointerUp={pointerUp}>
       <ReactGlobe
         ref={globe}
         width={size.w}
@@ -182,17 +203,10 @@ export function WorldGlobe(p: Props) {
         particlesList="points"
         particleLat="lat"
         particleLng="lng"
-        particleAltitude={0.008}
+        particleAltitude={particleAlt}
         particlesColor="color"
         particlesSize="size"
         particlesSizeAttenuation
-        onParticleClick={(pt: object) => p.onAgent((pt as AgentPoint).id)}
-        htmlElementsData={p.businesses}
-        htmlLat="lat"
-        htmlLng="lng"
-        htmlAltitude={0.01}
-        htmlElement={businessEl}
-        htmlTransitionDuration={0}
         arcsData={p.arcs}
         arcStartLat="startLat"
         arcStartLng="startLng"
@@ -224,7 +238,7 @@ export function WorldGlobe(p: Props) {
         hexSideColor={hexSide}
         hexBinMerge
         hexTransitionDuration={0}
-        onGlobeClick={({ lat, lng }: { lat: number; lng: number }) => p.onGlobe(lat, lng)}
+        pointerEventsFilter={pointerTarget}
       />
     </div>
   );

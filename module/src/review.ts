@@ -4,7 +4,7 @@ import { requireRole, worldOf, type Ctx } from './ctx';
 import { MATERIALITY_CENTS } from './desk';
 import { DEFAULT_AUTO_APPROVE_CENTS } from './review-score';
 import { STEP_KEYS } from './review-types';
-import { agentLabel, businessLabel, dollars, refundLabel, settleRefund } from './sim';
+import { agentLabel, applyCredit, businessLabel, dollars, refundLabel, settleRefund } from './sim';
 import type { RefundRow } from './simdb';
 
 // The video reviewer's bookkeeping. The worker runs the pipeline (ingest,
@@ -198,3 +198,36 @@ export function autoDecideImpl(ctx: Ctx, refundId: bigint, amount: number, note:
 }
 
 export const autoDecide = spacetimedb.reducer({ refundId: t.u64(), amount: t.u32(), note: t.string() }, (ctx, a) => autoDecideImpl(ctx, a.refundId, a.amount, a.note));
+
+/** What the CREAO Score Reviewer may move a score by after one claim: code holds these bounds, the agent picks inside them. */
+export const SCORE_BOUNDS = { gain: [1, 15], loss: [-60, -1] } as const;
+
+/**
+ * The shopper's score change for one decided real claim, judged by the CREAO Score Reviewer (or a
+ * labelled rule when that agent is not connected). Once per refund, only after the decision, bounded.
+ */
+export function applyScoreReviewImpl(ctx: Ctx, a: { refundId: bigint; direction: string; delta: number; reason: string; runId: string; provenance: string }) {
+  requireRole(ctx, 'worker');
+  const r = ctx.db.refund.id.find(a.refundId);
+  if (!r) throw new SenderError('no such refund');
+  if (r.status !== 'accepted' && r.status !== 'declined') throw new SenderError(`refund is ${r.status}; the score is reviewed after the decision`);
+  if (ctx.db.scoreReview.refundId.find(a.refundId)) throw new SenderError('this refund already has a score review');
+  if (!['gain', 'loss', 'same'].includes(a.direction)) throw new SenderError('direction must be gain, loss or same');
+  const [lo, hi] = a.direction === 'same' ? [0, 0] : SCORE_BOUNDS[a.direction as 'gain' | 'loss'];
+  const delta = Math.max(lo, Math.min(hi, Math.round(a.delta)));
+  const w = worldOf(ctx);
+  const before = w.agent(r.agentId).score;
+  if (delta !== 0) applyCredit(w, r.agentId, `score_review_${a.direction}`, delta, 'refund', r.id, false);
+  const after = w.agent(r.agentId).score;
+  w.feed('score_review', r.agentId, r.businessId, 0, r.id, `[Score] ${agentLabel(r.agentId)} ${before} → ${after} after ${refundLabel(r.id)}: ${a.reason.slice(0, 120)}`);
+  w.commit();
+  ctx.db.scoreReview.insert({
+    refundId: r.id, agentId: r.agentId, direction: a.direction, delta: after - before, before, after, reason: a.reason.slice(0, 300),
+    decision: r.status, runId: a.runId, provenance: a.provenance, at: ctx.timestamp,
+  });
+}
+
+export const applyScoreReview = spacetimedb.reducer(
+  { refundId: t.u64(), direction: t.string(), delta: t.i32(), reason: t.string(), runId: t.string(), provenance: t.string() },
+  (ctx, a) => applyScoreReviewImpl(ctx, a),
+);

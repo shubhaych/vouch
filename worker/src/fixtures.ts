@@ -3,6 +3,7 @@
 // more evidence, frame reuse or a failed challenge → never accept). This is
 // recorded-style test data, labelled Fixture everywhere it shows; it is not
 // a stand-in model. Recorded files (<seat>.recorded.<name>.json) win.
+import { scoreRule, type ScoreInput } from './review/score-rule';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type { Seat } from './env';
@@ -87,6 +88,7 @@ export function fixtureResponse(seat: Seat, c: unknown): unknown {
   if (seat === 'listing_matcher') return listingFixture(c);
   if (seat === 'policy_checker') return policyFixture(c);
   if (seat === 'risk_scorecard') return scorecardFixture(c);
+  if (seat === 'score_reviewer') return scoreRule(c as unknown as ScoreInput);
   if (seat === 'returns_monitor') return monitorFixture(c);
   if (seat === 'refund_reviewer') return reviewerFixture(c);
   if (seat === 'customer_liaison') return liaisonFixture(c);
