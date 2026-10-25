@@ -26,7 +26,7 @@ export function JudgeNext() {
       <ol className="chapter-path">
         <li className="chapter-path__item chapter-path__item--primary">
           {merchantHref ? (
-            <Link href={merchantHref} className="chapter-path__link" data-testid="chapter-merchant-live">
+            <Link href="/business" className="chapter-path__link" data-testid="chapter-merchant-live">
               <span className="chapter-path__n">01</span>
               <span className="chapter-path__body">
                 <span className="chapter-path__label">
@@ -41,7 +41,7 @@ export function JudgeNext() {
               </span>
             </Link>
           ) : (
-            <Link href="/merchant/claim/fixture" className="chapter-path__link" data-testid="chapter-merchant-waiting">
+            <Link href="/business" className="chapter-path__link" data-testid="chapter-merchant-waiting">
               <span className="chapter-path__n">01</span>
               <span className="chapter-path__body">
                 <span className="chapter-path__label">
