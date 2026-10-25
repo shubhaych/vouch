@@ -29,12 +29,15 @@ const yOf = (score: number, top: number, bottom: number) => top + (1 - Math.min(
  * money in above a dashed line and refunds out below it, then what each refund did to a shopper's score.
  * Marks slide left as they age; the same shopper written several times in the window is bracketed.
  */
-export function LiveFlow({ businessId, day, running, onSelectAgent }: {
-  businessId: number;
+export function LiveFlow({ businessId, day, running, onSelectAgent, scores: showScores = true }: {
+  /** null: every merchant. */
+  businessId: number | null;
   day: number;
   running: boolean | null;
   onSelectAgent: (id: number) => void;
+  scores?: boolean;
 }) {
+  const mine = (b: number) => businessId === null || b === businessId;
   const conn = useConn();
   const reduced = !!useReducedMotion();
   // Row callbacks append here; the clock below copies it into state, so rendering never reads the ref.
@@ -51,17 +54,17 @@ export function LiveFlow({ businessId, day, running, onSelectAgent }: {
       if (marks.current.length > 600) marks.current.splice(0, marks.current.length - 600);
     };
     const onPurchase = (_c: unknown, p: Purchase) => {
-      if (p.business === businessId && fresh(p.day)) push({ kind: "in", t: performance.now(), cents: p.amount, agentId: p.buyer, key: `p${p.id}` });
+      if (mine(p.business) && fresh(p.day)) push({ kind: "in", t: performance.now(), cents: p.amount, agentId: p.buyer, key: `p${p.id}` });
     };
     const onRefund = (_c: unknown, old: Refund, r: Refund) => {
-      if (r.businessId === businessId && r.status === "accepted" && old.status !== "accepted" && fresh(r.decidedDay || r.day)) {
+      if (mine(r.businessId) && r.status === "accepted" && old.status !== "accepted" && fresh(r.decidedDay || r.day)) {
         push({ kind: "out", t: performance.now(), cents: r.amount, agentId: r.agentId, key: `r${r.id}` });
       }
     };
     const onCredit = (_c: unknown, c: CreditEvent) => {
       if (c.causeTable !== "refund" || !fresh(c.day)) return;
       const r = conn.db.refund.id.find(c.causeId);
-      if (!r || r.businessId !== businessId) return;
+      if (!r || !mine(r.businessId)) return;
       push({ kind: "score", t: performance.now(), agentId: c.agentId, delta: c.delta, after: c.after, refundId: c.causeId, key: `c${c.id}` });
     };
     conn.db.purchase.onInsert(onPurchase as never);
@@ -151,7 +154,7 @@ export function LiveFlow({ businessId, day, running, onSelectAgent }: {
         </svg>
       </div>
 
-      <div className="live-flow__chart" data-testid="live-flow-scores">
+      {showScores ? <div className="live-flow__chart" data-testid="live-flow-scores">
         <p className="merchant-flow__legend">
           <span style={{ background: GAIN }} />Score up
           <span style={{ background: LOSS }} />Score down
@@ -205,7 +208,7 @@ export function LiveFlow({ businessId, day, running, onSelectAgent }: {
             <text x={W / 2} y={H / 2 + 4} fontSize={11} textAnchor="middle" fill="#6b4a66">{idle ? "Simulation paused: no score changes." : "Waiting for this merchant's next refund decision…"}</text>
           ) : null}
         </svg>
-      </div>
+      </div> : null}
     </div>
   );
 }
@@ -241,9 +244,14 @@ export function AgentAcrossMerchants({ agentId, agent, businesses, day, onBack }
   }, [creditsAll, refundsAll, agentId, businesses]);
 
   const total = lanes.reduce((s, l) => s + l.marks.length, 0);
-  const laneH = 24;
+  const laneH = 26;
   const height = 30 + Math.max(1, lanes.length) * laneH;
-  const xDay = (d: number) => 96 + ((Math.max(from, d) - from) / Math.max(1, day - from)) * (W - 118);
+  // Marks sit in order along each lane (oldest left), evenly spaced so arrows and labels never stack.
+  const x0 = 100;
+  const span = W - x0 - 30;
+  const maxN = Math.max(1, ...lanes.map((l) => l.marks.length));
+  const step = Math.min(44, span / maxN);
+  const showLabels = step >= 26;
 
   return (
     <div className="live-flow live-flow--agent" data-testid="agent-merchants">
@@ -263,9 +271,9 @@ export function AgentAcrossMerchants({ agentId, agent, businesses, day, onBack }
             return (
               <g key={lane.id}>
                 <text x={4} y={y + 4} fontSize={9.5} fill="#3a0f34" fontWeight={650}>{lane.name.length > 15 ? `${lane.name.slice(0, 14)}…` : lane.name}</text>
-                <line x1={96} x2={W - 8} y1={y} y2={y} stroke="#3a0f34" strokeOpacity={0.12} strokeDasharray="3 4" />
-                {lane.marks.map((m, j) => {
-                  const x = xDay(m.day) + (j % 3) * 2;
+                <line x1={x0} x2={W - 8} y1={y} y2={y} stroke="#3a0f34" strokeOpacity={0.12} strokeDasharray="3 4" />
+                {[...lane.marks].sort((a, b) => a.day - b.day).map((m, j) => {
+                  const x = x0 + 8 + j * step;
                   const up = m.delta > 0;
                   const color = m.delta === 0 ? SAME : up ? GAIN : LOSS;
                   return (
@@ -281,15 +289,15 @@ export function AgentAcrossMerchants({ agentId, agent, businesses, day, onBack }
                       {m.delta === 0 ? <circle cx={x} cy={y} r={4.5} fill={color} /> : (
                         <path d={up ? `M${x},${y - 7} L${x + 5.5},${y + 3} L${x - 5.5},${y + 3} Z` : `M${x},${y + 7} L${x + 5.5},${y - 3} L${x - 5.5},${y - 3} Z`} fill={color} />
                       )}
-                      {m.delta !== 0 ? <text x={x + 7} y={y + 3.5} fontSize={9} fontWeight={700} fill={color}>{up ? `+${m.delta}` : `−${Math.abs(m.delta)}`}</text> : null}
+                      {m.delta !== 0 && showLabels ? <text x={x + 7} y={y + 3.5} fontSize={9} fontWeight={700} fill={color}>{up ? `+${m.delta}` : `−${Math.abs(m.delta)}`}</text> : null}
                     </motion.g>
                   );
                 })}
               </g>
             );
           })}
-          <text x={96} y={height - 2} fontSize={8} fill="#6b4a66">D{from}</text>
-          <text x={W - 8} y={height - 2} fontSize={8} fill="#6b4a66" textAnchor="end">D{day}</text>
+          <text x={x0} y={height - 2} fontSize={8} fill="#6b4a66">oldest</text>
+          <text x={W - 8} y={height - 2} fontSize={8} fill="#6b4a66" textAnchor="end">newest · hover an arrow for its day</text>
           <text x={W / 2} y={12} fontSize={9} textAnchor="middle" fill="#6b4a66">Every merchant that decided one of this shopper&apos;s refunds, newest first</text>
         </svg>
       )}
