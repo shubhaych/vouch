@@ -76,3 +76,39 @@ export function evaluateScoreVerdict(i: ScoreInput, v: unknown): Evaluated {
   if (direction === 'gain' && !supportedByVideo(i)) return { ok: false, why: 'a gain needs video support for the claim' };
   return { ok: true, out: { direction, delta, reason: reason.slice(0, 300) }, notes };
 }
+
+/** What the CREAO panel said: the Refund Investigator's recommendation and the Risk Scorecard's caution. */
+export interface PanelInput {
+  investigator?: { action: string; confidence: number };
+  scorecard?: { caution: string };
+}
+
+/**
+ * The score change from a panel of CREAO seats doing their own jobs on the decided claim. The Refund
+ * Investigator re-reads the finished evidence: when it backs the decision, the footage supported (or
+ * contradicted) the claim. The Risk Scorecard's caution sizes the change. Null when no seat answered.
+ */
+export function panelVerdict(i: ScoreInput, p: PanelInput): ScoreOutput | null {
+  if (!p.investigator && !p.scorecard) return null;
+  const inv = p.investigator;
+  const backs = inv && inv.confidence >= 0.5 ? inv.action : null;
+  const caution = p.scorecard?.caution ?? 'unknown';
+  const size = caution === 'high' ? 'high' : caution === 'low' ? 'low' : 'medium';
+  const named = [inv ? `Refund Investigator ${inv.action.replace('_', ' ')} (${Math.round(inv.confidence * 100)}%)` : '', p.scorecard ? `Risk Scorecard caution ${caution}` : ''].filter(Boolean).join(', ');
+  if (i.decision === 'accepted') {
+    const supported = backs === 'accept' || (!inv && supportedByVideo(i));
+    if (!supported) return { direction: 'same', delta: 0, reason: `Accepted, but the CREAO panel did not find video support for the claim, so no change (${named}).` };
+    const full = i.amountCents >= i.requestedCents && !i.extraClipUsed;
+    const base = full ? 12 : 6;
+    const delta = Math.min(15, Math.max(1, size === 'high' ? Math.round(base / 2) : size === 'low' ? base + 2 : base));
+    return { direction: 'gain', delta, reason: `Accepted with support on video, confirmed by the CREAO panel (${named}).` };
+  }
+  if (i.verifiedFraud) return { direction: 'loss', delta: -60, reason: `Declined after a confirmed fraud pattern (${named}).` };
+  const contradicted = backs === 'decline' || (!inv && contradictedByVideo(i));
+  if (contradicted) {
+    const delta = size === 'high' ? -50 : size === 'low' ? -30 : -40;
+    return { direction: 'loss', delta, reason: `Declined: the CREAO panel found the video contradicted the claim (${named}).` };
+  }
+  const delta = size === 'high' ? -15 : size === 'low' ? -5 : -10;
+  return { direction: 'loss', delta, reason: `Declined on evidence the CREAO panel found inconclusive: a small loss, not a fraud finding (${named}).` };
+}

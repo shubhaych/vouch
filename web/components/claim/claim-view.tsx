@@ -144,7 +144,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 }
 
 /** Who judged the score change, from the score_review row's provenance. */
-const SCORE_JUDGE: Record<string, string> = { live: "CREAO Score Reviewer", fixture: "CREAO Score Reviewer (fixture)", rule: "by rule · CREAO Score Reviewer not connected" };
+const SCORE_JUDGE: Record<string, string> = { live: "CREAO Score Reviewer", fixture: "CREAO Score Reviewer (fixture)", panel_live: "CREAO panel: Refund Investigator + Risk Scorecard", panel_fixture: "CREAO panel (fixture)", rule: "by rule · no CREAO seat answered" };
 
 // The phone shows progress only: step label, status and the customer-safe
 // liveNote. Findings, scores and summaries stay on the business side.

@@ -148,7 +148,7 @@ const DIRECTION = {
   loss: { label: "Lost credibility", cls: "text-fraud", sign: "" },
   same: { label: "No change", cls: "text-ink-soft-dark", sign: "±" },
 } as const;
-const JUDGE: Record<string, string> = { live: "CREAO Score Reviewer", fixture: "CREAO Score Reviewer (fixture)", rule: "Rule (Score Reviewer agent not connected)" };
+const JUDGE: Record<string, string> = { live: "CREAO Score Reviewer", fixture: "CREAO Score Reviewer (fixture)", panel_live: "CREAO panel: Refund Investigator + Risk Scorecard", panel_fixture: "CREAO panel (fixture)", rule: "Rule (Score Reviewer agent not connected)" };
 
 /** The shopper's Vouch score after this claim, as the CREAO Score Reviewer judged it, with its one-line reason. */
 function ScoreChange({ refundId }: { refundId: bigint }) {

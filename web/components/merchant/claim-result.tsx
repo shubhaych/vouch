@@ -202,7 +202,7 @@ function Selected({
                 {review.direction === "gain" ? "Gained credibility" : review.direction === "loss" ? "Lost credibility" : "No change"}: {review.before} → {review.after} ({review.delta >= 0 ? "+" : ""}{review.delta})
               </p>
               <p className="mt-0.5">{review.reason}</p>
-              <p className="mt-0.5 text-xs text-ink-soft-dark">{review.provenance === "rule" ? "Rule (CREAO Score Reviewer not connected)" : `CREAO Score Reviewer${review.provenance === "fixture" ? " (fixture)" : ""}`}</p>
+              <p className="mt-0.5 text-xs text-ink-soft-dark">{review.provenance === "rule" ? "Rule (no CREAO seat answered)" : review.provenance.startsWith("panel") ? `CREAO panel: Refund Investigator + Risk Scorecard${review.provenance === "panel_fixture" ? " (fixture)" : ""}` : `CREAO Score Reviewer${review.provenance === "fixture" ? " (fixture)" : ""}`}</p>
             </div>
           ) : decided ? (
             <p className="mt-2 text-sm text-ink-soft-dark">Decision recorded. The CREAO Score Reviewer is judging the score change…</p>

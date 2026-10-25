@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateScoreVerdict, scoreRule, type ScoreInput } from '../src/review/score-rule';
+import { evaluateScoreVerdict, panelVerdict, scoreRule, type ScoreInput } from '../src/review/score-rule';
 
 // The CREAO Score Reviewer judges inside its brief; the worker checks the answer before the module applies it.
 const base: ScoreInput = { decision: 'accepted', amountCents: 2900, requestedCents: 2900, factory: { action: 'accept', status: 'validated' }, challenge: 'passed', contradicted: false, shopper: { score: 612, band: 'neutral' } };
@@ -48,6 +48,27 @@ describe('score verdict evaluation', () => {
   it('the rule itself passes the evaluation for every decision shape', () => {
     for (const i of [base, declined, inconclusive, { ...declined, verifiedFraud: true }, { ...base, amountCents: 1000 }, { ...base, extraClipUsed: true }]) {
       expect(evaluateScoreVerdict(i, scoreRule(i))).toMatchObject({ ok: true, notes: [] });
+    }
+  });
+});
+
+describe('CREAO panel verdict', () => {
+  const inv = (action: string, confidence = 0.8) => ({ investigator: { action, confidence } });
+  it('an investigator-backed accept is a gain sized by the scorecard', () => {
+    expect(panelVerdict(base, { ...inv('accept'), scorecard: { caution: 'low' } })).toMatchObject({ direction: 'gain', delta: 14 });
+    expect(panelVerdict(base, { ...inv('accept'), scorecard: { caution: 'high' } })).toMatchObject({ direction: 'gain', delta: 6 });
+  });
+  it('an accept the investigator does not back is no change', () => {
+    expect(panelVerdict(base, inv('more_evidence'))).toMatchObject({ direction: 'same', delta: 0 });
+  });
+  it('an investigator-backed decline is a contradicted loss; otherwise a small loss', () => {
+    expect(panelVerdict(inconclusive, { ...inv('decline'), scorecard: { caution: 'medium' } })).toMatchObject({ direction: 'loss', delta: -40 });
+    expect(panelVerdict(inconclusive, { ...inv('accept'), scorecard: { caution: 'high' } })).toMatchObject({ direction: 'loss', delta: -15 });
+  });
+  it('returns null with no seat, and every panel answer passes the evaluator', () => {
+    expect(panelVerdict(base, {})).toBeNull();
+    for (const i of [base, declined, inconclusive]) for (const a of ['accept', 'decline', 'more_evidence']) for (const c of ['low', 'medium', 'high', 'unknown']) {
+      expect(evaluateScoreVerdict(i, panelVerdict(i, { ...inv(a), scorecard: { caution: c } }))).toMatchObject({ ok: true });
     }
   });
 });
