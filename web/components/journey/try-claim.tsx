@@ -214,6 +214,8 @@ function LiveHandoff() {
 
   useEffect(() => {
     if (phase !== "buying" || !newestPurchase || targetRefund || refunding.current) return;
+    // After a reload the purchase row can arrive before its refund row; the refund already exists, so wait for it.
+    if (newestPurchase.status !== "ordered" && newestPurchase.status !== "delivered") return;
     const purchaseId = newestPurchase.id;
     const needsDeliver = newestPurchase.status === "ordered";
     const sku = newestPurchase.item;
