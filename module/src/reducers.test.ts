@@ -109,16 +109,31 @@ describe('T2.9 segregation of duties', () => {
     expect(k.db.journalLine.count()).toBe(2n);
   });
 
-  it('a decline is reviewed for the score afterwards, and only a person can decline', () => {
+  it('a CREAO decline verdict scores at once, but only a person can decline the refund', () => {
     const k = world();
     const { refundId, agentId } = liveClaim(k, 1);
     const before = k.db.agent.id.find(agentId)!.score;
     k.as(worker, (ctx) => proposeImpl(ctx, proposal(refundId, 0, 'decline')));
-    expect(() => k.as(worker, (ctx) => applyScoreReviewImpl(ctx, { refundId, direction: 'loss', delta: -40, reason: 'x', runId: 'r', provenance: 'rule' }))).toThrow(/after the decision/);
-    k.as(biz, (ctx) => decideImpl(ctx, refundId, 'decline', 0, 'item intact'));
-    expect(k.db.agent.id.find(agentId)!.score).toBe(before);
     k.as(worker, (ctx) => applyScoreReviewImpl(ctx, { refundId, direction: 'loss', delta: -40, reason: 'Video shows the item intact', runId: 'r', provenance: 'rule' }));
     expect(k.db.agent.id.find(agentId)!.score).toBe(before - 40);
+    expect(k.db.refund.id.find(refundId)!.status).toBe('recommended');
+    k.as(biz, (ctx) => decideImpl(ctx, refundId, 'decline', 0, 'item intact'));
+    expect(k.db.refund.id.find(refundId)!.status).toBe('declined');
+    expect(k.db.agent.id.find(agentId)!.score).toBe(before - 40);
+  });
+
+  it('a CREAO accept or decline verdict can move the score before a person decides; more evidence cannot', () => {
+    const k = world();
+    const { refundId, agentId } = liveClaim(k, 1);
+    const before = k.db.agent.id.find(agentId)!.score;
+    k.as(worker, (ctx) => proposeImpl(ctx, proposal(refundId, 0, 'more_evidence')));
+    expect(() => k.as(worker, (ctx) => applyScoreReviewImpl(ctx, { refundId, direction: 'gain', delta: 10, reason: 'x', runId: 'r', provenance: 'rule' }))).toThrow(/CREAO verdict/);
+    k.as(worker, (ctx) => proposeImpl(ctx, proposal(refundId, 24_900)));
+    k.as(worker, (ctx) => applyScoreReviewImpl(ctx, { refundId, direction: 'gain', delta: 12, reason: 'Wrong colour shown clearly', runId: 'r', provenance: 'panel_live' }));
+    expect(k.db.agent.id.find(agentId)!.score).toBe(before + 12);
+    expect(k.db.scoreReview.refundId.find(refundId)?.decision).toBe('creao_accept');
+    k.as(biz, (ctx) => decideImpl(ctx, refundId, 'accept', 24_900, ''));
+    expect(k.db.agent.id.find(agentId)!.score).toBe(before + 12);
   });
 });
 

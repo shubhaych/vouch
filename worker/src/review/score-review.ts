@@ -1,4 +1,4 @@
-// After a person (or the bounded auto-approve) decides a real claim, CREAO
+// After a CREAO verdict that was not put on hold, or a person's decision, on a real claim, CREAO
 // agents judge what it does to the shopper's Vouch score. Preferred: the saved
 // Score Reviewer gives a direct verdict. Always, when their seats are connected:
 // a panel of the Refund Investigator (does the evidence back the decision?) and
@@ -31,15 +31,31 @@ export class ScoreReviewer {
 
   start() {
     const db = this.conn.db;
-    db.refund.onUpdate((_c, _o, r) => this.consider(r));
-    for (const r of db.refund.iter()) this.consider(r);
+    // Only decisions arrive on their own; a CREAO verdict comes through afterVerdict, so a held review never scores.
+    db.refund.onUpdate((_c, _o, r) => { if (r.status === 'accepted' || r.status === 'declined') this.consider(r); });
+    for (const r of db.refund.iter()) if (r.status === 'accepted' || r.status === 'declined') this.consider(r);
     const seats = (['score_reviewer', ...PANEL] as Seat[]).map((s) => `${s}=${seatAvailable(s) ? seatPath(s) : 'off'}`).join(' ');
     log(`score reviewer started: CREAO ${seats}`);
     if (!PANEL.some((s) => seatAvailable(s)) && !seatAvailable('score_reviewer')) log('WARNING: no CREAO seat can judge score changes; they fall back to the labelled rule');
   }
 
+  /** Called by the video review when it reached a verdict that was not put on hold. */
+  afterVerdict(refundId: bigint) {
+    const r = this.conn.db.refund.id.find(refundId);
+    if (r && this.verdictOf(r)) this.consider(r);
+  }
+
+  /** accepted/declined after a decision, or the open CREAO accept/decline proposal before one. */
+  private verdictOf(r: Refund): 'accepted' | 'declined' | null {
+    if (r.status === 'accepted' || r.status === 'declined') return r.status;
+    if (r.status !== 'recommended') return null;
+    const open = [...this.conn.db.decision.refundId.filter(r.id)].filter((d) => d.status === 'proposed' || d.status === 'sent_to_controller').sort((a, b) => Number(b.id - a.id))[0];
+    return open?.action === 'accept' ? 'accepted' : open?.action === 'decline' ? 'declined' : null;
+  }
+
   private consider(r: Refund) {
-    if (r.source === 'sim' || (r.status !== 'accepted' && r.status !== 'declined')) return;
+    if (r.source === 'sim' || (r.status !== 'accepted' && r.status !== 'declined' && r.status !== 'recommended')) return;
+    if (!this.verdictOf(r)) return;
     if (this.busy.has(r.id) || this.conn.db.scoreReview.refundId.find(r.id)) return;
     this.busy.add(r.id);
     void this.run(r).catch((e) => log(`score review R-${r.id} failed: ${(e as Error).message}`)).finally(() => this.busy.delete(r.id));
@@ -58,7 +74,7 @@ export class ScoreReviewer {
     // Only a confirmed pattern naming this shopper counts as verified fraud; a detector flag alone never does.
     const verifiedFraud = [...db.fraudPattern.iter()].some((p) => p.status === 'confirmed' && p.agentIds.includes(r.agentId));
     const input: ScoreInput = {
-      decision: r.status as 'accepted' | 'declined',
+      decision: this.verdictOf(r) ?? 'accepted',
       amountCents: r.amount,
       requestedCents: purchase?.amount ?? r.amount,
       factory: A ? { action: A.action, status: A.status, nextStep: A.nextStep, rationale: A.rationale.slice(0, 400) } : undefined,

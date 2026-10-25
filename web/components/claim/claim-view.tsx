@@ -166,7 +166,7 @@ function ReviewerStepper({ rows, decided, scoreReview }: { rows: readonly Analys
           let status = s?.status ?? "pending";
           let tag: string | null = null;
           let note: string | null = s?.liveNote || null;
-          if (k === "review" && decided) {
+          if (k === "review" && (decided || scoreReview)) {
             if (scoreReview) {
               status = "done";
               tag = SCORE_JUDGE[scoreReview.provenance] ?? scoreReview.provenance;
@@ -174,11 +174,11 @@ function ReviewerStepper({ rows, decided, scoreReview }: { rows: readonly Analys
             } else {
               status = "running";
               tag = null;
-              note = "The CREAO Score Reviewer is judging what this decision does to your score.";
+              note = "CREAO is judging what this outcome does to your score.";
             }
           } else if (k === "review" && status === "skipped") {
             // Before the decision the Refund Reviewer seat may be absent; the Score Reviewer still runs after it.
-            tag = "after the decision";
+            tag = "after the verdict";
             note = null;
           }
           const done = status === "done";

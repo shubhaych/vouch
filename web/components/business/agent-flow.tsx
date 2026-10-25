@@ -260,7 +260,7 @@ function scoreContributor(review: ScoreReview | undefined, out: Contributor[], m
   if (!review || (review.provenance !== "live" && review.provenance !== "fixture")) return;
   out.push({
     key: "score_reviewer", name: "Score Reviewer", sponsor: "CREAO", prov: provOf(review.provenance),
-    role: "After the decision, judges how this claim should move the shopper's Vouch score, within fixed bounds.",
+    role: "After a CREAO verdict that is not on hold (or a decision), judges how this claim should move the shopper's Vouch score, within fixed bounds.",
     insight: review.reason, moments: [], source: `The decision (${review.decision}) and the shopper's history`, details: [],
     feeds: [{ metric: "vouch", how: `moved the score ${review.delta >= 0 ? "+" : ""}${review.delta}` }],
   });

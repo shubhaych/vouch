@@ -69,6 +69,8 @@ export interface ReviewRunnerOptions {
   takeCreaoBudget: () => boolean;
   /** Showcase claims the home demo marked as live (the others are replayed, never reviewed). */
   liveShowcaseClaims: Set<bigint>;
+  /** A verdict that was not put on hold: the shopper's score is judged now, not after a person decides. */
+  onVerdict?: (refundId: bigint) => void;
 }
 
 class ReviewFailure extends Error {}
@@ -470,6 +472,7 @@ export class ReviewRunner {
           }
         }
         await step('decision', 'done', `${tier.tier} ${TIER_LABEL[tier.tier]}: proposed ${action}${amount ? ` ${money(amount)}` : ''}.${decided}${decided ? '' : ' A person decides.'}`, customerMsg);
+        if (action === 'accept' || action === 'decline') this.opts.onVerdict?.(refund.id);
       }
       const secs = Math.round((Date.now() - t0) / 1000);
       await r.finishAnalysis({ jobId, status: lanesOnly ? 'lanes_only' : 'done', costNote: `${droidSessions} Droid session(s), ${creaoRuns} CREAO run(s), ${secs} s`, droidSessions: Math.min(255, droidSessions) });

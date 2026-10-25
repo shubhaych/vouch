@@ -192,9 +192,9 @@ function Selected({
             <span className="text-sm text-ink-soft-dark">/ 1000 · {agent?.band ?? "…"}</span>
             <Badge kind="live" />
           </div>
-          {reviewPending || waitingVideo ? (
+          {(reviewPending || waitingVideo) && !review ? (
             <p className="mt-2 text-sm text-review">
-              Review pending — score unchanged until a confirmed merchant decision.
+              Review pending. The score moves once CREAO reaches a verdict, and not while the claim is on hold.
             </p>
           ) : review ? (
             <div className="mt-2 text-sm" data-testid="claim-score-review">
@@ -339,7 +339,7 @@ function FixtureResult() {
             Confirmed history
           </span>
           <p className="mt-2 text-2xl font-bold">{scoreLabel(claim.scoreBefore)}</p>
-          <p className="mt-1 text-sm text-ink-soft">Review pending — score unchanged until a confirmed outcome.</p>
+          <p className="mt-1 text-sm text-ink-soft">Review pending. The score moves once CREAO reaches a verdict, and not while the claim is on hold.</p>
         </div>
       </div>
 

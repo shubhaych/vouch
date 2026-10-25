@@ -327,15 +327,17 @@ async function main() {
   const credentials = new Credentials(conn);
   await credentials.start();
   const orchestrator = new Orchestrator(conn, (agentId, refundId, verifier) => credentials.check(agentId, refundId, verifier));
+  const scoreReviewer = new ScoreReviewer(conn);
   // The video reviewer owns every claim with a video; the Desk Lead keeps simulated and video-less claims. REVIEW_ENABLED=0 restores the old path.
   if (config.review.enabled) {
     const reviewer = new ReviewRunner(conn, (agentId, refundId, verifier) => credentials.check(agentId, refundId, verifier), {
       takeCreaoBudget: () => orchestrator.takeBudget(), liveShowcaseClaims: orchestrator.liveShowcaseClaims,
+      onVerdict: (refundId) => scoreReviewer.afterVerdict(refundId),
     });
     orchestrator.handledByReviewer = (c) => reviewer.handles(c);
     reviewer.start();
   }
-  new ScoreReviewer(conn).start();
+  scoreReviewer.start();
   keepSimRunning(conn);
   orchestrator.start();
   new DetectorRunner(conn).start();

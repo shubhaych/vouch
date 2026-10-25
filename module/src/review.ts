@@ -210,7 +210,15 @@ export function applyScoreReviewImpl(ctx: Ctx, a: { refundId: bigint; direction:
   requireRole(ctx, 'worker');
   const r = ctx.db.refund.id.find(a.refundId);
   if (!r) throw new SenderError('no such refund');
-  if (r.status !== 'accepted' && r.status !== 'declined') throw new SenderError(`refund is ${r.status}; the score is reviewed after the decision`);
+  // A CREAO verdict (an open accept/decline proposal) is enough: the worker only asks when the review was
+  // not put on hold (extra clip, a person, offline). A later merchant decision does not apply it twice.
+  let verdict = '';
+  if (r.status === 'recommended') {
+    let open: { id: bigint; action: string } | undefined;
+    for (const d of ctx.db.decision.refundId.filter(r.id)) if ((d.status === 'proposed' || d.status === 'sent_to_controller') && (!open || d.id > open.id)) open = d;
+    if (open && (open.action === 'accept' || open.action === 'decline')) verdict = `creao_${open.action}`;
+  }
+  if (r.status !== 'accepted' && r.status !== 'declined' && !verdict) throw new SenderError(`refund is ${r.status}; the score is reviewed after the decision or a CREAO verdict`);
   if (ctx.db.scoreReview.refundId.find(a.refundId)) throw new SenderError('this refund already has a score review');
   if (!['gain', 'loss', 'same'].includes(a.direction)) throw new SenderError('direction must be gain, loss or same');
   const [lo, hi] = a.direction === 'same' ? [0, 0] : SCORE_BOUNDS[a.direction as 'gain' | 'loss'];
@@ -223,7 +231,7 @@ export function applyScoreReviewImpl(ctx: Ctx, a: { refundId: bigint; direction:
   w.commit();
   ctx.db.scoreReview.insert({
     refundId: r.id, agentId: r.agentId, direction: a.direction, delta: after - before, before, after, reason: a.reason.slice(0, 300),
-    decision: r.status, runId: a.runId, provenance: a.provenance, at: ctx.timestamp,
+    decision: verdict || r.status, runId: a.runId, provenance: a.provenance, at: ctx.timestamp,
   });
 }
 
