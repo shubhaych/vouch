@@ -81,6 +81,7 @@ export const config = {
   factoryKey: str('FACTORY_API_KEY'),
   seed: BigInt(str('SIM_SEED', '11')),
   population: Number(str('SIM_POPULATION', '10000')),
+  financeDeskEnabled: str('FINANCE_DESK', '0') === '1',
 };
 
 export type Seat = keyof typeof config.creao.agentIds;

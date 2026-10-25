@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useTable } from "spacetimedb/react";
+import Link from "next/link";
 import { tables } from "@/module_bindings";
 import type { AnalysisJob, Claim, Report as ReportRow } from "@/module_bindings/types";
 import { Badge } from "@/components/ui/badge";
@@ -65,7 +66,16 @@ export function ReportPanel({ claim, row, order, actions }: { claim: Claim; row:
   const [recs] = useTable(tables.recommendation.where((r) => r.claimId.eq(claim.id)));
   const rec = recs.find((r) => r.jobId === row.jobId);
   if (!report) return <div className="glass p-4 text-sm text-review" data-testid="report-panel">The report for this claim could not be read.</div>;
-  return <ReportContent key={String(row.jobId)} report={report.order || !order ? report : { ...report, order }} claimId={claim.id} auditPassed={row.auditPassed} autoDecided={!!rec?.autoDecided} fallbackReel={row.proofReelUrl} actions={actions} />;
+  return (
+    <div className="min-w-0 space-y-3">
+      {process.env.NEXT_PUBLIC_DESK === "1" ? (
+        <div className="flex justify-end">
+          <Link className="btn btn--secondary btn--sm" href={`/desk?claim=${claim.id}&refund=${claim.refundId}`}>Finance impact</Link>
+        </div>
+      ) : null}
+      <ReportContent key={String(row.jobId)} report={report.order || !order ? report : { ...report, order }} claimId={claim.id} auditPassed={row.auditPassed} autoDecided={!!rec?.autoDecided} fallbackReel={row.proofReelUrl} actions={actions} />
+    </div>
+  );
 }
 
 type OpenImage = (list: ReportArtifact[], index: number) => void;

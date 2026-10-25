@@ -48,6 +48,14 @@ async function main() {
     log(`world: day ${run.day}, ${run.population} agents, running=${run.running}`);
   }
 
+  // The finance portfolio is an optional, isolated module add-on. Seed its
+  // catalog and rows only when enabled; it never changes the refund path.
+  if (config.financeDeskEnabled) {
+    await conn.reducers.financeSeedPortfolio({ seed: config.seed, force: false })
+      .then(() => log('Finance Desk portfolio is seeded (paused until a controller starts it)'))
+      .catch((e: Error) => log(`Finance Desk unavailable; main refund path continues: ${e.message}`));
+  }
+
   if (config.creao.mode === 'live') {
     try { await resolveAgents(); } catch (e) { log(`CREAO live mode is not ready: ${(e as Error).message}. Claims will wait as "investigator offline" until fixed.`); }
   }

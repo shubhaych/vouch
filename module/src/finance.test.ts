@@ -31,6 +31,7 @@ const actor = (ctx: Ctx, role: string): Actor => ({ who: ctx.sender, role });
 const base = { companyId: COMPANY, decisionRef: 'D-1', formulaVersion: 'v1', evidenceIds: 'A-1,A-2', processorRef: 'ch_1' };
 const audits = (ctx: Ctx, rule: string) => [...ctx.db.financeAudit.iter()].filter((a) => a.rule === rule && a.refused);
 let workerActor: Actor;
+let accountantIdentity: Actor['who'];
 
 describe('the ledger as reducers', () => {
   it('books Maya end to end through request, prepare, accrual, reversal and the return; the trial balance is zero', () => {
@@ -66,6 +67,7 @@ describe('the ledger as reducers', () => {
   it('refuses an unbalanced proposal, an entry into a locked period, editing a posted entry and self-approval, and audits each', () => {
     const k = desk();
     k.as(worker, (ctx) => { workerActor = actor(ctx, 'worker'); });
+    k.as(accountant, (ctx) => { accountantIdentity = ctx.sender; });
     // unbalanced
     const r1 = k.as(worker, (ctx) => requestImpl(ctx, { ...base, kind: 'clawback', cents: 100, period: '2026-08', memo: 'x', sourceRef: 'cluster:1' }, workerActor));
     k.as(accountant, (ctx) => expect(prepareImpl(ctx, r1, actor(ctx, 'accountant'), { lines: [{ account: '1010', debit: 100, credit: 0 }, { account: '4100', debit: 0, credit: 99 }] })).toBe(0n));
@@ -86,7 +88,7 @@ describe('the ledger as reducers', () => {
     k.as(accountant, (ctx) => editEntryImpl(ctx, e3, actor(ctx, 'accountant')));
     k.as(worker, (ctx) => expect(audits(ctx, 'POSTED_IMMUTABLE')).toHaveLength(1));
     // close and lock August, then try to write into it
-    k.as(worker, (ctx) => closeLiteImpl(ctx, COMPANY, '2026-08', workerActor, { who: accountant.identity ?? ctx.sender, role: 'accountant' }));
+    k.as(worker, (ctx) => closeLiteImpl(ctx, COMPANY, '2026-08', workerActor, { who: accountantIdentity, role: 'accountant' }));
     k.as(controller, (ctx) => lockPeriodImpl(ctx, COMPANY, '2026-08', actor(ctx, 'controller')));
     const r4 = k.as(worker, (ctx) => requestImpl(ctx, { ...base, kind: 'leg2_authorized', cents: 45_00, period: '2026-08', memo: 'late', sourceRef: 'o:3' }, workerActor));
     k.as(accountant, (ctx) => expect(prepareImpl(ctx, r4, actor(ctx, 'accountant'))).toBe(0n));

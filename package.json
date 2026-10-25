@@ -30,7 +30,9 @@
     "hello:creao": "tsx scripts/hello-creao.ts",
     "hello:droid": "tsx scripts/hello-droid.ts",
     "demo:reset": "tsx scripts/demo-reset.ts",
-    "eval": "tsx detectors/eval.ts"
+    "eval": "tsx detectors/eval.ts",
+    "desk:book": "node --import tsx worker/src/finance/build-book.ts build",
+    "desk:reconcile": "node --import tsx worker/src/finance/build-book.ts reconcile"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

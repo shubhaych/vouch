@@ -30,3 +30,6 @@ playwright-report/
 # spacetime publish build output
 module/dist/
 .stdb/
+
+# Finance Desk: the generated DuckDB book (rebuild with npm run desk:book)
+worker/data/
