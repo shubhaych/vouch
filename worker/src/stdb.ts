@@ -9,7 +9,7 @@ import { config, log } from './env';
 
 export type Conn = DbConnection;
 /** worker and poster claim their roles once; showcase is a third identity that takes the business seat for the home demo. */
-export type Label = 'worker' | 'poster' | 'showcase';
+export type Label = 'worker' | 'poster' | 'showcase' | 'accountant' | 'reconciler' | 'analyst';
 
 // One token per server and database: a token issued by the local server is rejected by
 // Maincloud (and the other way round), so switching servers must not reuse it.
@@ -47,7 +47,8 @@ export function connect(label: Label, queries: string[], timeoutMs = 30_000): Pr
             if (!mine && label !== 'showcase') {
               try {
                 if (label === 'worker') await conn.reducers.bootstrapWorker({});
-                else await conn.reducers.bootstrapPoster({});
+                else if (label === 'poster') await conn.reducers.bootstrapPoster({});
+                else await conn.reducers.bootstrapFinanceSeat({ seat: label });
                 log(`${label} identity ${hex.slice(0, 12)}… claimed the ${label} role`);
               } catch (e) {
                 log(`could not claim the ${label} role: ${(e as Error).message}. If another machine became the ${label} first, republish with --delete-data (demo data only).`);

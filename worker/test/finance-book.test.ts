@@ -2,7 +2,8 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { generateBook, openBook, rows } from '../src/finance/book';
+import { BOOK_MONTHS, generateBook, openBook, rows } from '../src/finance/book';
+import { reconcilePeriod } from '../src/finance/reconcile';
 
 const dir = mkdtempSync(join(tmpdir(), 'vouch-finance-book-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -22,6 +23,11 @@ describe('seeded featured-company book', () => {
       const truthA = await rows(ca, `SELECT * FROM grader_truth ORDER BY exception_id`);
       const truthB = await rows(cb, `SELECT * FROM grader_truth ORDER BY exception_id`);
       expect(truthA).toEqual(truthB);
+      for (const period of BOOK_MONTHS) {
+        const close = await reconcilePeriod(ca, period);
+        expect(close.summary.events).toBeGreaterThan(0);
+        expect(close.bridge.reduce((sum, line) => sum + line.cents, 0)).toBe(0);
+      }
       expect(a.ms).toBeLessThan(5 * 60_000);
     } finally {
       ca.closeSync();

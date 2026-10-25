@@ -8,8 +8,11 @@ import { tables } from "@/module_bindings";
 import { Badge } from "@/components/ui/badge";
 import { money } from "@/lib/format";
 import { useCall } from "@/lib/stdb/hooks";
+import { WORKER_URL } from "@/lib/stdb/config";
+import { toast } from "@/components/ui/toast";
 
 const cents = (n: bigint | number) => money(Number(n) / 100);
+const PERIODS = ["2026-09", "2026-08", "2026-07", "2026-06", "2026-05", "2026-04", "2026-03", "2026-02", "2026-01", "2025-12", "2025-11", "2025-10"];
 
 export function FinanceDesk() {
   const params = useSearchParams();
@@ -17,11 +20,16 @@ export function FinanceDesk() {
   const [simState] = useTable(tables.financeSimState);
   const call = useCall();
   const [selectedId, setSelectedId] = useState(1);
+  const [period, setPeriod] = useState("2026-09");
+  const [controllerCode, setControllerCode] = useState("");
+  const [closing, setClosing] = useState(false);
   const [states] = useTable(tables.financeCompanyState.where((r) => r.companyId.eq(selectedId)));
   const [hours] = useTable(tables.financeStatsHourly.where((r) => r.companyId.eq(selectedId)));
   const [obligations] = useTable(tables.financeObligation.where((r) => r.companyId.eq(selectedId)));
   const [entries] = useTable(tables.financeEntry.where((r) => r.companyId.eq(selectedId)));
   const [queue] = useTable(tables.financeQueue.where((r) => r.companyId.eq(selectedId)));
+  const [closes] = useTable(tables.financeClose.where((r) => r.companyId.eq(selectedId)));
+  const [bridgeRows] = useTable(tables.financeBridge.where((r) => r.companyId.eq(selectedId)));
   const company = companies.find((c) => c.id === selectedId);
   const state = states[0];
   const latest = useMemo(() => [...hours].sort((a, b) => Number(b.simHour - a.simHour))[0], [hours]);
@@ -30,6 +38,24 @@ export function FinanceDesk() {
   const unresolved = queue.filter((q) => q.status === "open");
   const claimRef = params.get("claim");
   const isLivePortfolio = !!simState[0];
+  const close = closes.find((c) => c.period === period);
+  const bridge = bridgeRows.filter((b) => b.period === period).sort((a, b) => Number(b.id - a.id));
+
+  const runClose = async () => {
+    setClosing(true);
+    try {
+      const response = await fetch(`${WORKER_URL}/finance/close/${period}`, {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: controllerCode }),
+      });
+      const body = await response.json() as { error?: string; status?: string };
+      if (!response.ok) throw new Error(body.error || `Close failed (${response.status})`);
+      toast(`Close ${period} recorded. Review the bridge before locking.`, "honest");
+    } catch (error) {
+      toast((error as Error).message || `Finance worker at ${WORKER_URL} is unavailable.`, "fraud");
+    } finally {
+      setClosing(false);
+    }
+  };
 
   return (
     <main className="app-dark mx-auto min-h-screen max-w-[1440px] space-y-5 px-4 py-6 text-ink-dark sm:px-6" data-testid="finance-desk">
@@ -88,6 +114,31 @@ export function FinanceDesk() {
         </div>
       </section>
 
+      <section className="glass space-y-4 p-4" data-testid="finance-close">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div><p className="panel-title">Period close · three-way reconciliation</p><p className="mt-1 text-xs text-ink-soft-dark">Processor is authoritative for cash movement, the bank for settlement, and the Vouch log for authorization. The ledger is derived.</p></div>
+          <Badge kind="simulated" />
+        </div>
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="text-xs text-ink-soft-dark">Period<select className="mt-1 block rounded-md border border-line-dark bg-black/30 px-3 py-2 text-sm" value={period} onChange={(e) => setPeriod(e.target.value)}>{PERIODS.map((p) => <option key={p}>{p}</option>)}</select></label>
+          {selectedId === 1 ? <>
+            <label className="text-xs text-ink-soft-dark">Controller code<input className="mt-1 block w-48 rounded-md border border-line-dark bg-black/30 px-3 py-2 text-sm" type="password" value={controllerCode} onChange={(e) => setControllerCode(e.target.value)} /></label>
+            <button className="btn btn--primary btn--sm" onClick={() => void runClose()} disabled={closing || !controllerCode}>{closing ? "Reconciling…" : "Run close"}</button>
+          </> : <p className="text-xs text-ink-soft-dark">Lite-company close uses its in-module ledger; the one-million-order reconciliation is available for Brindle &amp; Co.</p>}
+        </div>
+        {close ? <>
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+            <Mini label="Ledger" value={Number(close.ledgerCents) / 100} formatMoney />
+            <Mini label="Processor" value={Number(close.processorCents) / 100} formatMoney />
+            <Mini label="Bank" value={Number(close.bankCents) / 100} formatMoney />
+            <Mini label="Matched / events" value={`${close.matched.toLocaleString()} / ${close.events.toLocaleString()}`} />
+            <Mini label="Close status" value={close.status} />
+          </div>
+          <p className="text-xs text-ink-soft-dark">{close.memo}</p>
+        </> : <p className="text-sm text-ink-soft-dark">No close snapshot for {period} yet.</p>}
+        {bridge.length ? <div className="overflow-x-auto"><table className="w-full min-w-[660px] text-left text-sm"><thead className="text-xs text-ink-soft-dark"><tr><th className="p-2">Variance bridge</th><th className="p-2">Delta</th><th className="p-2">Authority</th><th className="p-2">Explanation</th></tr></thead><tbody>{bridge.map((b) => <tr key={String(b.id)} className="border-t border-line-dark/70"><td className="p-2">{b.cause}</td><td className="p-2 font-mono">{cents(b.cents)}</td><td className="p-2">{b.winner}</td><td className="p-2 text-xs text-ink-soft-dark">{b.why} · {b.explained ? "explained" : "unexplained"}</td></tr>)}</tbody></table><p className="mt-2 text-right text-xs text-ink-soft-dark">Bridge total: {cents(bridge.reduce((sum, b) => sum + b.cents, 0n))}</p></div> : null}
+      </section>
+
       <section className="glass overflow-hidden">
         <div className="flex items-center justify-between border-b border-line-dark p-4">
           <div><p className="panel-title">Return obligations</p><p className="mt-1 text-xs text-ink-soft-dark">A conditional refund leg is accrued until the warehouse confirms the return.</p></div>
@@ -111,6 +162,7 @@ function Metric({ title, value, note }: { title: string; value: string; note: st
   return <div className="glass p-4"><p className="text-xs text-ink-soft-dark">{title}</p><p className="mt-2 text-2xl font-semibold tabular-nums">{value}</p><p className="mt-1 text-xs text-ink-soft-dark">{note}</p><Badge kind="simulated" /></div>;
 }
 
-function Mini({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-lg border border-line-dark/70 p-3"><p className="text-xs text-ink-soft-dark">{label}</p><p className="mt-1 text-xl font-semibold tabular-nums">{value.toLocaleString()}</p></div>;
+function Mini({ label, value, formatMoney = false }: { label: string; value: number | string; formatMoney?: boolean }) {
+  const text = typeof value === "number" ? (formatMoney ? money(value) : value.toLocaleString()) : value;
+  return <div className="rounded-lg border border-line-dark/70 p-3"><p className="text-xs text-ink-soft-dark">{label}</p><p className="mt-1 text-xl font-semibold tabular-nums">{text}</p></div>;
 }

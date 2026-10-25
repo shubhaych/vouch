@@ -10,10 +10,17 @@ Started during Cal Hacks 13.0. First commit: `cc89a17`, 2026-10-23 20:57:05 -070
 | `/world` | The globe: 10,000 agents, 60 businesses, purchase and refund arcs, the event monitor, agent panels, the Fraud Replay and the Observatory. |
 | `/shop`, `/claim/[id]` | The shopper's phone flow: join, buy, fast-forward, request a refund, record a video holding up the requested number of fingers, then watch the reviewer's steps (received, transcribed, frames, integrity, Droid investigating, proof, audit, score, reviewed, decision). |
 | `/business` | The refunds desk: the CREAO org chart with the kill switch, the video reviewer's report (tier, proof reel with a timeline, one finding per spoken claim with clips, integrity, history, score, the Reviewer's opinion, how it was investigated, limits), the five-step credential check, the recommendation, the decision. |
+| `/desk` | The opt-in Refund Finance Desk: the seeded 100-company portfolio, return obligations and the featured-company close view. Set `NEXT_PUBLIC_DESK=1` for the Finance impact link; set `FINANCE_DESK=1` for the worker's isolated book and close endpoint. |
 | `/lab` | The Droid Detector Lab: queued jobs, the plan, tool calls, the diff, scores on a fresh world, promote or reject. |
 | `/system` | Live row counts, agent-steps per second, events per second, ping p50/p95, and benchmark results. |
 
 Every number on screen carries a badge: **Live** means computed now from SpacetimeDB rows, **Simulated** means it comes from the agent simulation, **Fixture** means recorded test data, and **Replay** means the replay of a real run. The agents are synthetic: "Simulated agents. Vouch does not track real locations."
+
+## Refund Finance Desk (in progress)
+
+The Desk is a company-finance add-on to the existing refund flow. It tracks the refund's effect on the company's revenue, cash, conditional return obligations, reserve and forecast, with a separate controller review. The first slice includes a reproducible one-million-order DuckDB book, a read-only three-way reconciliation, and a SpacetimeDB-backed portfolio view. Generated book data and portfolio activity are simulated; no finance CREAO agents are connected yet. See [FINANCE_STATUS.md](FINANCE_STATUS.md) for the current gate and limits.
+
+Seats: returns accountant, cash reconciler, returns analyst, on an e-commerce finance team; the controller signs off.
 
 ## CREAO: the agents do the core work
 

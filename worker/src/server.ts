@@ -18,6 +18,8 @@ import { LabRunner } from './lab';
 import { Showcase } from './showcase';
 import { mirrorOf } from './mirror';
 import { ReviewRunner } from './review/runner';
+import { generateBook } from './finance/book';
+import { closeBookPeriod } from './finance/close';
 
 const WORKER_QUERIES = [
   'SELECT * FROM sim_run', 'SELECT * FROM metrics', 'SELECT * FROM control', 'SELECT * FROM agent', 'SELECT * FROM business',
@@ -39,6 +41,7 @@ async function main() {
   mirrorOf(conn); // index purchase, refund and agent before anything reads them
   const poster = await connect('poster', ['SELECT * FROM decision']);
   await conn.reducers.setSeatCodes({ businessCode: config.demoBusinessCode, controllerCode: config.demoControllerCode }).catch((e: Error) => log('seat codes:', e.message));
+  let financeReconciler: typeof conn | undefined;
 
   const run = conn.db.simRun.id.find(1);
   if (!run?.seeded) {
@@ -51,9 +54,20 @@ async function main() {
   // The finance portfolio is an optional, isolated module add-on. Seed its
   // catalog and rows only when enabled; it never changes the refund path.
   if (config.financeDeskEnabled) {
-    await conn.reducers.financeSeedPortfolio({ seed: config.seed, force: false })
-      .then(() => log('Finance Desk portfolio is seeded (paused until a controller starts it)'))
-      .catch((e: Error) => log(`Finance Desk unavailable; main refund path continues: ${e.message}`));
+    try {
+      const [, reconciler] = await Promise.all([connect('accountant', []), connect('reconciler', []), connect('analyst', [])]);
+      financeReconciler = reconciler.conn;
+      if (!existsSync(config.financeBookPath)) {
+        const book = await generateBook(config.financeBookPath, config.financeBookSeed);
+        log(`Finance Desk book generated: ${book.counts.orders} orders in ${book.ms} ms`);
+      }
+      await conn.reducers.financeSeedPortfolio({ seed: config.seed, force: false })
+        .then(() => log('Finance Desk portfolio is seeded (paused until a controller starts it)'))
+        .catch((e: Error) => log(`Finance Desk unavailable; main refund path continues: ${e.message}`));
+    } catch (e) {
+      financeReconciler = undefined;
+      log(`Finance Desk setup failed; main refund path continues: ${(e as Error).message}`);
+    }
   }
 
   if (config.creao.mode === 'live') {
@@ -85,6 +99,19 @@ async function main() {
   await app.register(multipart, { limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 } });
 
   app.get('/health', async () => ({ ok: true, mode: config.creao.mode, day: conn.db.simRun.id.find(1)?.day ?? null }));
+
+  if (config.financeDeskEnabled) {
+    app.post<{ Params: { period: string }; Body: { code?: string } }>('/finance/close/:period', async (req, reply) => {
+      if (req.body?.code !== config.demoControllerCode) return reply.code(403).send({ error: 'controller code required' });
+      if (!financeReconciler) return reply.code(503).send({ error: 'finance reconciler is offline' });
+      try {
+        return await closeBookPeriod(financeReconciler, config.financeBookPath, req.params.period);
+      } catch (e) {
+        log('Finance Desk close failed', (e as Error).message);
+        return reply.code(500).send({ error: (e as Error).message });
+      }
+    });
+  }
 
   // The phone uploads here, never to SpacetimeDB. The nonce ties the upload to the claim's challenge.
   app.post<{ Params: { claimId: string }; Querystring: { nonce?: string } }>('/upload/:claimId', async (req, reply) => {

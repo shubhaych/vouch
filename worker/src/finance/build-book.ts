@@ -1,15 +1,13 @@
-import { resolve } from 'node:path';
-import { REPO_ROOT } from '../env';
+import { config } from '../env';
 import { generateBook, openBook } from './book';
 import { reconcilePeriod } from './reconcile';
 
-const file = resolve(REPO_ROOT, process.env.FINANCE_BOOK_PATH || 'worker/data/brindle.duckdb');
+const file = config.financeBookPath;
 const command = process.argv[2] || 'build';
 
 if (command === 'build') {
-  const seed = Number(process.env.FINANCE_BOOK_SEED || 1);
-  const result = await generateBook(file, seed);
-  console.log(JSON.stringify({ file, seed, ...result }, null, 2));
+  const result = await generateBook(file, config.financeBookSeed);
+  console.log(JSON.stringify({ file, seed: config.financeBookSeed, ...result }, null, 2));
 } else if (command === 'reconcile') {
   const period = process.argv[3];
   if (!period) throw new Error('Pass a period in YYYY-MM form: npm run desk:reconcile -- 2026-09');
