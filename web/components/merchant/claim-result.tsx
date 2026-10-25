@@ -12,6 +12,7 @@ import { catalogItem, businessDef } from "@vouch/module/world";
 import { Investigation, parse } from "@/components/business/investigation";
 import { DecisionActions, RecommendationCard } from "@/components/business/recommendation";
 import { ReportPanel, ReviewingPanel } from "@/components/business/report-panel";
+import { VouchScorePanel } from "@/components/business/vouch-score-panel";
 import type { Report } from "@vouch/module/review-types";
 import { makeHandoffClaim, formatMoney, scoreLabel, type DemoClaim } from "@/lib/demo/claims";
 
@@ -144,22 +145,15 @@ function Selected({
   const [decisions] = useTable(tables.decision.where((r) => r.refundId.eq(claim.refundId)));
   const [reports] = useTable(tables.report.where((r) => r.claimId.eq(claim.id)));
   const [jobs] = useTable(tables.analysisJob.where((r) => r.claimId.eq(claim.id)));
-  const [agents] = useTable(tables.agent.where((r) => r.id.eq(claim.agentId)));
-  const [reviews] = useTable(tables.scoreReview.where((r) => r.refundId.eq(claim.refundId)));
-  const review = reviews[0];
   const [partners] = useTable(tables.partnerOrder.where((r) => r.purchaseId.eq(refund?.purchaseId ?? 0n)), { enabled: !!refund });
   const partner = partners[0];
   const report = [...reports].sort((a, b) => Number(b.id - a.id))[0];
   const job = [...jobs].sort((a, b) => Number(b.id - a.id))[0];
-  const agent = agents[0];
   const item = partner ? { name: partner.name, description: partner.description } : purchase ? catalogItem(purchase.item) : undefined;
   const biz = refund ? businessDef(refund.businessId) : undefined;
 
   if (!refund) return <div className="skeleton h-96" />;
 
-  const open = ["requested", "investigating", "recommended", "awaiting_controller", "more_evidence"].includes(refund.status);
-  const decided = !open;
-  const reviewPending = open && (!!job || ["investigating", "recommended", "frames_ready"].includes(claim.status));
   const waitingVideo = claim.status === "awaiting_video";
   const jobRunning = !!job && job.status === "running";
 
@@ -183,33 +177,7 @@ function Selected({
             </p>
           ) : null}
         </div>
-        <div>
-          <span className="panel-title">Confirmed Vouch history</span>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-3xl font-bold" data-testid="claim-score">
-              {agent?.score ?? "—"}
-            </span>
-            <span className="text-sm text-ink-soft-dark">/ 1000 · {agent?.band ?? "…"}</span>
-            <Badge kind="live" />
-          </div>
-          {(reviewPending || waitingVideo) && !review ? (
-            <p className="mt-2 text-sm text-review">
-              Review pending. The score moves once CREAO reaches a verdict, and not while the claim is on hold.
-            </p>
-          ) : review ? (
-            <div className="mt-2 text-sm" data-testid="claim-score-review">
-              <p className={review.direction === "gain" ? "text-honest" : review.direction === "loss" ? "text-fraud" : "text-ink-soft-dark"}>
-                {review.direction === "gain" ? "Gained credibility" : review.direction === "loss" ? "Lost credibility" : "No change"}: {review.before} → {review.after} ({review.delta >= 0 ? "+" : ""}{review.delta})
-              </p>
-              <p className="mt-0.5">{review.reason}</p>
-              <p className="mt-0.5 text-xs text-ink-soft-dark">{review.provenance === "rule" ? "Rule (no CREAO seat answered)" : review.provenance.startsWith("panel") ? `CREAO panel: Refund Investigator + Risk Scorecard${review.provenance === "panel_fixture" ? " (fixture)" : ""}` : `CREAO Score Reviewer${review.provenance === "fixture" ? " (fixture)" : ""}`}</p>
-            </div>
-          ) : decided ? (
-            <p className="mt-2 text-sm text-ink-soft-dark">Decision recorded. The CREAO Score Reviewer is judging the score change…</p>
-          ) : (
-            <p className="mt-2 text-sm text-ink-soft-dark">No score change yet for this claim.</p>
-          )}
-        </div>
+        <VouchScorePanel claim={claim} refund={refund} hasJob={!!job} />
       </section>
 
       {waitingVideo ? (

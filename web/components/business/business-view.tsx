@@ -16,6 +16,7 @@ import { parse } from "./investigation";
 import type { Report } from "@vouch/module/review-types";
 import { OrgChart } from "./org-chart";
 import { ReturnsPulse } from "./returns-pulse";
+import { VouchScorePanel } from "./vouch-score-panel";
 
 export function BusinessView() {
   return (
@@ -43,7 +44,8 @@ function BusinessInner() {
 
   const sorted = useMemo(() => [...claims].sort((a, b) => Number(b.id - a.id)), [claims]);
   const wanted = params.get("refund");
-  const selected = (wanted ? sorted.find((c) => c.refundId.toString() === wanted) : undefined) ?? sorted[0];
+  const wantedClaim = params.get("claim");
+  const selected = (wantedClaim ? sorted.find((c) => c.id.toString() === wantedClaim) : undefined) ?? (wanted ? sorted.find((c) => c.refundId.toString() === wanted) : undefined) ?? sorted[0];
   const select = (c: Claim) => { setFrame(0); router.replace(`/business?refund=${c.refundId}`, { scroll: false }); };
 
   return (
@@ -155,7 +157,8 @@ function Selected({ claim, frame, onFrame, seatRole, seatBusiness }: { claim: Cl
   if (report || job) {
     const current = report && (!job || job.status !== "running" || report.jobId === job.id);
     return (
-      <div className="min-w-0 lg:col-start-2 xl:col-end-4 xl:row-start-1">
+      <div className="min-w-0 space-y-4 lg:col-start-2 xl:col-end-4 xl:row-start-1">
+        <section className="glass p-4"><VouchScorePanel claim={claim} refund={refund} hasJob={!!job} /></section>
         {current ? <ReportPanel claim={claim} row={report} order={orderOf(purchases[0], refund.amount)} actions={<DecisionActions claim={claim} refund={refund} decisions={decisions} seatRole={seatRole} seatBusiness={seatBusiness} acceptCents={acceptCents(report.json)} />} />
           : job ? <ReviewingPanel job={job} /> : null}
       </div>
@@ -165,6 +168,7 @@ function Selected({ claim, frame, onFrame, seatRole, seatBusiness }: { claim: Cl
   return (
     <>
       <div className="min-w-0 space-y-4 lg:col-start-2 xl:sticky xl:top-4 xl:col-start-3 xl:row-start-1 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto scroll-thin" data-lenis-prevent>
+        <section className="glass p-4"><VouchScorePanel claim={claim} refund={refund} hasJob={false} /></section>
         <RecommendationCard claim={claim} refund={refund} decisions={decisions} evidence={evidence} seatRole={seatRole} seatBusiness={seatBusiness} onFrame={onFrame} />
       </div>
       <div className="min-w-0 lg:col-start-2 xl:row-start-1">
