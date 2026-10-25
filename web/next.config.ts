@@ -19,6 +19,8 @@ if (process.env.NEXT_PUBLIC_DATA === "fixture" && process.argv.includes("build")
 }
 
 const nextConfig: NextConfig = {
+  // `next dev` refuses scripts and HMR from any hostname but localhost, so a phone or a tunnel page would never hydrate.
+  allowedDevOrigins: ["*.trycloudflare.com", "*.ngrok-free.app", "*.ngrok.app", "*.loca.lt"],
   // The engine's pure code (world, score, sim labels) is shared from the module workspace as TypeScript source.
   transpilePackages: ["@vouch/module"],
   turbopack: {

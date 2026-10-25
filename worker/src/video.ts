@@ -5,12 +5,13 @@
 // CREAO can fetch them through the tunnel and nobody else can list them.
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import type { DbConnection } from '../module_bindings/index';
 import { config, log } from './env';
 import { mirrorOf } from './mirror';
+import { checkFingers, fingerMessage } from './fingers';
 
 const run = promisify(execFile);
 export const MAX_UPLOAD_BYTES = 60 * 1024 * 1024;
@@ -32,8 +33,8 @@ function mediaSecret(): string {
   return secret;
 }
 
-export function signPath(path: string, now = Date.now()): string {
-  const exp = now + URL_TTL_MS;
+export function signPath(path: string, now = Date.now(), ttlMs = URL_TTL_MS): string {
+  const exp = now + ttlMs;
   const sig = createHmac('sha256', mediaSecret()).update(`${path}|${exp}`).digest('hex').slice(0, 32);
   return `${config.publicUrl}${path}?exp=${exp}&sig=${sig}`;
 }
@@ -45,19 +46,20 @@ export function checkSignature(path: string, exp: string, sig: string, now = Dat
 }
 
 export class UploadError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  /** `code` tells the phone what to do: 'fingers' means record a new video. */
+  constructor(public status: number, message: string, public code?: 'fingers') { super(message); }
 }
 
-export interface Probe { duration: number; width: number; height: number }
+export interface Probe { duration: number; width: number; height: number; hasAudio: boolean }
 
 export async function probe(file: string): Promise<Probe> {
   try {
-    const { stdout } = await run('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height:format=duration', '-of', 'json', file]);
-    const j = JSON.parse(stdout) as { streams?: { width?: number; height?: number }[]; format?: { duration?: string } };
-    const s = j.streams?.[0];
+    const { stdout } = await run('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,width,height:format=duration', '-of', 'json', file]);
+    const j = JSON.parse(stdout) as { streams?: { codec_type?: string; width?: number; height?: number }[]; format?: { duration?: string } };
+    const s = j.streams?.find((x) => x.codec_type === 'video');
     const duration = Number(j.format?.duration ?? 0);
     if (!s || !s.width || !s.height || !Number.isFinite(duration) || duration <= 0) throw new Error('no video stream');
-    return { duration, width: s.width, height: s.height };
+    return { duration, width: s.width, height: s.height, hasAudio: !!j.streams?.some((x) => x.codec_type === 'audio') };
   } catch {
     throw new UploadError(422, 'We could not read that video. Please record it again in the app.');
   }
@@ -118,7 +120,17 @@ export function findReuse(hashes: string[], claimId: bigint, others: { id: bigin
 export interface Checks {
   fresh: boolean; uploaded_after_s: number; duration_s: number; width: number; height: number; duration_ok: boolean; resolution_ok: boolean;
   frame_reuse: ReuseMatch[]; frame_times: number[]; blank_frames: number; frame_motion: number | null; still_image: boolean; within_window: boolean; reason_allowed: boolean; over_video_threshold: boolean; policy_line: string;
+  /** 1 = the claim video, 2 = the one extra clip a customer may add when more evidence is needed. */
+  clips: 1 | 2; has_audio: boolean;
+  /** The quick check made while the phone waited; 'unsure' means it let the upload through. */
+  finger_check?: { verdict: string; seen: number | null; ms: number };
+  /** For clip 2: when the extra clip was requested (ISO), and the first clip's checks. */
+  extra_requested_at?: string; first?: Omit<Checks, 'first'>;
 }
+
+/** A customer may add exactly one clip after the claim video. Only the worker can attach video, so this is the gate. */
+export const MAX_CLIPS = 2;
+export const EXTRA_STALE_AFTER_MS = 30 * 60_000;
 
 /** A flat frame (black, white, a lens cap) has no left/right brightness steps, so its dHash is (almost) all zeros. */
 export const isBlank = (h: string) => hamming(h, '0000000000000000') <= 2;
@@ -138,8 +150,25 @@ export const STILL_MOTION_MAX = 3;
 /** Little motion is a reason for more evidence, never a decline: a steady, honest shot can be still too. */
 export const isStill = (motion: number | null) => motion !== null && motion <= STILL_MOTION_MAX;
 
+/** Bounded parallelism, retaining the same selected frames and hash algorithm. */
+export async function extractUploadFrames(video: string, dir: string, times: number[], prefix = '') {
+  const frames: { index: number; time: number; hash: string; file: string }[] = [];
+  for (let i = 0; i < times.length; i += 3) {
+    const batch = await Promise.all(times.slice(i, i + 3).map(async (time, j) => {
+      const index = i + j;
+      const file = `${prefix}${index}.jpg`;
+      const out = resolve(dir, file);
+      await run('ffmpeg', ['-v', 'error', '-y', '-ss', String(time), '-i', video, '-frames:v', '1', '-vf', 'scale=960:-2', '-q:v', '4', out], { timeout: 30_000 });
+      return { index, time, hash: await dHash(out), file };
+    }));
+    frames.push(...batch);
+  }
+  return frames;
+}
+
 /** Handles one upload end to end. Throws UploadError with a message the phone shows. */
 export async function processUpload(conn: DbConnection, claimId: bigint, nonce: string, data: Buffer, ext: string, now = Date.now()): Promise<{ frames: number; checks: Checks }> {
+  const processingStarted = Date.now();
   // A claim created a moment ago may still be on its way to this worker's subscription.
   let c = conn.db.claim.id.find(claimId);
   for (let i = 0; !c && i < 20; i++) {
@@ -154,24 +183,37 @@ export async function processUpload(conn: DbConnection, claimId: bigint, nonce: 
   if (data.length > MAX_UPLOAD_BYTES) throw new UploadError(413, 'That video is too large. Please record again at a lower quality.');
   if (data.length < 1000) throw new UploadError(422, 'We could not read that video. Please record it again in the app.');
 
+  // A claim already holding a video that is back at more_evidence is getting its one extra clip.
+  const prior = JSON.parse(c.checksJson || '{}') as Partial<Checks>;
+  const clip: 1 | 2 = c.status === 'more_evidence' && !!c.videoUrl ? 2 : 1;
+  if (clip === 2 && (prior.clips ?? 1) >= MAX_CLIPS) throw new UploadError(409, 'You have already sent your one extra clip. A person at the store will review your claim.');
+
   const dir = resolve(config.mediaDir, String(claimId));
   mkdirSync(dir, { recursive: true });
-  const video = resolve(dir, `video.${ext.replace(/[^a-z0-9]/gi, '') || 'mp4'}`);
+  const video = resolve(dir, `${clip === 2 ? 'extra' : 'video'}.${ext.replace(/[^a-z0-9]/gi, '') || 'mp4'}`);
   writeFileSync(video, data);
   const p = await probe(video);
   if (p.duration < MIN_SECONDS) throw new UploadError(422, `That video is ${p.duration.toFixed(1)} seconds. Please record at least ${MIN_SECONDS} seconds, ending with the finger challenge.`);
 
-  const times = await frameTimes(video, p.duration);
-  const frameUrls: string[] = [];
-  const hashes: string[] = [];
-  for (let i = 0; i < times.length; i++) {
-    const out = resolve(dir, `${i}.jpg`);
-    await run('ffmpeg', ['-v', 'error', '-y', '-ss', String(times[i]), '-i', video, '-frames:v', '1', '-vf', 'scale=960:-2', '-q:v', '4', out]);
-    if (!existsSync(out)) continue;
-    hashes.push(await dHash(out));
-    frameUrls.push(signPath(`/media/${claimId}/${i}.jpg`));
+  // The finger challenge is checked alongside the frames: a clear miss sends the phone back to record
+  // again, and the rejected file never counts as the claim video or the one extra clip.
+  const [times, fingers] = await Promise.all([frameTimes(video, p.duration), checkFingers(video, p.duration, c.fingerCount, dir)]);
+  const miss = fingerMessage(fingers, c.fingerCount);
+  log(`C-${claimId}: finger check ${fingers.verdict} (${fingers.note}) in ${fingers.ms} ms`);
+  if (miss) {
+    rmSync(video, { force: true });
+    throw new UploadError(422, miss, 'fingers');
   }
-  if (frameUrls.length < 2) throw new UploadError(422, 'We could not extract frames from that video. Please record it again.');
+  const frames = await extractUploadFrames(video, dir, times, clip === 2 ? 'x' : '');
+  const newUrls = frames.map((f) => signPath(`/media/${claimId}/${f.file}`));
+  const hashes = frames.map((f) => f.hash);
+  if (newUrls.length < 2) throw new UploadError(422, 'We could not extract frames from that video. Please record it again.');
+  // Clip 2 appends its frames, so later claims are checked for reuse of either clip.
+  const frameUrls = clip === 2 ? [...c.frameUrls, ...newUrls] : newUrls;
+  const frameHashes = clip === 2 ? [...c.frameHashes, ...hashes] : hashes;
+  // The extra clip's freshness counts from when it was requested (the latest proposal), not from the claim.
+  const requestedAt = clip === 2 ? [...conn.db.decision.iter()].filter((d) => d.refundId === c!.refundId).reduce((t, d) => Math.max(t, Number(d.at.microsSinceUnixEpoch / 1000n)), 0) : 0;
+  const since = clip === 2 && requestedAt ? now - requestedAt : age;
 
   const others = [...conn.db.claim.iter()].filter((x) => x.frameHashes.length > 0).map((x) => ({ id: x.id, frameHashes: x.frameHashes }));
   const m = mirrorOf(conn);
@@ -181,8 +223,8 @@ export async function processUpload(conn: DbConnection, claimId: bigint, nonce: 
   const policy = business ? (JSON.parse(business.policy) as { windowDays: number; needsVideoOverCents: number }) : { windowDays: 30, needsVideoOverCents: 10_000 };
   const withinWindow = !!refund && !!purchase && refund.day - purchase.deliverDay <= policy.windowDays;
   const checks: Checks = {
-    fresh: age <= STALE_AFTER_MS,
-    uploaded_after_s: Math.round(age / 1000),
+    fresh: since <= (clip === 2 ? EXTRA_STALE_AFTER_MS : STALE_AFTER_MS),
+    uploaded_after_s: Math.round(since / 1000),
     duration_s: Math.round(p.duration * 10) / 10,
     width: p.width,
     height: p.height,
@@ -197,8 +239,12 @@ export async function processUpload(conn: DbConnection, claimId: bigint, nonce: 
     reason_allowed: refund?.reasonCode !== 'changed_mind' || policy.windowDays >= 14,
     over_video_threshold: !!refund && refund.amount > policy.needsVideoOverCents,
     policy_line: `${policy.windowDays}-day window; video required over $${(policy.needsVideoOverCents / 100).toFixed(0)}`,
+    clips: clip,
+    has_audio: p.hasAudio,
+    finger_check: { verdict: fingers.verdict, seen: fingers.seen, ms: fingers.ms },
+    ...(clip === 2 ? { ...(requestedAt ? { extra_requested_at: new Date(requestedAt).toISOString() } : {}), first: (({ first: _f, ...rest }) => rest)(prior as Checks) } : {}),
   };
-  await conn.reducers.attachVideo({ claimId, videoUrl: signPath(`/media/${claimId}/${video.split('/').pop()}`), frameUrls, frameHashes: hashes, checksJson: JSON.stringify(checks) });
-  log(`C-${claimId}: ${frameUrls.length} frames, ${p.duration.toFixed(1)} s ${p.width}x${p.height}, reuse ${checks.frame_reuse.map((r) => r.matches_claim).join(',') || 'none'}`);
-  return { frames: frameUrls.length, checks };
+  await conn.reducers.attachVideo({ claimId, videoUrl: signPath(`/media/${claimId}/${video.split('/').pop()}`), frameUrls, frameHashes, checksJson: JSON.stringify(checks) });
+  log(`C-${claimId}: clip ${clip}, ${newUrls.length} frames, ${p.duration.toFixed(1)} s ${p.width}x${p.height}, ${p.hasAudio ? 'with' : 'NO'} audio, reuse ${checks.frame_reuse.map((r) => r.matches_claim).join(',') || 'none'}, server preparation ${Date.now() - processingStarted} ms (excludes network transfer)`);
+  return { frames: newUrls.length, checks };
 }

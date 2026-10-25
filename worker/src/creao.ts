@@ -9,14 +9,23 @@
 // Do not mix them: /v1/runs expects agent_id + input, the app path expects inputs.
 // Runs take minutes. Polling every 15 s is the primary path (it works from a
 // cloud session); webhooks are a best-effort optimisation on the laptop.
-import { config, log, type Seat } from './env';
+import { OPTIONAL_SEATS, config, log, type Seat } from './env';
 import { fixtureResponse } from './fixtures';
 
 export const AGENT_NAMES: Record<Seat, string> = {
   evidence_analyst: 'Vouch Evidence Analyst',
   refund_investigator: 'Vouch Refund Investigator',
   pattern_analyst: 'Vouch Pattern Analyst',
+  refund_reviewer: 'Vouch Refund Reviewer',
+  customer_liaison: 'Vouch Customer Liaison',
 };
+
+/** True when a live run of this seat can start: fixture mode, or the saved agent was found (optional seats may be missing). */
+export function seatAvailable(seat: Seat): boolean {
+  if (config.creao.mode === 'fixture') return true;
+  if (resolvedIds[seat]) return true;
+  return apiPath() === 'app' ? !!config.creao.appIds[seat] : !OPTIONAL_SEATS.includes(seat);
+}
 
 export type ApiPath = 'account' | 'app' | 'fixture';
 export interface RunHandle { runId: string; seat: Seat; path: ApiPath; conversationId: string; runUrl: string }
@@ -51,13 +60,19 @@ export async function resolveAgents(): Promise<Record<Seat, string>> {
     const list = (Array.isArray(body) ? body : ((body as { agents?: unknown[]; data?: unknown[] }).agents ?? (body as { data?: unknown[] }).data ?? [])) as { agent_id?: string; id?: string; name?: string }[];
     for (const seat of missing) {
       const hit = list.find((a) => a.name?.trim().toLowerCase() === AGENT_NAMES[seat].toLowerCase());
-      if (!hit) throw new Error(`no saved CREAO agent named "${AGENT_NAMES[seat]}" (found: ${list.map((a) => a.name).join(', ') || 'none'})`);
+      if (!hit) {
+        if (OPTIONAL_SEATS.includes(seat)) { log(`no saved CREAO agent named "${AGENT_NAMES[seat]}": the ${seat.replace('_', ' ')} seat is offline`); continue; }
+        throw new Error(`no saved CREAO agent named "${AGENT_NAMES[seat]}" (found: ${list.map((a) => a.name).join(', ') || 'none'})`);
+      }
       out[seat] = (hit.agent_id ?? hit.id)!;
     }
   }
   if (apiPath() === 'app') {
     for (const seat of Object.keys(AGENT_NAMES) as Seat[]) {
-      if (!config.creao.appIds[seat]) throw new Error(`app path: set CREAO_${seat.toUpperCase()}_APP_ID (the UUID on the saved agent's page)`);
+      if (!config.creao.appIds[seat]) {
+        if (OPTIONAL_SEATS.includes(seat)) continue;
+        throw new Error(`app path: set CREAO_${seat.toUpperCase()}_APP_ID (the UUID on the saved agent's page)`);
+      }
       out[seat] = config.creao.appIds[seat];
     }
   }
@@ -77,6 +92,7 @@ export async function startRun(seat: Seat, caseJson: unknown, caseRef: string): 
   }
   if (path === 'account') {
     const agentId = resolvedIds[seat] ?? (await resolveAgents())[seat];
+    if (!agentId) throw new Error(`CREAO seat ${seat} has no saved agent`);
     const res = await fetch(`${ACCOUNT_BASE}/runs`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${config.creao.apiKey}`, 'Content-Type': 'application/json' },

@@ -34,8 +34,12 @@ import {
 } from "spacetimedb";
 
 // Import all reducer arg schemas
+import AddArtifactReducer from "./add_artifact_reducer";
+import AddFindingReducer from "./add_finding_reducer";
 import AppendLabEventReducer from "./append_lab_event_reducer";
 import AttachVideoReducer from "./attach_video_reducer";
+import AuditFindingReducer from "./audit_finding_reducer";
+import AutoDecideReducer from "./auto_decide_reducer";
 import BootstrapPosterReducer from "./bootstrap_poster_reducer";
 import BootstrapWorkerReducer from "./bootstrap_worker_reducer";
 import BuyReducer from "./buy_reducer";
@@ -44,6 +48,7 @@ import DecideReducer from "./decide_reducer";
 import EnqueueLabReducer from "./enqueue_lab_reducer";
 import EnqueueLabTriggerReducer from "./enqueue_lab_trigger_reducer";
 import FastForwardReducer from "./fast_forward_reducer";
+import FinishAnalysisReducer from "./finish_analysis_reducer";
 import FinishLabJobReducer from "./finish_lab_job_reducer";
 import FinishRunReducer from "./finish_run_reducer";
 import FlagPatternReducer from "./flag_pattern_reducer";
@@ -70,10 +75,15 @@ import SetIssuerKeyReducer from "./set_issuer_key_reducer";
 import SetPatternStatusReducer from "./set_pattern_status_reducer";
 import SetSeatCodesReducer from "./set_seat_codes_reducer";
 import SetSimReducer from "./set_sim_reducer";
+import SetStepReducer from "./set_step_reducer";
 import ShowcaseActReducer from "./showcase_act_reducer";
+import StartAnalysisReducer from "./start_analysis_reducer";
 import StartLabJobReducer from "./start_lab_job_reducer";
 import SwitchBusinessReducer from "./switch_business_reducer";
 import TakeBusinessSeatReducer from "./take_business_seat_reducer";
+import WriteRecommendationReducer from "./write_recommendation_reducer";
+import WriteReportReducer from "./write_report_reducer";
+import WriteScoreReducer from "./write_score_reducer";
 
 // Import all procedure arg schemas
 import * as ExportTruthProcedure from "./export_truth_procedure";
@@ -81,15 +91,20 @@ import * as ExportTruthProcedure from "./export_truth_procedure";
 // Import all table schema definitions
 import AgentRow from "./agent_table";
 import AgentRunRow from "./agent_run_table";
+import AnalysisJobRow from "./analysis_job_table";
+import AnalysisStepRow from "./analysis_step_table";
+import ArtifactRow from "./artifact_table";
 import BenchResultRow from "./bench_result_table";
 import BusinessRow from "./business_table";
 import ClaimRow from "./claim_table";
+import ClaimScoreRow from "./claim_score_table";
 import ControlRow from "./control_table";
 import CredentialRow from "./credential_table";
 import CreditEventRow from "./credit_event_table";
 import DecisionRow from "./decision_table";
 import EventFeedRow from "./event_feed_table";
 import EvidenceRow from "./evidence_table";
+import FindingRow from "./finding_table";
 import FraudPatternRow from "./fraud_pattern_table";
 import JournalEntryRow from "./journal_entry_table";
 import JournalLineRow from "./journal_line_table";
@@ -100,8 +115,10 @@ import MetricsRow from "./metrics_table";
 import MyAgentRow from "./my_agent_table";
 import PatternEventRow from "./pattern_event_table";
 import PurchaseRow from "./purchase_table";
+import RecommendationRow from "./recommendation_table";
 import RefundRow from "./refund_table";
 import RegionStatRow from "./region_stat_table";
+import ReportRow from "./report_table";
 import RoleRow from "./role_table";
 import SimRunRow from "./sim_run_table";
 import VerificationRow from "./verification_table";
@@ -135,6 +152,48 @@ const tablesSchema = __schema({
       { name: 'agent_run_run_id_key', constraint: 'unique', columns: ['runId'] },
     ],
   }, AgentRunRow),
+  analysisJob: __table({
+    name: 'analysis_job',
+    indexes: [
+      { accessor: 'claimId', name: 'analysis_job_claim_id_idx_btree', algorithm: 'btree', columns: [
+        'claimId',
+      ] },
+      { accessor: 'id', name: 'analysis_job_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'analysis_job_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AnalysisJobRow),
+  analysisStep: __table({
+    name: 'analysis_step',
+    indexes: [
+      { accessor: 'id', name: 'analysis_step_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'jobId', name: 'analysis_step_job_id_idx_btree', algorithm: 'btree', columns: [
+        'jobId',
+      ] },
+    ],
+    constraints: [
+      { name: 'analysis_step_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, AnalysisStepRow),
+  artifact: __table({
+    name: 'artifact',
+    indexes: [
+      { accessor: 'id', name: 'artifact_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'jobId', name: 'artifact_job_id_idx_btree', algorithm: 'btree', columns: [
+        'jobId',
+      ] },
+    ],
+    constraints: [
+      { name: 'artifact_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ArtifactRow),
   benchResult: __table({
     name: 'bench_result',
     indexes: [
@@ -171,6 +230,17 @@ const tablesSchema = __schema({
       { name: 'claim_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ClaimRow),
+  claimScore: __table({
+    name: 'claim_score',
+    indexes: [
+      { accessor: 'claimId', name: 'claim_score_claim_id_idx_btree', algorithm: 'btree', columns: [
+        'claimId',
+      ] },
+    ],
+    constraints: [
+      { name: 'claim_score_claim_id_key', constraint: 'unique', columns: ['claimId'] },
+    ],
+  }, ClaimScoreRow),
   control: __table({
     name: 'control',
     indexes: [
@@ -246,6 +316,20 @@ const tablesSchema = __schema({
       { name: 'evidence_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, EvidenceRow),
+  finding: __table({
+    name: 'finding',
+    indexes: [
+      { accessor: 'id', name: 'finding_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'jobId', name: 'finding_job_id_idx_btree', algorithm: 'btree', columns: [
+        'jobId',
+      ] },
+    ],
+    constraints: [
+      { name: 'finding_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, FindingRow),
   fraudPattern: __table({
     name: 'fraud_pattern',
     indexes: [
@@ -373,6 +457,17 @@ const tablesSchema = __schema({
       { name: 'purchase_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, PurchaseRow),
+  recommendation: __table({
+    name: 'recommendation',
+    indexes: [
+      { accessor: 'claimId', name: 'recommendation_claim_id_idx_btree', algorithm: 'btree', columns: [
+        'claimId',
+      ] },
+    ],
+    constraints: [
+      { name: 'recommendation_claim_id_key', constraint: 'unique', columns: ['claimId'] },
+    ],
+  }, RecommendationRow),
   refund: __table({
     name: 'refund',
     indexes: [
@@ -413,6 +508,20 @@ const tablesSchema = __schema({
       { name: 'region_stat_region_id_key', constraint: 'unique', columns: ['regionId'] },
     ],
   }, RegionStatRow),
+  report: __table({
+    name: 'report',
+    indexes: [
+      { accessor: 'claimId', name: 'report_claim_id_idx_btree', algorithm: 'btree', columns: [
+        'claimId',
+      ] },
+      { accessor: 'id', name: 'report_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'report_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ReportRow),
   role: __table({
     name: 'role',
     indexes: [
@@ -457,8 +566,12 @@ const tablesSchema = __schema({
 
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
 const reducersSchema = __reducers(
+  __reducerSchema("add_artifact", AddArtifactReducer),
+  __reducerSchema("add_finding", AddFindingReducer),
   __reducerSchema("append_lab_event", AppendLabEventReducer),
   __reducerSchema("attach_video", AttachVideoReducer),
+  __reducerSchema("audit_finding", AuditFindingReducer),
+  __reducerSchema("auto_decide", AutoDecideReducer),
   __reducerSchema("bootstrap_poster", BootstrapPosterReducer),
   __reducerSchema("bootstrap_worker", BootstrapWorkerReducer),
   __reducerSchema("buy", BuyReducer),
@@ -467,6 +580,7 @@ const reducersSchema = __reducers(
   __reducerSchema("enqueue_lab", EnqueueLabReducer),
   __reducerSchema("enqueue_lab_trigger", EnqueueLabTriggerReducer),
   __reducerSchema("fast_forward", FastForwardReducer),
+  __reducerSchema("finish_analysis", FinishAnalysisReducer),
   __reducerSchema("finish_lab_job", FinishLabJobReducer),
   __reducerSchema("finish_run", FinishRunReducer),
   __reducerSchema("flag_pattern", FlagPatternReducer),
@@ -493,10 +607,15 @@ const reducersSchema = __reducers(
   __reducerSchema("set_pattern_status", SetPatternStatusReducer),
   __reducerSchema("set_seat_codes", SetSeatCodesReducer),
   __reducerSchema("set_sim", SetSimReducer),
+  __reducerSchema("set_step", SetStepReducer),
   __reducerSchema("showcase_act", ShowcaseActReducer),
+  __reducerSchema("start_analysis", StartAnalysisReducer),
   __reducerSchema("start_lab_job", StartLabJobReducer),
   __reducerSchema("switch_business", SwitchBusinessReducer),
   __reducerSchema("take_business_seat", TakeBusinessSeatReducer),
+  __reducerSchema("write_recommendation", WriteRecommendationReducer),
+  __reducerSchema("write_report", WriteReportReducer),
+  __reducerSchema("write_score", WriteScoreReducer),
 );
 
 /** The schema information for all procedures in this module. This is defined the same way as the procedures would have been defined in the server. */

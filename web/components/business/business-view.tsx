@@ -8,9 +8,12 @@ import type { Claim } from "@/module_bindings/types";
 import { Badge } from "@/components/ui/badge";
 import { useCall, useStatus } from "@/lib/stdb/hooks";
 import { agentLabel, businessLabel, claimLabel, money, timeAgo, titleCase } from "@/lib/format";
-import { BUSINESS_A, BUSINESS_B, businessDef } from "@vouch/module/world";
+import { BUSINESS_A, BUSINESS_B, businessDef, catalogItem } from "@vouch/module/world";
 import { Investigation } from "./investigation";
-import { RecommendationCard } from "./recommendation";
+import { DecisionActions, RecommendationCard } from "./recommendation";
+import { ReportPanel, ReviewingPanel, shortVerdict } from "./report-panel";
+import { parse } from "./investigation";
+import type { Report } from "@vouch/module/review-types";
 import { OrgChart } from "./org-chart";
 
 export function BusinessView() {
@@ -70,8 +73,8 @@ function BusinessInner() {
 
       <OrgChart canToggle={!!seat} />
 
-      <div className="grid gap-4 xl:grid-cols-[18rem_1fr_22rem]">
-        <aside className="glass flex max-h-[80vh] flex-col" data-testid="queue">
+      <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[14rem_minmax(0,1fr)] xl:grid-cols-[14rem_minmax(0,1fr)_20rem] 2xl:grid-cols-[16rem_minmax(0,1fr)_22rem]">
+        <aside className="glass flex max-h-[80vh] flex-col lg:sticky lg:top-4 lg:row-span-2 xl:row-span-1" data-testid="queue">
           <div className="flex items-center justify-between border-b border-line-dark px-3 py-2">
             <span className="panel-title">Queue</span>
             <span className="text-xs text-ink-soft-dark">{claims.length} <Badge kind="live" /></span>
@@ -87,9 +90,38 @@ function BusinessInner() {
   );
 }
 
+/** What was ordered, from the live rows; reports written before the order was stored fall back to this. */
+function orderOf(p: { item: number; amount: number } | undefined, requestedCents: number) {
+  if (!p) return undefined;
+  const item = catalogItem(p.item);
+  return { item: item?.name ?? `SKU-${p.item}`, description: item?.description ?? "", priceCents: p.amount, requestedCents };
+}
+
+/** The amount the main recommendation offers, so Accept pays what it says. */
+function acceptCents(json: string): number | undefined {
+  const A = parse<Report | null>(json, null)?.factoryAssessment;
+  return A?.status === "validated" && A.action === "accept" ? A.amountCents : undefined;
+}
+
+/** What the queue shows for a claim: the report's recommendation, the review in progress, or the Investigator's proposal. */
+function useQueueVerdict(c: Claim): { text: string; chip: string } | null {
+  const [reports] = useTable(tables.report.where((r) => r.claimId.eq(c.id)));
+  const [jobs] = useTable(tables.analysisJob.where((r) => r.claimId.eq(c.id)));
+  const [decisions] = useTable(tables.decision.where((r) => r.refundId.eq(c.refundId)));
+  const report = [...reports].sort((a, b) => Number(b.id - a.id))[0];
+  const job = [...jobs].sort((a, b) => Number(b.id - a.id))[0];
+  const A = useMemo(() => (report ? parse<Report | null>(report.json, null)?.factoryAssessment : undefined), [report]);
+  if (job?.status === "running") return { text: "Reviewing…", chip: "chip chip--accent" };
+  if (A) return shortVerdict(A);
+  const d = [...decisions].filter((x) => x.status !== "superseded").sort((a, b) => Number(b.id - a.id))[0];
+  if (!d) return null;
+  return d.action === "accept" ? { text: `Accept ${money(d.amount)}`, chip: "chip chip--honest" } : d.action === "decline" ? { text: "Reject", chip: "chip chip--fraud" } : { text: "More evidence", chip: "chip chip--review" };
+}
+
 function QueueItem({ c, active, onClick }: { c: Claim; active: boolean; onClick: () => void }) {
   const [refunds] = useTable(tables.refund.where((r) => r.id.eq(c.refundId)));
   const r = refunds[0];
+  const verdict = useQueueVerdict(c);
   return (
     <li>
       <button onClick={onClick} className={`w-full rounded-lg border px-2.5 py-2 text-left transition ${active ? "border-accent/70 bg-accent/5" : "border-line-dark hover:border-accent/40"}`} data-testid={`queue-${c.id}`}>
@@ -97,6 +129,7 @@ function QueueItem({ c, active, onClick }: { c: Claim; active: boolean; onClick:
           <span className="font-mono text-sm font-bold">{claimLabel(c.id)}</span>
           <span className={STATUS_CHIP[c.status] ?? "chip"}>{titleCase(c.status)}</span>
         </div>
+        {verdict ? <div className="mt-1 flex items-center gap-1.5 text-xs"><span className="text-ink-soft-dark">Recommends</span><span className={verdict.chip} data-testid={`queue-verdict-${c.id}`}>{verdict.text}</span></div> : null}
         <div className="mt-0.5 text-xs text-ink-soft-dark">
           {agentLabel(c.agentId)} · {r ? `${money(r.amount)} · ${businessLabel(r.businessId)}` : "…"} · {c.kind} · {timeAgo(Number(c.createdAt.microsSinceUnixEpoch / 1000n))} ago
         </div>
@@ -111,12 +144,29 @@ function Selected({ claim, frame, onFrame, seatRole, seatBusiness }: { claim: Cl
   const [purchases] = useTable(tables.purchase.where((r) => r.id.eq(refund?.purchaseId ?? 0n)), { enabled: !!refund });
   const [evidence] = useTable(tables.evidence.where((r) => r.claimId.eq(claim.id)));
   const [decisions] = useTable(tables.decision.where((r) => r.refundId.eq(claim.refundId)));
+  const [reports] = useTable(tables.report.where((r) => r.claimId.eq(claim.id)));
+  const [jobs] = useTable(tables.analysisJob.where((r) => r.claimId.eq(claim.id)));
+  const report = [...reports].sort((a, b) => Number(b.id - a.id))[0];
+  const job = [...jobs].sort((a, b) => Number(b.id - a.id))[0];
   if (!refund) return <div className="skeleton h-96 xl:col-span-2" />;
+  // A video-reviewed claim has one recommendation, the report's, with the decision buttons under it.
+  if (report || job) {
+    const current = report && (!job || job.status !== "running" || report.jobId === job.id);
+    return (
+      <div className="min-w-0 lg:col-start-2 xl:col-end-4 xl:row-start-1">
+        {current ? <ReportPanel claim={claim} row={report} order={orderOf(purchases[0], refund.amount)} actions={<DecisionActions claim={claim} refund={refund} decisions={decisions} seatRole={seatRole} seatBusiness={seatBusiness} acceptCents={acceptCents(report.json)} />} />
+          : job ? <ReviewingPanel job={job} /> : null}
+      </div>
+    );
+  }
+  // Other claims: the CREAO Refund Investigator's card, above the evidence on narrow screens and a sticky column on wide ones.
   return (
     <>
-      <Investigation claim={claim} refund={refund} purchase={purchases[0]} evidence={[...evidence]} frame={frame} onFrame={onFrame} />
-      <div className="space-y-4">
+      <div className="min-w-0 space-y-4 lg:col-start-2 xl:sticky xl:top-4 xl:col-start-3 xl:row-start-1 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto scroll-thin">
         <RecommendationCard claim={claim} refund={refund} decisions={decisions} evidence={evidence} seatRole={seatRole} seatBusiness={seatBusiness} onFrame={onFrame} />
+      </div>
+      <div className="min-w-0 lg:col-start-2 xl:row-start-1">
+        <Investigation claim={claim} refund={refund} purchase={purchases[0]} evidence={[...evidence]} frame={frame} onFrame={onFrame} />
       </div>
     </>
   );

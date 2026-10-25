@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
 import { ClaimView } from "@/components/claim/claim-view";
+import { hintToProps, parseHint } from "@/lib/claim-link";
 
 export const metadata: Metadata = { title: "Your claim" };
 
-export default function ClaimPage() {
-  return (
-    <Suspense fallback={<main className="min-h-screen bg-bg" />}>
-      <ClaimView />
-    </Suspense>
-  );
+// The QR link carries the claim's details, so the first HTML response already
+// holds the upload box; the live rows arrive over SpacetimeDB afterwards.
+export default async function ClaimPage({ params, searchParams }: PageProps<"/claim/[id]">) {
+  const { id } = await params;
+  const hint = hintToProps(parseHint(await searchParams));
+  return <ClaimView idParam={id} hint={hint} />;
 }

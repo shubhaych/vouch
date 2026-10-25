@@ -58,7 +58,14 @@ export function connect(label: Label, queries: string[], timeoutMs = 30_000): Pr
             clearTimeout(timer);
             done({ conn, identity: hex });
           })
-          .onError((ctx) => log(`${label} subscription error`, (ctx as { event?: unknown }).event ?? ''))
+          .onError((ctx) => {
+            const event = (ctx as { event?: unknown }).event;
+            log(`${label} subscription error`, event ?? '');
+            // A missing table means the database still runs an older module than this worker was built against.
+            if (/no such table/.test(String((event as { message?: string })?.message ?? event))) {
+              log(`${label}: ${config.stdbUri}/${config.stdbDb} runs an older module; publish module/ to it first (local: npm run stdb:publish; Maincloud: STDB_SERVER=maincloud STDB_DB=vouch-world npm run stdb:publish)`);
+            }
+          })
           .subscribe(['SELECT * FROM role', ...queries]);
       })
       .onConnectError((_ctx, err) => {

@@ -11,7 +11,9 @@
     "./world": "./src/world.ts",
     "./score": "./src/score.ts",
     "./text": "./src/text.ts",
-    "./rng": "./src/rng.ts"
+    "./rng": "./src/rng.ts",
+    "./review-score": "./src/review-score.ts",
+    "./review-types": "./src/review-types.ts"
   },
   "scripts": {
     "typecheck": "tsc -p .",

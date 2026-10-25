@@ -49,11 +49,26 @@ npx tsx scripts/hello-droid.ts           # T0.6: prints one sentence and "[resul
 - **T4.3:** on `/lab`, ask Droid with one of the five preset goals. With the worker running, the job streams its plan, tool calls (each allowed or cancelled with the reason), the diff and the evaluator's scores live. The recording is saved to `worker/fixtures/lab/job-<n>.json`. Put that path in the README's "A lab job's recorded events".
 - **T4.4 live:** press Promote on a job whose scores beat the live detector. `detectors/live/<id>.ts` gets the next version. At the next detector run (every 5 simulated days), pattern cards show the new version.
 
+## 3b. The video reviewer (Factory Droid + CREAO Refund Reviewer)
+
+```bash
+pip install faster-whisper                      # the transcript lane; without it the report says "no transcript"
+# FACTORY_API_KEY set, local or Maincloud STDB in .env (the case folders are worker/cases/<claim>/, git-ignored)
+npm run worker                                   # log says "video reviewer started (Droid live, 20 sessions/hour, proof by worker)"
+npx tsx scripts/claim-flow.ts qa/videos/S02-fresh.mp4   # or a phone video; prints the tier's proposal when the report row lands
+```
+- On `/claim/<id>` the ten steps tick with Droid's live notes ("Checking claim 1 of 2 at 00:04"); on `/business` the report panel shows the tier, the reel, the findings with clips, the audit, the score and "How this was investigated".
+- `worker/cases/<claim>/droid.log` holds every message, tool call and fence decision; `report.md` is the same report for people.
+- **Reviewer live:** create `Vouch Refund Reviewer` and `Vouch Customer Liaison` on agent.creao.ai ([CREAO.md](CREAO.md)), restart with `CREAO_MODE=live`; the report's Reviewer block turns from Fixture to Live with the run id.
+- Done so far on the laptop (2026-10-24): fixture-mode pipeline end to end on S01 (lanes only, T4 proposal in 2 s); live Droid sessions on S02–S05 (claims extraction, Case Analyst with the fence and nudges, MCP tools, findings; on S05 → C-6 the Report Auditor verified every hash and clip and passed all three findings, 150 s end to end with 3 sessions). The QA videos have no audio and show synthetic footage, so every live run ended in T4 "more evidence". Still to do: a run with faster-whisper installed, a real phone video, the Reviewer live.
+
 ## 4. Phone and screens (T2.1, T1.5, videos)
 
-- **T2.1:** set `NEXT_PUBLIC_WORKER_URL` to the tunnel URL. On `/shop`, buy, fast-forward and request a refund. Scan the QR with a phone; `/claim/<id>` opens and records with the rear camera.
+- **T2.1:** the phone needs HTTPS for the camera and must reach both the web app and the worker. With no account: `brew install cloudflared`, then in two terminals `cloudflared tunnel --url http://localhost:3000` and `cloudflared tunnel --url http://localhost:8787`; each prints an `https://<words>.trycloudflare.com` URL. Start the web app and the worker with `NEXT_PUBLIC_WORKER_URL=<worker tunnel URL>` (the worker reuses it for the proof-clip links). Open `/shop` on the laptop **through the web tunnel URL** (the QR encodes the page's own origin), buy, fast-forward and request a refund. Scan the QR with the phone; `/claim/<id>` opens and records with the rear camera. The database must be reachable from the phone too: Maincloud is, a local server is not.
 - **T1.5:** on the demo laptop, `/world` keeps 45 fps or better. Check with Chrome DevTools, Rendering, Frame rendering stats.
 - **Videos:** record V01–V07, V15 and V16 on a phone into `qa/videos/` (the list is in `qa/checklist.md`). Then rerun the video matrix in live mode and paste the table into QA_REPORT.md.
+
+- UNVERIFIED-LIVE: factory: extra-clip flow on a phone (no finger challenge → "Add more evidence" → second clip joined on the business timeline): `npm run worker`
 
 ## 5. Fill in and ship
 

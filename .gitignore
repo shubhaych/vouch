@@ -13,6 +13,10 @@ web/next-env.d.ts
 worker/.keys/
 worker/media/
 worker/.lab/
+# One case folder per reviewed claim: the video, frames, probes, proof clips and Droid logs
+worker/cases/
+__pycache__/
+.venv-review/
 
 # Droid candidates are per job; keep the folder, not the jobs
 detectors/candidates/*

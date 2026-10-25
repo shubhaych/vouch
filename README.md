@@ -1,6 +1,6 @@
 # Vouch World
 
-Refund fraud costs businesses money, and the usual fraud controls punish honest shoppers. Vouch handles both. Ten thousand simulated shoppers buy and return goods inside a SpacetimeDB database. Three saved CREAO agents investigate claims and confirm fraud patterns. A Factory Droid writes and tests new fraud detectors inside a fenced lab. A real person can join from a phone, buy, record a damaged item and watch the refund get decided live.
+Refund fraud costs businesses money, and the usual fraud controls punish honest shoppers. Vouch handles both. Ten thousand simulated shoppers buy and return goods inside a SpacetimeDB database. A real person can join from a phone, buy, record a damaged item and watch the refund get decided live: a fenced Factory Droid session investigates the video claim by claim, a CREAO Refund Reviewer checks the report, and the business decides from a tiered recommendation. Saved CREAO agents also confirm fraud patterns, and a second Droid fence writes and tests new fraud detectors in the lab.
 
 Started during Cal Hacks 13.0. First commit: `cc89a17`, 2026-10-23 20:57:05 -0700.
 
@@ -8,8 +8,8 @@ Started during Cal Hacks 13.0. First commit: `cc89a17`, 2026-10-23 20:57:05 -070
 | --- | --- |
 | `/` | Home page in Constructa's format. A live demo panel runs a purchase through to a verified refund and a credit change. |
 | `/world` | The globe: 10,000 agents, 60 businesses, purchase and refund arcs, the event monitor, agent panels, the Fraud Replay and the Observatory. |
-| `/shop`, `/claim/[id]` | The shopper's phone flow: join, buy, fast-forward, request a refund, record a video holding up the requested number of fingers. |
-| `/business` | The refunds desk: the CREAO org chart with the kill switch, frames and checks, the five-step credential check, the recommendation, the decision. |
+| `/shop`, `/claim/[id]` | The shopper's phone flow: join, buy, fast-forward, request a refund, record a video holding up the requested number of fingers, then watch the reviewer's steps (received, transcribed, frames, integrity, Droid investigating, proof, audit, score, reviewed, decision). |
+| `/business` | The refunds desk: the CREAO org chart with the kill switch, the video reviewer's report (tier, proof reel with a timeline, one finding per spoken claim with clips, integrity, history, score, the Reviewer's opinion, how it was investigated, limits), the five-step credential check, the recommendation, the decision. |
 | `/lab` | The Droid Detector Lab: queued jobs, the plan, tool calls, the diff, scores on a fresh world, promote or reject. |
 | `/system` | Live row counts, agent-steps per second, events per second, ping p50/p95, and benchmark results. |
 
@@ -34,7 +34,30 @@ Three saved agents, built on agent.creao.ai, fill the investigation seats. The w
 
 The agents' instructions and setup steps are in [docs/CREAO.md](docs/CREAO.md). In this repository's test runs the agents were replaced by hand-written fixtures in `worker/fixtures/`, labelled Fixture on screen. See [docs/LIVE_CHECKLIST.md](docs/LIVE_CHECKLIST.md) for the live runs still to do.
 
-## Factory: where Droid is used
+## Factory: the video reviewer
+
+Every refund claim with a video is investigated by Droid sessions that run on the worker through `@factory/droid-sdk` (`worker/src/review/`). This is the part of Vouch that would be hard to build without Factory: the reviewer is not a prompt that returns a verdict, it is an agent that works inside a case folder, measures the footage with real tools, and leaves a complete, auditable trail that the business page shows.
+
+**The pipeline for one claim** (`worker/src/review/runner.ts`; every step is an `analysis_step` row, so the phone shows progress live):
+
+1. **Ingest.** ffmpeg normalises the upload to `cases/<claim>/video.mp4`, extracts `audio.wav`, samples frames every 0.5 s and at scene changes, and builds 3×3 contact sheets with the time burnt into each tile, so one `Read` shows Droid 4.5 s of video.
+2. **Lanes.** The transcript lane (faster-whisper, word timestamps) and the integrity lane (black and frozen frames, cut rate, frame reuse against earlier claims, metadata, the finger challenge) run in parallel. One Droid call turns the transcript (or the written reason) into **spoken claims** with the moment each was said.
+3. **Case Analyst (Droid, fenced).** A Droid session opens in the case folder with `CASE.md`, the frames, the mosaics and a set of read-only probes (`worker/tools/probes/`: luminance of a region over time, sound onsets, part motion, screen-recapture hints, OCR). It plans, looks at the moments each claim points to, runs probes or writes its own, and records **exactly one finding per claim** (supports / contradicts / neutral) plus integrity findings through the `vouch-case` MCP server. Every finding must cite a time window and an artifact it registered.
+4. **Proof.** For each finding a captioned clip and a still are cut, plus a 20–40 s proof reel. The worker cuts them by default; `REVIEW_DROID_PROOF=1` runs the Proof Builder as a second Droid session instead (same files).
+5. **Report Auditor (Droid) and the worker's own audit.** The auditor writes and runs a test over every finding (artifact exists and its hash matches, window inside the video, proof clip covers it, wording describes footage and never the person, one finding per claim). The worker runs the same checks itself; a rejection by either sticks, and rejected findings stay in the report under "Rejected by the audit".
+6. **Score, tier, recommendation.** The deterministic formula in `module/src/review-score.ts` (shared with the web) turns evidence support, coverage, integrity and account history into P(legit) and a tier: T1 refund now, T2 partial now and the rest on return, T3 refund on return, T4 more evidence, T5 a person decides. Nothing ever auto-denies.
+7. **CREAO Refund Reviewer.** The saved agent reads the report and says whether it agrees; auto-decision happens only for T1/T2, under the store's limit, when the Reviewer agrees. A Customer Liaison agent writes the customer message.
+
+**What makes it a Factory feature.**
+- *A fenced agent, not a prompt.* The Droid SDK's permission handler (`worker/src/review/fence.ts`, 15 unit tests) sees every tool call before it runs, including each call inside a `Script`, and cancels anything outside the case: the Case Analyst may write only `work/`, run only `python3`/`node` on its own scripts or the shared probes, `ffmpeg`/`ffprobe` writing into `work/`, and the role's `vouch-case` tools; the web and subagents are disabled. Droid can write its own probe when none fits.
+- *Custom tools through `createSdkMcpServer`.* `get_case`, `add_artifact`, `add_finding`, `audit_finding`, `set_live_note`, `vision_label` are in-process MCP tools backed by SpacetimeDB reducers, so every artifact and finding is a row the business page subscribes to while the session is still running.
+- *Nested sessions with a budget.* `vision_label` runs a short nested Droid call over a frame; every session, retry and nested call counts against `MAX_DROID_SESSIONS_PER_HOUR`.
+- *Visible work.* The plan, every command with its exit code and duration, every fence decision and every message is in `cases/<claim>/droid.log`, linked from the report, and summarised under "How this was investigated".
+- *Graceful degradation.* No key, no budget or a failed session means "Automated checks only": the lanes still run, the report says so, the tier is capped at T3, and the business decides.
+
+**Verified live on the laptop (2026-10-24):** the fixture-mode run of the full pipeline, and real Droid sessions through the SDK (claims extraction, session start, MCP tools, fence decisions for direct calls and for `Script` batches). The last run (`qa/videos/S05-fresh.mp4` → C-6) took 150 s with three sessions: the Case Analyst wrote its plan and an audio-track probe, registered mosaics, frames and the probe's chart, and recorded three findings; the worker cut the clips and reel; the Report Auditor wrote and ran `work/audit_test.py`, verified every hash and clip and passed all three; the worker's audit agreed. The QA videos are synthetic and silent, so the tier was T4 "more evidence" every time, never a decline. Two facts found the hard way, both in [docs/VERIFIED.md](docs/VERIFIED.md): with autonomy *off* the session has no file-write tool (Droid writes files through `Execute`, which the fence judges), and with autonomy *low* file writes bypass the permission handler, so the reviewer stays on *off*. The transcript lane needs `pip install faster-whisper`; without it the report says "no transcript" and claims come from the written reason.
+
+## Factory: the Detector Lab
 
 `worker/src/lab.ts` runs a Droid SDK session when a lab job is enqueued. Four things can enqueue one:
 - an event (a person overrides a recommendation, or a pattern is dismissed),
@@ -105,8 +128,11 @@ These numbers are measured on a simulated economy we designed. They show the met
 | The shopper's purchase and payment | Simulated payment; the claim and the video are real |
 | Video frames, hashes, freshness, blank-frame, little-motion and reuse checks | Live (ffmpeg and dHash in the worker) |
 | CREAO findings, recommendations and pattern reviews | Fixture in this build (`CREAO_MODE=fixture`); live runs wait for the agents (see the checklist) |
+| The video reviewer's ingest, integrity checks, findings, proof clips, audit and score | Live (ffmpeg, the probes and the formula run in the worker; findings come from a live Droid session when `FACTORY_API_KEY` is set, otherwise the report says "Automated checks only") |
+| The CREAO Refund Reviewer's opinion | Fixture until the saved agent exists (labelled Fixture; "Reviewer offline" when neither is available) |
 | Detector scores | Measured on fresh simulated worlds against the simulation's ground truth |
-| Droid jobs | Not run here (no Droid in the cloud session); the fence and the pipeline are unit tested |
+| Droid review sessions | Run live on the laptop through the SDK; see "Factory: the video reviewer" for what was verified |
+| Droid lab jobs | Not run live yet; the fence and the pipeline are unit tested |
 | Credentials | Real Ed25519 signatures and salted digests; simulated issuers; registry in SpacetimeDB, not on a public chain |
 
 Line-by-line detail, with the command that checks each line: [docs/REAL_VS_SIMULATED.md](docs/REAL_VS_SIMULATED.md). Facts checked against the real libraries and services: [docs/VERIFIED.md](docs/VERIFIED.md).
@@ -135,7 +161,8 @@ Full steps, including the CREAO agents, Maincloud publishing, the Droid CLI and 
   - Droid jobs need the laptop.
   - The SpacetimeDB numbers come from a local server.
   - Each one has an exact command in [docs/LIVE_CHECKLIST.md](docs/LIVE_CHECKLIST.md).
-- **The video checks are internally consistent, not proof of authenticity.** A convincing fake video can fool a vision model. Vouch raises the cost and routes doubt to a person.
+- **The video checks are internally consistent, not proof of authenticity.** A convincing fake video can fool a vision model. Vouch raises the cost and routes doubt to a person. Findings describe the footage, never the person; the reviewer never auto-denies.
+- **The reviewer's transcript lane needs faster-whisper on the worker** (`pip install faster-whisper`). Without it, and for videos with no audio track, claims come from the written reason and the report says so.
 - **The shopping score is illustrative, not a consumer report.** In production it would need consent, explanations and an appeal path. Appeals are out of scope.
 - **The detector numbers come from a simulation we designed.**
 - **The globe spreads agents up to 3° around their region's centre so they can be seen.** Positions are simulated home regions, not locations.

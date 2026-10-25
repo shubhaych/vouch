@@ -13,6 +13,7 @@ import { useCall, useStatus } from "@/lib/stdb/hooks";
 import { agentLabel, businessLabel, money, titleCase } from "@/lib/format";
 import { BUSINESS_A, BUSINESS_B, CATALOG, businessDef, catalogItem, type CatalogItem } from "@vouch/module/world";
 import { REASONS } from "@vouch/module/text";
+import { claimHref } from "@/lib/claim-link";
 
 const BAND_TEXT: Record<string, string> = { red: "text-red-600", amber: "text-amber-600", neutral: "text-slate-600", green: "text-emerald-600" };
 const SHOPS = [BUSINESS_A, BUSINESS_B];
@@ -151,7 +152,7 @@ function Orders({ agentId }: { agentId: number }) {
   );
 }
 
-function OrderCard({ p, refund }: { p: Purchase; refund?: { id: bigint; status: string; amount: number } }) {
+function OrderCard({ p, refund }: { p: Purchase; refund?: { id: bigint; status: string; amount: number; reasonCode: string } }) {
   const call = useCall();
   const item = catalogItem(p.item);
   const [flip, setFlip] = useState(false);
@@ -172,7 +173,9 @@ function OrderCard({ p, refund }: { p: Purchase; refund?: { id: bigint; status: 
     const ok = await call("requestRefund", (r) => r.requestRefund({ purchaseId: p.id, reasonCode: reason, reasonText: text || `${titleCase(reason)}: ${item?.name}` }));
     if (ok) setAsking(false);
   };
-  const claimUrl = claim && typeof window !== "undefined" ? `${window.location.origin}/claim/${claim.id}` : "";
+  // The link carries the claim's details so the phone shows the upload box before its live connection is up.
+  const claimPath = claim ? claimHref(claim, p, refund) : "";
+  const claimUrl = claim && typeof window !== "undefined" ? `${window.location.origin}${claimPath}` : "";
 
   return (
     <article className="card-light p-4" data-testid={`order-${p.id}`}>
@@ -211,10 +214,10 @@ function OrderCard({ p, refund }: { p: Purchase; refund?: { id: bigint; status: 
       ) : null}
       {claim ? (
         <div className="mt-4 flex flex-wrap items-center gap-5 rounded-lg border border-line bg-bg p-4" data-testid="claim-qr">
-          <QRCodeSVG value={claimUrl} size={128} marginSize={1} />
+          <QRCodeSVG value={claimUrl} size={168} marginSize={2} />
           <div className="space-y-1 text-sm">
             <div className="font-semibold">Claim C-{claim.id.toString()}: record the video on your phone</div>
-            <div className="text-ink-soft">Scan the code, or <Link className="text-cyan-700 underline" href={`/claim/${claim.id}`} data-testid="use-this-device">use this device</Link>. At the end, hold up <b>{claim.fingerCount}</b> fingers next to the item.</div>
+            <div className="text-ink-soft">Scan the code, or <Link className="text-cyan-700 underline" href={claimPath} data-testid="use-this-device">use this device</Link>. At the end, hold up <b>{claim.fingerCount}</b> fingers next to the item.</div>
             <div className="text-xs text-ink-soft">Status: {titleCase(claim.status)} <Badge kind="live" /></div>
           </div>
         </div>
