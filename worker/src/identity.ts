@@ -3,8 +3,8 @@
 // the redacted result is stored (identity_screening) for the business page and the agents.
 import type { DbConnection } from '../module_bindings/index';
 import type { Claim, IdentityScreening as ScreeningRow } from '../module_bindings/types';
-import { screen, type PersonaId } from './crs';
-import { log } from './env';
+import { sandboxReady, screen, type PersonaId } from './crs';
+import { config, log } from './env';
 import { call } from './stdb';
 
 /** Deterministic and mostly clean, like real returns: about 85% P01, 5% each for P12, P13 and P16. */
@@ -14,10 +14,18 @@ export function personaFor(agentId: number): PersonaId {
   return slot === 0 ? 'P12' : slot === 1 ? 'P13' : slot === 2 ? 'P16' : 'P01';
 }
 
+/**
+ * A stored screening is kept unless it failed, or it is a fixture and the sandbox can now answer. A sandbox answer is
+ * always kept: it is a real API response, and the personas answer from a script, so asking again would only spend calls.
+ */
+export function keepScreening(row: ScreeningRow | undefined, sandboxUsable = config.crs.mode === 'sandbox' && !sandboxReady()): boolean {
+  return !!row && !row.failed && (row.source === 'sandbox' || !sandboxUsable);
+}
+
 /** Screens the claim's shopper once and records it; later calls return the stored row. Null when CRS could not answer. */
 export async function screenClaim(conn: DbConnection, c: Claim): Promise<ScreeningRow | null> {
   const have = conn.db.identityScreening.claimId.find(c.id);
-  if (have) return have;
+  if (have && keepScreening(have)) return have;
   const persona = personaFor(c.agentId);
   try {
     const s = await screen(persona);

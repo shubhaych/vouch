@@ -90,7 +90,7 @@ Routing rules (`normalize` in `crs.ts`, Vouch's rules, not CRS's):
 
 - **Only the four personas.** Never send real or invented personal data: unrecognised data can reach a paid downstream provider. Simulated shoppers are mapped onto a persona; they never get their own identity data.
 - **Secrets and PII stay in the worker.** The browser sends a persona id and receives an `IdentityScreening`. Never put credentials, tokens, SSNs, birth dates or raw vendor payloads in `web/`, a public SpacetimeDB table, logs or screenshots.
-- **Repeated failed logins can lock the account.** The client waits 5 minutes after a failed login; keep that.
+- **Repeated failed logins disable the account** (CRS113, then CRS114; only CRS can re-enable it). One rejected login is recorded in `worker/.keys/crs-login-failed` (a hash of the credentials, never the password) and those credentials are not tried again, even after a restart; the two product calls share one login. While the sandbox is unusable the worker uses labelled fixture screenings. Delete that file only once CRS confirms the credentials.
 - **CRS is an input, not a decision.** Agents propose, people decide. A discrepancy is a reason for a person to look, not proof that the return is improper; keep the identity question separate from the item question.
 - **Label provenance.** Sandbox results are real API responses to scripted personas; fixture results are `Fixture`. Batch mixes are synthetic: show routing counts, never fraud rates.
 

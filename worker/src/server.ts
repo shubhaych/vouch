@@ -38,6 +38,8 @@ const WORKER_QUERIES = [
   'SELECT * FROM verification', 'SELECT * FROM lab_job', 'SELECT * FROM partner_order',
   'SELECT * FROM analysis_job', 'SELECT * FROM analysis_step', 'SELECT * FROM artifact', 'SELECT * FROM finding', 'SELECT * FROM report',
   'SELECT * FROM claim_score', 'SELECT * FROM recommendation', 'SELECT * FROM score_review',
+  // Without it every restart re-screened every claim with CRS.
+  'SELECT * FROM identity_screening',
 ];
 const FINANCE_WORKER_QUERIES = [
   'SELECT * FROM finance_agent_run', 'SELECT * FROM finance_sim_state', 'SELECT * FROM finance_company_state',
@@ -342,7 +344,7 @@ async function main() {
   keepSimRunning(conn);
   orchestrator.start();
   // Real claims filed before CRS was wired in get one screening; sandbox answers are cached per persona, so this is at most four CRS calls.
-  void (async () => { for (const c of [...conn.db.claim.iter()]) if (c.kind !== 'simulated' && !conn.db.identityScreening.claimId.find(c.id)) await screenClaim(conn, c); })();
+  void (async () => { for (const c of [...conn.db.claim.iter()]) if (c.kind !== 'simulated') await screenClaim(conn, c); })();
   new DetectorRunner(conn).start();
   const pulse = new PulseRunner(conn, { creaoOn: () => conn.db.control.key.find('creao_enabled')?.value === 'true', takeBudget: () => orchestrator.takeBudget() });
   pulse.start();

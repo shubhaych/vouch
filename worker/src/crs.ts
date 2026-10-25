@@ -2,7 +2,8 @@
 // CRS answers "do these identity and contact details need more verification?", never
 // "should this refund be approved". Only the four documented sandbox personas are ever
 // sent: unrecognised data can be forwarded to a paid downstream provider.
-import { existsSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { config, log } from './env';
 
@@ -99,15 +100,29 @@ export function fixtureScreening(id: PersonaId): IdentityScreening {
 
 const PERSONAS_PATH = resolve(config.keysDir, 'crs-personas.json');
 const TIMEOUT_MS = 15_000;
-const LOGIN_BACKOFF_MS = 5 * 60_000; // repeated failed logins can lock the account
 const CACHE_MS = 10 * 60_000; // sandbox personas answer the same way every time
 
 let token: { value: string; until: number } | null = null;
-let loginBlockedUntil = 0;
 const cache = new Map<PersonaId, IdentityScreening>();
+
+// Repeated failed logins disable the sandbox account (CRS113 Access Denied, then CRS114 Account Disabled) and only the
+// CRS team can re-enable it. So one rejected login is remembered on disk, keyed by a hash of the credentials, and those
+// credentials are not tried again, even after a restart; changing CRS_USERNAME or CRS_PASSWORD clears it.
+const loginFailedPath = () => resolve(config.keysDir, 'crs-login-failed');
+const credentialHash = () => createHash('sha256').update(`${config.crs.username}\0${config.crs.password}`).digest('hex');
+
+/** Why CRS rejected the current credentials, when it has; null otherwise. */
+export function rejectedLogin(): string | null {
+  const f = loginFailedPath();
+  if (!existsSync(f)) return null;
+  const [hash, ...why] = readFileSync(f, 'utf8').split('\n');
+  return hash === credentialHash() ? why.join(' ').trim() || 'login rejected' : null;
+}
 
 export function sandboxReady(): string | null {
   if (!config.crs.username || !config.crs.password) return 'CRS_USERNAME and CRS_PASSWORD are not set';
+  const rejected = rejectedLogin();
+  if (rejected) return `CRS rejected these credentials (${rejected}); not retrying so the account is not disabled. Fix CRS_USERNAME / CRS_PASSWORD, or delete ${loginFailedPath()} once CRS confirms them.`;
   if (!existsSync(PERSONAS_PATH)) return `persona details missing: create ${PERSONAS_PATH} from the CRS Postman collection`;
   // Placeholders would reach CRS as unrecognised data, which it may forward to a paid provider.
   if (/<[^>]*>/.test(readFileSync(PERSONAS_PATH, 'utf8'))) return `${PERSONAS_PATH} still has <placeholder> values: fill them in from the CRS Postman collection`;
@@ -134,15 +149,27 @@ async function post(path: string, body: unknown, auth?: string): Promise<{ statu
   return { status: res.status, json };
 }
 
-async function login(): Promise<string> {
-  if (token && token.until > Date.now()) return token.value;
-  if (Date.now() < loginBlockedUntil) throw new Error('CRS login failed recently; waiting before trying again');
+// Fraud Finder and TruValidate run in parallel; they share one login so a bad password is one failure, not two.
+let loggingIn: Promise<string> | null = null;
+function login(): Promise<string> {
+  if (token && token.until > Date.now()) return Promise.resolve(token.value);
+  loggingIn ??= freshLogin().finally(() => { loggingIn = null; });
+  return loggingIn;
+}
+
+async function freshLogin(): Promise<string> {
+  const rejected = rejectedLogin();
+  if (rejected) throw new Error(`CRS rejected these credentials earlier (${rejected}); not retrying`);
   const { status, json } = await post('/users/login', { username: config.crs.username, password: config.crs.password });
   const j = (json ?? {}) as Record<string, unknown>;
   const value = [j.token, j.accessToken, j.access_token, j.jwt].find((v): v is string => typeof v === 'string' && v.length > 0);
   if (status >= 300 || !value) {
-    loginBlockedUntil = Date.now() + LOGIN_BACKOFF_MS;
-    throw new Error(`CRS login failed (HTTP ${status})`);
+    // CRS's own code (CRS113, CRS114...) says whether the account is still usable; the body never holds the password.
+    const why = `HTTP ${status}${[j.code, j.errorCode, j.message, j.error].filter((v) => typeof v === 'string' && v).map((v) => `: ${String(v).slice(0, 120)}`).join('')}`;
+    mkdirSync(config.keysDir, { recursive: true });
+    writeFileSync(loginFailedPath(), `${credentialHash()}\n${why}\n`, { mode: 0o600 });
+    log(`CRS login rejected (${why}); these credentials will not be tried again`);
+    throw new Error(`CRS login failed (${why})`);
   }
   const expiresIn = Number(j.expiresIn ?? j.expires_in);
   token = { value, until: Date.now() + (Number.isFinite(expiresIn) && expiresIn > 60 ? (expiresIn - 60) * 1000 : 10 * 60_000) };
@@ -178,6 +205,12 @@ export async function sandboxScreening(id: PersonaId): Promise<IdentityScreening
   return result;
 }
 
+let fallbackLogged = '';
+/** Sandbox when it can be used; otherwise the labelled fixture, so an unusable sandbox never stamps every claim "failed". */
 export async function screen(id: PersonaId): Promise<IdentityScreening> {
-  return config.crs.mode === 'sandbox' ? sandboxScreening(id) : fixtureScreening(id);
+  if (config.crs.mode !== 'sandbox') return fixtureScreening(id);
+  const notReady = sandboxReady();
+  if (!notReady) return sandboxScreening(id);
+  if (fallbackLogged !== notReady) log(`CRS sandbox not usable, using fixture screenings: ${(fallbackLogged = notReady)}`);
+  return fixtureScreening(id);
 }
