@@ -36,7 +36,9 @@ for (const t of tracked) if (/^\.env$|^\.env\.(?!example)|worker\/\.keys\/|worke
 
 // 4. Every nav link has a page.
 for (const { href } of NAV) {
-  const page = join('web/app', href === '/' ? '' : href, 'page.tsx');
+  // An in-page anchor (/#try) needs the page it points into, not a page named after the anchor.
+  const path = href.split('#')[0] || '/';
+  const page = join('web/app', path === '/' ? '' : path, 'page.tsx');
   if (!existsSync(page)) fail(`${href} is in lib/routes.ts but ${page} does not exist`);
 }
 
