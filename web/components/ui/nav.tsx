@@ -30,6 +30,7 @@ export function Nav() {
               key={n.href}
               href={n.href}
               className="nav__link"
+              aria-current={path === n.href ? "page" : undefined}
               data-testid={`nav-${n.label.toLowerCase().replace(/\s+/g, "-")}`}
               onClick={(e) => onHashClick(e, n.href)}
             >
