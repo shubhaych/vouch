@@ -111,6 +111,7 @@ import JournalLineRow from "./journal_line_table";
 import LabEventRow from "./lab_event_table";
 import LabJobRow from "./lab_job_table";
 import LatencyPingRow from "./latency_ping_table";
+import MerchantFlowDayRow from "./merchant_flow_day_table";
 import MetricsRow from "./metrics_table";
 import MyAgentRow from "./my_agent_table";
 import PatternEventRow from "./pattern_event_table";
@@ -409,6 +410,23 @@ const tablesSchema = __schema({
       { name: 'latency_ping_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, LatencyPingRow),
+  merchantFlowDay: __table({
+    name: 'merchant_flow_day',
+    indexes: [
+      { accessor: 'businessId', name: 'merchant_flow_day_business_id_idx_btree', algorithm: 'btree', columns: [
+        'businessId',
+      ] },
+      { accessor: 'day', name: 'merchant_flow_day_day_idx_btree', algorithm: 'btree', columns: [
+        'day',
+      ] },
+      { accessor: 'key', name: 'merchant_flow_day_key_idx_btree', algorithm: 'btree', columns: [
+        'key',
+      ] },
+    ],
+    constraints: [
+      { name: 'merchant_flow_day_key_key', constraint: 'unique', columns: ['key'] },
+    ],
+  }, MerchantFlowDayRow),
   metrics: __table({
     name: 'metrics',
     indexes: [

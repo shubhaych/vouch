@@ -62,7 +62,7 @@ function LabInner() {
             <span className="panel-title">Jobs</span>
             <span className="text-xs text-ink-soft-dark">{jobs.length} <Badge kind="live" /></span>
           </div>
-          <ol className="scroll-thin min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
+          <ol className="scroll-thin min-h-0 flex-1 space-y-1 overflow-y-auto p-2" data-lenis-prevent>
             {sorted.length === 0 ? <li className="p-2 text-xs text-ink-soft-dark">No jobs yet. Triggers: a business override or a dismissed pattern (event), every 30 simulated days (schedule), Ask Droid (user), two undecided reviews (another agent).</li> : null}
             {sorted.map((j) => (
               <li key={j.id}>
@@ -227,7 +227,7 @@ function DiffView({ text, title }: { text: string; title: string }) {
   return (
     <div className="glass overflow-hidden" data-testid="lab-diff">
       <div className="border-b border-line-dark px-4 py-2 panel-title">Diff · {title}</div>
-      <div className="scroll-thin max-h-[28rem] overflow-auto font-mono text-[0.68rem]">
+      <div className="scroll-thin max-h-[28rem] overflow-auto font-mono text-[0.68rem]" data-lenis-prevent>
         <table className="w-full table-fixed">
           <tbody>
             {rows.map((r, i) => (

@@ -188,7 +188,7 @@ export function ReplayPanel({ pattern, replay, onAgent, onClose }: { pattern: Fr
         </div>
       </div>
 
-      <div className="scroll-thin min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
+      <div className="scroll-thin min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3" data-lenis-prevent>
         <div className="rounded-lg border border-review/40 bg-review/5 p-3 text-sm" data-testid="why-flagged">
           <div className="panel-title mb-1">Why it was flagged · {pattern.detectorId} v{pattern.detectorVersion}</div>
           <p>{featureSentence(pattern.kind, features)}.</p>

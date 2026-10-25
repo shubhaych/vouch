@@ -175,6 +175,21 @@ const regionStat = table({ name: 'region_stat', public: true }, {
   scoreHist: t.array(t.u32()),
 });
 
+/**
+ * Persistent day buckets for merchant money flow. Updated in recordPurchase /
+ * settleRefund (accepted only). businessId 0 is the all-merchants rollup.
+ * Do not derive charts from event_feed — that is a 512-row ring.
+ */
+const merchantFlowDay = table({ name: 'merchant_flow_day', public: true }, {
+  key: t.string().primaryKey(), // `${businessId}:${day}`
+  businessId: t.u16().index(),
+  day: t.u32().index(),
+  purchaseCents: t.u64(),
+  refundPaidCents: t.u64(), // accepted / paid only — requested is not money out
+  purchases: t.u32(),
+  refundsPaid: t.u32(),
+});
+
 const fraudPattern = table({ name: 'fraud_pattern', public: true }, {
   id: t.u32().primaryKey(), // shown as FR-028
   kind: t.string(), // false_defect | refund_frequency | coordinated
@@ -460,7 +475,7 @@ const recommendation = table({ name: 'recommendation', public: true }, {
 
 export const spacetimedb = schema({
   role, seatCode, counter, simRun, simTick, agent, agentTruth, shopperLink, business, purchase, refundIntent, refund,
-  creditEvent, eventFeed, regionStat, fraudPattern, patternEvent, claim, evidence, agentRun, control, decision,
+  creditEvent, eventFeed, regionStat, merchantFlowDay, fraudPattern, patternEvent, claim, evidence, agentRun, control, decision,
   journalEntry, journalLine, credential, verification, labJob, labEvent, metrics, latencyPing, benchResult,
   analysisJob, analysisStep, artifact, finding, report, claimScore, recommendation,
 });

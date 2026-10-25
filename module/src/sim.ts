@@ -11,7 +11,8 @@ import {
   bandOf, bucketOf, clampScore,
 } from './score';
 import { falseDefectText, honestClaimText, ringClaimText, type ReasonCode } from './text';
-import type { AgentRow, BusinessRow, PurchaseRow, RefundRow, RegionStatRow, SimDb, SimRunRow } from './simdb';
+import type { AgentRow, BusinessRow, MerchantFlowDayRow, PurchaseRow, RefundRow, RegionStatRow, SimDb, SimRunRow } from './simdb';
+import { ALL_MERCHANTS_FLOW_ID } from './simdb';
 
 export const FEED_SLOTS = 512;
 export const SHOWCASE_AGENT_ID = 421;
@@ -55,6 +56,8 @@ export class World {
   private dirtyBusinesses = new Set<number>();
   private stats = new Map<number, RegionStatRow>();
   private dirtyStats = new Set<number>();
+  private flows = new Map<string, MerchantFlowDayRow>();
+  private dirtyFlows = new Set<string>();
   private policies = new Map<number, Policy>();
 
   constructor(readonly db: SimDb, public run: SimRunRow) {
@@ -112,6 +115,37 @@ export class World {
     return s;
   }
 
+  /** Load or create a day bucket for one merchant (or the all-merchants rollup). */
+  flow(businessId: number): MerchantFlowDayRow {
+    const key = `${businessId}:${this.day}`;
+    let row = this.flows.get(key);
+    if (!row) {
+      row = this.db.merchantFlowDay.key.find(key);
+      if (!row) {
+        row = this.db.merchantFlowDay.insert({
+          key, businessId, day: this.day, purchaseCents: 0n, refundPaidCents: 0n, purchases: 0, refundsPaid: 0,
+        });
+      }
+      this.flows.set(key, row);
+    }
+    this.dirtyFlows.add(key);
+    return row;
+  }
+
+  /** Purchase inflow or accepted-refund outflow — both merchant and all-merchants buckets. */
+  bumpFlow(businessId: number, kind: 'purchase' | 'refund_paid', cents: number) {
+    for (const id of [businessId, ALL_MERCHANTS_FLOW_ID]) {
+      const row = this.flow(id);
+      if (kind === 'purchase') {
+        row.purchaseCents += BigInt(cents);
+        row.purchases += 1;
+      } else {
+        row.refundPaidCents += BigInt(cents);
+        row.refundsPaid += 1;
+      }
+    }
+  }
+
   policy(businessId: number): Policy {
     let p = this.policies.get(businessId);
     if (!p) {
@@ -139,9 +173,11 @@ export class World {
     for (const id of this.dirtyAgents) this.db.agent.id.update(this.agents.get(id)!);
     for (const id of this.dirtyBusinesses) this.db.business.id.update(this.businesses.get(id)!);
     for (const id of this.dirtyStats) this.db.regionStat.regionId.update(this.stats.get(id)!);
+    for (const key of this.dirtyFlows) this.db.merchantFlowDay.key.update(this.flows.get(key)!);
     this.dirtyAgents.clear();
     this.dirtyBusinesses.clear();
     this.dirtyStats.clear();
+    this.dirtyFlows.clear();
     this.run.rngState = this.rng.state;
     this.db.simRun.id.update(this.run);
   }
@@ -397,6 +433,7 @@ export function recordPurchase(w: World, agentId: number, businessId: number, sk
   const s = w.stat(a.region);
   s.purchases += 1;
   s.salesCents += BigInt(amount);
+  w.bumpFlow(businessId, 'purchase', amount);
   w.events++;
   w.feed('purchase', agentId, businessId, amount, p.id, `[Purchase] ${agentLabel(agentId)} → ${businessLabel(businessId)} ${dollars(amount)} ${item.name}`);
   return p;
@@ -460,6 +497,7 @@ export function settleRefund(w: World, r: RefundRow, outcome: 'accepted' | 'decl
     b.balance -= BigInt(amount);
     b.refundsPaid += 1;
     w.touchBusiness(b);
+    w.bumpFlow(r.businessId, 'refund_paid', amount);
     s.accepted += 1;
     if (w.db.refundIntent.purchaseId.find(r.purchaseId)?.falseClaim) s.lossCents += BigInt(amount);
     const c = basis === 'fast' ? CREDIT.acceptedFast : CREDIT.acceptedEvidence;

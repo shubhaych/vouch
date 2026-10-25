@@ -35,6 +35,12 @@ export interface RegionStatRow {
   regionId: number; name: string; lat: number; lng: number; agents: number; purchases: number; salesCents: bigint; refundsRequested: number;
   accepted: number; declined: number; pending: number; lossCents: bigint; honestDeclines: number; fraudFlags: number; scoreHist: number[];
 }
+/** businessId 0 = all-merchants rollup. purchaseCents / refundPaidCents are authoritative for charts. */
+export interface MerchantFlowDayRow {
+  key: string; businessId: number; day: number; purchaseCents: bigint; refundPaidCents: bigint; purchases: number; refundsPaid: number;
+}
+/** Sentinel businessId for the all-merchants daily rollup. */
+export const ALL_MERCHANTS_FLOW_ID = 0;
 
 interface Unique<R, K> { find(key: K): R | undefined; update(row: R): R; delete(key: K): boolean }
 interface Indexed<R, K> { filter(key: K): Iterable<R> }
@@ -56,4 +62,9 @@ export interface SimDb {
   creditEvent: Table<CreditEventRow> & { id: Unique<CreditEventRow, bigint>; agentId: Indexed<CreditEventRow, number> };
   eventFeed: Table<FeedRow> & { slot: Unique<FeedRow, number> };
   regionStat: Table<RegionStatRow> & { regionId: Unique<RegionStatRow, number> };
+  merchantFlowDay: Table<MerchantFlowDayRow> & {
+    key: Unique<MerchantFlowDayRow, string>;
+    businessId: Indexed<MerchantFlowDayRow, number>;
+    day: Indexed<MerchantFlowDayRow, number>;
+  };
 }

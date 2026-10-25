@@ -52,7 +52,7 @@ export function PatternsRail({ patterns, selectedId, onOpen }: { patterns: reado
             ))}
           </div>
         </div>
-        <ol className="scroll-thin min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
+        <ol className="scroll-thin min-h-0 flex-1 space-y-1 overflow-y-auto p-2" data-lenis-prevent>
           {shown.length === 0 ? (
             <li className="px-1 py-2 text-xs text-ink-soft-dark">No patterns yet. The worker runs the detectors every 5 simulated days and flags behaviour (timing, repetition, claim similarity, refund ratio), never region.</li>
           ) : null}

@@ -324,6 +324,17 @@ export const Line = __t.object("Line", {
 });
 export type Line = __Infer<typeof Line>;
 
+export const MerchantFlowDay = __t.object("MerchantFlowDay", {
+  key: __t.string(),
+  businessId: __t.u16(),
+  day: __t.u32(),
+  purchaseCents: __t.u64(),
+  refundPaidCents: __t.u64(),
+  purchases: __t.u32(),
+  refundsPaid: __t.u32(),
+});
+export type MerchantFlowDay = __Infer<typeof MerchantFlowDay>;
+
 export const Metrics = __t.object("Metrics", {
   id: __t.u8(),
   eventsTotal: __t.u64(),

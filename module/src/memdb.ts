@@ -111,6 +111,7 @@ export function createMemDb(): SimDb {
   const creditEvent = t<Row<SimDb['creditEvent']>>('id', ['agentId'], true);
   const eventFeed = t<Row<SimDb['eventFeed']>>('slot', []);
   const regionStat = t<Row<SimDb['regionStat']>>('regionId', []);
+  const merchantFlowDay = t<Row<SimDb['merchantFlowDay']>>('key', ['businessId', 'day']);
 
   return {
     simRun: { ...simRun.base(), id: simRun.unique() },
@@ -129,5 +130,9 @@ export function createMemDb(): SimDb {
     creditEvent: { ...creditEvent.base(), id: creditEvent.unique(), agentId: creditEvent.by('agentId') },
     eventFeed: { ...eventFeed.base(), slot: eventFeed.unique() },
     regionStat: { ...regionStat.base(), regionId: regionStat.unique() },
+    merchantFlowDay: {
+      ...merchantFlowDay.base(), key: merchantFlowDay.unique(),
+      businessId: merchantFlowDay.by('businessId'), day: merchantFlowDay.by('day'),
+    },
   } as unknown as SimDb;
 }

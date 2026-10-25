@@ -79,7 +79,7 @@ function BusinessInner() {
             <span className="panel-title">Queue</span>
             <span className="text-xs text-ink-soft-dark">{claims.length} <Badge kind="live" /></span>
           </div>
-          <ol className="scroll-thin min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
+          <ol className="scroll-thin min-h-0 flex-1 space-y-1 overflow-y-auto p-2" data-lenis-prevent>
             {sorted.length === 0 ? <li className="p-2 text-xs text-ink-soft-dark">No claims yet. File one from /shop, or open a simulated refund from an agent on /world.</li> : null}
             {sorted.map((c) => <QueueItem key={c.id.toString()} c={c} active={selected?.id === c.id} onClick={() => select(c)} />)}
           </ol>
@@ -162,7 +162,7 @@ function Selected({ claim, frame, onFrame, seatRole, seatBusiness }: { claim: Cl
   // Other claims: the CREAO Refund Investigator's card, above the evidence on narrow screens and a sticky column on wide ones.
   return (
     <>
-      <div className="min-w-0 space-y-4 lg:col-start-2 xl:sticky xl:top-4 xl:col-start-3 xl:row-start-1 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto scroll-thin">
+      <div className="min-w-0 space-y-4 lg:col-start-2 xl:sticky xl:top-4 xl:col-start-3 xl:row-start-1 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto scroll-thin" data-lenis-prevent>
         <RecommendationCard claim={claim} refund={refund} decisions={decisions} evidence={evidence} seatRole={seatRole} seatBusiness={seatBusiness} onFrame={onFrame} />
       </div>
       <div className="min-w-0 lg:col-start-2 xl:row-start-1">

@@ -27,6 +27,8 @@ interface Props {
   hexMax?: number;
   pov?: Pov | null;
   autoRotate?: boolean;
+  /** Ice: softer land + plum atmosphere for the light simulation scene. */
+  look?: "dark" | "ice";
   onAgent: (id: number) => void;
   onGlobe: (lat: number, lng: number) => void;
   onHex?: (lat: number, lng: number) => void;
@@ -78,7 +80,18 @@ export function WorldGlobe(p: Props) {
     if (ready && p.pov && globe.current) globe.current.pointOfView(p.pov, 1200);
   }, [ready, p.pov]);
 
-  const material = useMemo(() => new THREE.MeshPhongMaterial({ color: "#0a1224", emissive: "#060b16", shininess: 6 }), []);
+  const ice = p.look === "ice";
+  const material = useMemo(
+    () =>
+      new THREE.MeshPhongMaterial(
+        ice
+          ? { color: "#1a2438", emissive: "#0c1220", shininess: 8 }
+          : { color: "#0a1224", emissive: "#060b16", shininess: 6 },
+      ),
+    [ice],
+  );
+  const land = ice ? () => "rgba(107,74,102,0.22)" : landColor;
+  const atmo = ice ? "#6b4a66" : "#22d3ee";
 
   // Stable accessors and one merged mesh: a new accessor function on every render made
   // react-globe.gl rebuild every hex mesh each time the feed re-rendered the globe (QA-008).
@@ -145,7 +158,7 @@ export function WorldGlobe(p: Props) {
 
   return (
     <div ref={box} className="absolute inset-0 isolate z-0" data-testid="globe">
-      <style>{`.globe-biz{display:block;transform:translate(-50%,-50%) rotate(45deg);background:#fbbf24;border:1px solid #fff8;box-shadow:0 0 10px #fbbf2499;border-radius:2px;cursor:pointer;pointer-events:auto;padding:0}`}</style>
+      <style>{`.globe-biz{display:block;transform:translate(-50%,-50%) rotate(45deg);background:${ice ? "#eaaa00" : "#fbbf24"};border:1px solid ${ice ? "rgba(58,15,52,0.35)" : "#fff8"};box-shadow:${ice ? "0 0 0 1px rgba(234,170,0,0.35)" : "0 0 10px #fbbf2499"};border-radius:2px;cursor:pointer;pointer-events:auto;padding:0}`}</style>
       <ReactGlobe
         ref={globe}
         width={size.w}
@@ -153,8 +166,8 @@ export function WorldGlobe(p: Props) {
         backgroundColor="rgba(0,0,0,0)"
         globeMaterial={material}
         showAtmosphere
-        atmosphereColor="#22d3ee"
-        atmosphereAltitude={0.16}
+        atmosphereColor={atmo}
+        atmosphereAltitude={ice ? 0.14 : 0.16}
         onGlobeReady={() => {
           setReady(true);
           if (process.env.NODE_ENV !== "production") (window as unknown as { __globe?: unknown }).__globe = globe.current;
@@ -163,7 +176,7 @@ export function WorldGlobe(p: Props) {
         hexPolygonResolution={3}
         hexPolygonMargin={0.62}
         hexPolygonUseDots
-        hexPolygonColor={landColor}
+        hexPolygonColor={land}
         hexPolygonsTransitionDuration={0}
         particlesData={stableParticles}
         particlesList="points"

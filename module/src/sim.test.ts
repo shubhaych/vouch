@@ -22,13 +22,13 @@ const events = (db: SimDb, n: number) => {
 };
 
 describe('T1.1 seedWorld', () => {
-  it('creates 10,000 agents, 60 businesses and 40 regions, and refuses to reseed', () => {
+  it('creates 10,000 agents, 100 businesses and 40 regions, and refuses to reseed', () => {
     const db = createMemDb();
     const run = seedWorld(db, { seed: 11n, population: 10_000 });
     expect(db.agent.count()).toBe(10_000n);
-    expect(db.business.count()).toBe(60n);
+    expect(db.business.count()).toBe(100n);
     expect(db.regionStat.count()).toBe(40n);
-    expect(BUSINESSES).toHaveLength(60);
+    expect(BUSINESSES).toHaveLength(100);
     expect(REGIONS).toHaveLength(40);
     expect(run.day).toBe(HISTORY_DAYS);
     expect(run.rings).toBeGreaterThan(20);
@@ -105,6 +105,33 @@ describe('the economy after 60 days', () => {
       expect(s.pending).toBe(w.open);
       expect(s.scoreHist.reduce((x, y) => x + y, 0)).toBe(s.agents);
     }
+  });
+
+  it('T1.4b merchant_flow_day matches purchase inflow and accepted refund outflow', () => {
+    let purchaseCents = 0n;
+    let purchases = 0;
+    for (const p of db.purchase.iter()) {
+      purchaseCents += BigInt(p.amount);
+      purchases += 1;
+    }
+    let refundPaidCents = 0n;
+    let refundsPaid = 0;
+    for (const r of db.refund.iter()) {
+      if (r.status !== 'accepted') continue;
+      refundPaidCents += BigInt(r.amount);
+      refundsPaid += 1;
+    }
+    const all = [...db.merchantFlowDay.businessId.filter(0)];
+    const sumIn = all.reduce((s, x) => s + x.purchaseCents, 0n);
+    const sumOut = all.reduce((s, x) => s + x.refundPaidCents, 0n);
+    const sumPurchases = all.reduce((s, x) => s + x.purchases, 0);
+    const sumRefunds = all.reduce((s, x) => s + x.refundsPaid, 0);
+    expect(sumIn).toBe(purchaseCents);
+    expect(sumOut).toBe(refundPaidCents);
+    expect(sumPurchases).toBe(purchases);
+    expect(sumRefunds).toBe(refundsPaid);
+    // Requested / pending refunds must not appear as money out.
+    expect(sumRefunds).toBeLessThanOrEqual([...db.refund.iter()].filter((r) => r.status === 'accepted').length);
   });
 
   it('the fast policy engine never declines', () => {

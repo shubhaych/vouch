@@ -87,6 +87,7 @@ export function EventMonitor({ events, people, onAgent, onPattern }: { events: F
       </div>
       <ol
         className="scroll-thin min-h-0 flex-1 overflow-y-auto px-2 py-1 font-mono text-[0.72rem] leading-5"
+        data-lenis-prevent
         onMouseEnter={() => setPaused(source)}
         onMouseLeave={() => setPaused(null)}
       >

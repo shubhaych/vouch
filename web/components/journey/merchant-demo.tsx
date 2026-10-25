@@ -57,7 +57,7 @@ export function MerchantDemo() {
             </span>
             <span className="badge badge--fixture">Fixture</span>
           </div>
-          <ul className="merchant-inbox__list">
+          <ul className="merchant-inbox__list" data-lenis-prevent>
             {claims.map((c) => (
               <li key={c.id}>
                 <button

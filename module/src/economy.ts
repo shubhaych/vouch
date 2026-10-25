@@ -28,7 +28,7 @@ export const init = spacetimedb.init((ctx) => initImpl(ctx));
 
 const RESET_TABLES = [
   'agent', 'agentTruth', 'shopperLink', 'business', 'purchase', 'refundIntent', 'refund', 'creditEvent', 'eventFeed', 'regionStat',
-  'fraudPattern', 'patternEvent', 'claim', 'evidence', 'decision', 'journalEntry', 'journalLine', 'credential', 'verification',
+  'merchantFlowDay', 'fraudPattern', 'patternEvent', 'claim', 'evidence', 'decision', 'journalEntry', 'journalLine', 'credential', 'verification',
 ] as const;
 
 export function seedWorldImpl(ctx: Ctx, seed: bigint, population: number, force: boolean) {
@@ -51,7 +51,7 @@ export function seedWorldImpl(ctx: Ctx, seed: bigint, population: number, force:
   scheduleTick(ctx, seeded.tickMicros);
 }
 
-/** Creates agents, private truth rows, 60 businesses and 40 regions. Refuses to reseed without force. */
+/** Creates agents, private truth rows, 100 businesses and 40 regions. Refuses to reseed without force. */
 export const seedWorld = spacetimedb.reducer(
   { seed: t.u64(), population: t.u32(), force: t.bool() },
   (ctx, a) => seedWorldImpl(ctx, a.seed, a.population, a.force),

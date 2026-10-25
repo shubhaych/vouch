@@ -64,7 +64,7 @@ export interface BusinessDef { id: number; name: string; regionId: number; categ
 const P = (windowDays: number, needsVideoOver: number, restockingFeePct = 0, storeCreditAllowed = true, notes = ''): Policy =>
   ({ windowDays, restockingFeePct, needsVideoOverCents: needsVideoOver * 100, storeCreditAllowed, notes });
 
-// 60 fixed businesses (B-001..B-060), 10 per category. B-019 (Business A) and
+// 100 fixed businesses (B-001..B-100), ~16–17 per category. B-019 (Business A) and
 // B-002 (Business B) are the two electronics stores the demo uses.
 export const BUSINESSES: readonly BusinessDef[] = [
   { id: 1, name: 'Harbor Threads', regionId: 1, category: 'apparel', policy: P(30, 150) },
@@ -127,6 +127,46 @@ export const BUSINESSES: readonly BusinessDef[] = [
   { id: 58, name: 'Mint Mirror', regionId: 38, category: 'beauty', policy: P(30, 100, 0, false) },
   { id: 59, name: 'Rally Republic', regionId: 1, category: 'sporting goods', policy: P(30, 150) },
   { id: 60, name: 'Fable Factory', regionId: 20, category: 'toys', policy: P(30, 100) },
+  { id: 61, name: 'Beacon Audio', regionId: 1, category: 'electronics', policy: P(30, 150) },
+  { id: 62, name: 'Copper Circuit', regionId: 6, category: 'electronics', policy: P(14, 100, 5) },
+  { id: 63, name: 'Ion Market', regionId: 33, category: 'electronics', policy: P(30, 200) },
+  { id: 64, name: 'Relay Desk', regionId: 16, category: 'electronics', policy: P(30, 150, 0, true, 'Physical damage from misuse is not covered') },
+  { id: 65, name: 'Pulse & Port', regionId: 4, category: 'electronics', policy: P(30, 100) },
+  { id: 66, name: 'Arc Lamp Labs', regionId: 32, category: 'electronics', policy: P(45, 250) },
+  { id: 67, name: 'Fieldwear Co', regionId: 2, category: 'apparel', policy: P(30, 150) },
+  { id: 68, name: 'Northline Apparel', regionId: 3, category: 'apparel', policy: P(30, 100) },
+  { id: 69, name: 'Loom & Label', regionId: 21, category: 'apparel', policy: P(45, 150) },
+  { id: 70, name: 'Sashiko Studio', regionId: 30, category: 'apparel', policy: P(14, 200) },
+  { id: 71, name: 'Harbor Flannel', regionId: 9, category: 'apparel', policy: P(30, 150) },
+  { id: 72, name: 'Ribbon Republic', regionId: 16, category: 'apparel', policy: P(30, 100) },
+  { id: 73, name: 'Quilt & Quiet', regionId: 18, category: 'home', policy: P(30, 150) },
+  { id: 74, name: 'Stoneware Lane', regionId: 5, category: 'home', policy: P(45, 200) },
+  { id: 75, name: 'Porch Light Home', regionId: 19, category: 'home', policy: P(30, 150) },
+  { id: 76, name: 'Maple Mantel', regionId: 13, category: 'home', policy: P(30, 150) },
+  { id: 77, name: 'Linen Attic', regionId: 40, category: 'home', policy: P(30, 100) },
+  { id: 78, name: 'Basalt Living', regionId: 7, category: 'home', policy: P(30, 150) },
+  { id: 79, name: 'Syrup Skin', regionId: 17, category: 'beauty', policy: P(14, 100, 0, false) },
+  { id: 80, name: 'Coral Cleanse', regionId: 31, category: 'beauty', policy: P(30, 100, 0, false) },
+  { id: 81, name: 'Night Serum Co', regionId: 37, category: 'beauty', policy: P(30, 150, 0, false) },
+  { id: 82, name: 'Fern & Foam', regionId: 27, category: 'beauty', policy: P(30, 100, 0, false) },
+  { id: 83, name: 'Opal Ritual', regionId: 11, category: 'beauty', policy: P(14, 100, 0, false) },
+  { id: 84, name: 'Tide Beauty', regionId: 26, category: 'beauty', policy: P(30, 100, 0, false) },
+  { id: 85, name: 'Alpine Kit', regionId: 9, category: 'sporting goods', policy: P(45, 200) },
+  { id: 86, name: 'Courtline Sports', regionId: 12, category: 'sporting goods', policy: P(30, 150) },
+  { id: 87, name: 'Riverbend Gear', regionId: 15, category: 'sporting goods', policy: P(30, 200) },
+  { id: 88, name: 'Stride Foundry', regionId: 22, category: 'sporting goods', policy: P(30, 150) },
+  { id: 89, name: 'Pitch & Pine', regionId: 25, category: 'sporting goods', policy: P(45, 250) },
+  { id: 90, name: 'Beacon Bike', regionId: 21, category: 'sporting goods', policy: P(30, 250) },
+  { id: 91, name: 'Cubby Craft', regionId: 4, category: 'toys', policy: P(30, 100) },
+  { id: 92, name: 'Starboard Toys', regionId: 34, category: 'toys', policy: P(45, 100) },
+  { id: 93, name: 'Paper Rocket Co', regionId: 28, category: 'toys', policy: P(30, 100) },
+  { id: 94, name: 'Block Party Toys', regionId: 23, category: 'toys', policy: P(30, 100) },
+  { id: 95, name: 'Nesting Doll Lab', regionId: 20, category: 'toys', policy: P(30, 100) },
+  { id: 96, name: 'Whistle & Wood', regionId: 32, category: 'toys', policy: P(30, 100) },
+  { id: 97, name: 'Gridline Gadgets', regionId: 10, category: 'electronics', policy: P(30, 150) },
+  { id: 98, name: 'Seam Society', regionId: 24, category: 'apparel', policy: P(30, 150) },
+  { id: 99, name: 'Hearthstone Home', regionId: 8, category: 'home', policy: P(30, 150) },
+  { id: 100, name: 'Trail Marker Co', regionId: 39, category: 'sporting goods', policy: P(30, 150) },
 ];
 
 export const BUSINESS_A = 19;

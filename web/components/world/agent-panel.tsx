@@ -70,7 +70,7 @@ export function AgentPanel({ agent, highlightCause, onClose, onPattern }: { agen
         </div>
         <button className="btn btn--ghost-dark btn--xs" onClick={onClose} aria-label="Close agent panel" data-testid="agent-close">✕</button>
       </div>
-      <div className="scroll-thin min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-3">
+      <div className="scroll-thin min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-3" data-lenis-prevent>
         <div className="grid grid-cols-3 gap-2">
           <div className="rounded-lg border border-line-dark bg-white/[0.03] p-2">
             <div className="text-[0.62rem] uppercase tracking-wider text-ink-soft-dark">Credit <Badge kind={agent.isLive ? "live" : "simulated"} /></div>

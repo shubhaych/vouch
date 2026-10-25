@@ -52,7 +52,7 @@ export function RegionPanel({ regionId, regions, businesses, patterns, agents, o
         </div>
         <button className="btn btn--ghost-dark btn--xs" onClick={onClose} aria-label="Close region panel">✕</button>
       </div>
-      <div className="scroll-thin min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-3">
+      <div className="scroll-thin min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-3" data-lenis-prevent>
         <div className="grid grid-cols-2 gap-3 text-sm">
           <Cell label="Transactions" value={<Tween value={r.purchases} />} />
           <Cell label="Refund rate" value={r.purchases ? pct(r.refundsRequested / r.purchases) : "0%"} />

@@ -136,7 +136,7 @@ export function ReportContent({ report, claimId, auditPassed, autoDecided = fals
           <div className="min-w-0 text-sm" data-testid="audio-transcript">
             <div className="text-xs text-ink-soft-dark">What they said on video{report.transcript?.language ? ` (${report.transcript.language})` : ""}</div>
             {transcript.length ? (
-              <ol className="scroll-thin mt-1 max-h-56 space-y-1.5 overflow-y-auto pr-1" data-testid="transcript">
+              <ol className="scroll-thin mt-1 max-h-56 space-y-1.5 overflow-y-auto pr-1" data-lenis-prevent data-testid="transcript">
                 {transcript.map((seg, i) => (
                   <li key={i} className="flex items-start gap-2">
                     <button className="shrink-0 font-mono text-xs text-accent underline disabled:no-underline" onClick={() => seek(seg.start)} disabled={!source}>{hms(seg.start)}</button>
@@ -345,7 +345,7 @@ export function ReportContent({ report, claimId, auditPassed, autoDecided = fals
             {report.method.ingestLog.length ? (
               <details>
                 <summary className="cursor-pointer text-xs text-ink-soft-dark">Ingest log ({report.method.ingestLog.length} lines)</summary>
-                <pre className="scroll-thin mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded bg-black/40 p-2 text-[0.68rem]">{report.method.ingestLog.join("\n")}</pre>
+                <pre className="scroll-thin mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded bg-black/40 p-2 text-[0.68rem]" data-lenis-prevent>{report.method.ingestLog.join("\n")}</pre>
               </details>
             ) : null}
           </div>
@@ -523,7 +523,7 @@ function DroidSession({ s }: { s: DroidSessionSummary }) {
       {s.plan ? (
         <details>
           <summary className="cursor-pointer text-xs text-ink-soft-dark">Plan</summary>
-          <pre className="scroll-thin mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded bg-black/40 p-2 text-[0.68rem]">{s.plan}</pre>
+          <pre className="scroll-thin mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded bg-black/40 p-2 text-[0.68rem]" data-lenis-prevent>{s.plan}</pre>
         </details>
       ) : null}
       {s.commands.length ? (

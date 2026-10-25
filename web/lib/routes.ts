@@ -1,8 +1,8 @@
 export interface NavItem { href: string; label: string }
 
-/** Pitch destinations a judge needs immediately. */
+/** Pitch destinations a judge needs immediately — claim → result → network → simulation. */
 export const NAV: NavItem[] = [
-  { href: "/#dilemma", label: "Problem" },
-  { href: "/#how", label: "How it works" },
-  { href: "/#demo", label: "Demo" },
+  { href: "/#try", label: "Try a claim" },
+  { href: "/network", label: "Network" },
+  { href: "/simulation", label: "Simulation" },
 ];

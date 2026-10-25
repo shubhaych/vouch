@@ -1,32 +1,31 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PromptCard } from "@/lib/demo/prompts";
 import { formatPromptAmount } from "@/lib/demo/prompts";
 import {
   CARD_COUNT,
   ENTRANCE_DURATION,
   DRIFT_DEG_PER_SEC,
+  cardOpacity,
   cardPose,
   cardTier,
   easeEntrance,
   layoutForFrame,
   poseTransform,
   promptExcerpt,
-  sceneEntrance,
   type WheelLayout,
 } from "@/lib/wheel/math";
 
 interface Props {
   cards: PromptCard[];
   reducedMotion: boolean;
-  skipToken: number;
-  onEntranceProgress?: (t: number) => void;
-  onReady?: () => void;
   onOpenCard: (card: PromptCard) => void;
   onAngle?: (angle: number) => void;
-  /** Accumulated scroll→wheel degrees (same sign as idle). Cleared each frame. */
+  /** Accumulated scroll→wheel degrees. Cleared each frame. Ignored during deal. */
   scrollDeltaRef?: React.MutableRefObject<number>;
+  /** Fired once when the deal finishes and drift may begin. */
+  onDealComplete?: () => void;
 }
 
 interface DragState {
@@ -40,45 +39,41 @@ interface DragState {
 export function ClaimWheel({
   cards,
   reducedMotion,
-  skipToken,
-  onEntranceProgress,
-  onReady,
   onOpenCard,
   onAngle,
   scrollDeltaRef,
+  onDealComplete,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const layoutRef = useRef<WheelLayout>(layoutForFrame(1200, 520));
   const entranceRef = useRef(reducedMotion ? 1 : 0);
-  const wheelRef = useRef(reducedMotion ? sceneEntrance(1, layoutRef.current).opening : 0);
-  const targetRef = useRef(wheelRef.current);
+  const wheelRef = useRef(0);
+  const targetRef = useRef(0);
   const velRef = useRef(0);
-  const driftOnRef = useRef(reducedMotion);
+  const driftOnRef = useRef(false);
   const pauseDriftRef = useRef(false);
   const dragRef = useRef<DragState | null>(null);
   const suppressClickRef = useRef(false);
   const prevStyleRef = useRef<string[]>([]);
-  const prevSceneRef = useRef("");
   const prevTierRef = useRef<string[]>([]);
-  const readySent = useRef(false);
+  const dealDoneRef = useRef(reducedMotion);
   const startRef = useRef<number | null>(null);
   const lastFrameRef = useRef<number | null>(null);
   const [layout, setLayout] = useState(() => layoutForFrame(1200, 520));
 
-  const finishIntro = useCallback(() => {
-    entranceRef.current = 1;
-    driftOnRef.current = !reducedMotion;
-    const scene = sceneEntrance(1, layoutRef.current);
-    targetRef.current = scene.opening;
-    wheelRef.current = scene.opening;
-    onEntranceProgress?.(1);
-  }, [onEntranceProgress, reducedMotion]);
-
   useEffect(() => {
-    if (skipToken > 0) finishIntro();
-  }, [skipToken, finishIntro]);
+    if (!reducedMotion) return;
+    entranceRef.current = 1;
+    driftOnRef.current = false;
+    wheelRef.current = 0;
+    targetRef.current = 0;
+    if (!dealDoneRef.current) {
+      dealDoneRef.current = true;
+      onDealComplete?.();
+    }
+  }, [reducedMotion, onDealComplete]);
 
   useEffect(() => {
     const el = rootRef.current;
@@ -97,39 +92,53 @@ export function ClaimWheel({
 
   useEffect(() => {
     let raf = 0;
+    const tip = layoutRef.current.tip;
+    const scale = layoutRef.current.sceneScale;
+    if (stageRef.current) {
+      stageRef.current.style.transform = `rotateX(${tip}deg) scale(${scale})`;
+    }
+
     const tick = (now: number) => {
       const dt = lastFrameRef.current == null ? 0.016 : Math.min(0.05, (now - lastFrameRef.current) / 1000);
       lastFrameRef.current = now;
       if (startRef.current == null) startRef.current = now;
 
-      if (!reducedMotion && skipToken === 0 && entranceRef.current < 1) {
-        const raw = Math.min(1, (now - startRef.current) / 1000 / ENTRANCE_DURATION);
-        entranceRef.current = raw;
-        onEntranceProgress?.(raw);
-        if (raw >= 1) driftOnRef.current = true;
+      const dealing = !reducedMotion && entranceRef.current < 1;
+      if (dealing) {
+        entranceRef.current = Math.min(1, (now - startRef.current) / 1000 / ENTRANCE_DURATION);
       }
 
       const L = layoutRef.current;
-      const entranceT = easeEntrance(entranceRef.current);
-      const scene = sceneEntrance(entranceT, L);
+      const entranceT = reducedMotion ? 1 : easeEntrance(entranceRef.current);
 
       if (!dragRef.current) {
-        if (scrollDeltaRef && scrollDeltaRef.current !== 0) {
-          targetRef.current += scrollDeltaRef.current;
-          scrollDeltaRef.current = 0;
+        if (dealing) {
+          // Lock wheel geometry during the deal — discard scroll deltas.
+          if (scrollDeltaRef) scrollDeltaRef.current = 0;
+          targetRef.current = 0;
+          wheelRef.current = 0;
+          velRef.current = 0;
+        } else {
+          if (!dealDoneRef.current) {
+            dealDoneRef.current = true;
+            driftOnRef.current = !reducedMotion;
+            onDealComplete?.();
+          }
+          if (scrollDeltaRef && scrollDeltaRef.current !== 0) {
+            targetRef.current += scrollDeltaRef.current;
+            scrollDeltaRef.current = 0;
+          }
+          if (driftOnRef.current && !reducedMotion && !pauseDriftRef.current) {
+            targetRef.current -= DRIFT_DEG_PER_SEC * dt;
+          }
+          if (Math.abs(velRef.current) > 0.02) {
+            targetRef.current += velRef.current * dt;
+            velRef.current *= Math.exp(-dt * 3.2);
+            if (Math.abs(velRef.current) < 0.02) velRef.current = 0;
+          }
+          const k = 1 - Math.exp(-dt * 9);
+          wheelRef.current += (targetRef.current - wheelRef.current) * k;
         }
-        if (entranceRef.current < 1 && skipToken === 0 && !reducedMotion) {
-          targetRef.current = scene.opening;
-        } else if (driftOnRef.current && !reducedMotion && !pauseDriftRef.current) {
-          targetRef.current -= DRIFT_DEG_PER_SEC * dt;
-        }
-        if (Math.abs(velRef.current) > 0.02) {
-          targetRef.current += velRef.current * dt;
-          velRef.current *= Math.exp(-dt * 3.2);
-          if (Math.abs(velRef.current) < 0.02) velRef.current = 0;
-        }
-        const k = 1 - Math.exp(-dt * 9);
-        wheelRef.current += (targetRef.current - wheelRef.current) * k;
       }
 
       const wheel = wheelRef.current;
@@ -138,15 +147,17 @@ export function ClaimWheel({
       for (let i = 0; i < CARD_COUNT; i++) {
         const pose = cardPose(i, entranceT, wheel, L);
         const tier = cardTier(pose.fromTop);
+        const opacity = pose.visible ? cardOpacity(pose.fromTop, L.hideDeg) : 0;
         const transform = poseTransform(pose);
-        const visibility = pose.visible ? "visible" : "hidden";
-        const key = `${transform}|${visibility}|${L.cardWidth}|${tier}`;
+        const visibility = pose.visible && opacity > 0.04 ? "visible" : "hidden";
+        const key = `${transform}|${visibility}|${L.cardWidth}|${tier}|${opacity.toFixed(2)}`;
         if (prevStyleRef.current[i] === key) continue;
         prevStyleRef.current[i] = key;
         const node = cardRefs.current[i];
         if (!node) continue;
         node.style.transform = transform;
         node.style.visibility = visibility;
+        node.style.opacity = String(opacity);
         node.style.width = `${L.cardWidth}px`;
         node.style.height = `${(L.cardWidth * 16) / 9}px`;
         if (prevTierRef.current[i] !== tier) {
@@ -156,22 +167,11 @@ export function ClaimWheel({
         node.tabIndex = pose.visible && tier === "focus" ? 0 : -1;
       }
 
-      const sceneKey = `${scene.rotateX.toFixed(3)}|${scene.scale.toFixed(4)}`;
-      if (prevSceneRef.current !== sceneKey && stageRef.current) {
-        prevSceneRef.current = sceneKey;
-        stageRef.current.style.transform = `rotateX(${scene.rotateX}deg) scale(${scene.scale})`;
-      }
-
-      if (!readySent.current && entranceRef.current >= 1) {
-        readySent.current = true;
-        onReady?.();
-      }
-
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [reducedMotion, skipToken, onEntranceProgress, onReady, onAngle, scrollDeltaRef]);
+  }, [reducedMotion, onAngle, scrollDeltaRef, onDealComplete]);
 
   const pause = () => {
     pauseDriftRef.current = true;
@@ -182,6 +182,7 @@ export function ClaimWheel({
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
+    if (entranceRef.current < 1 && !reducedMotion) return;
     rootRef.current?.setPointerCapture(e.pointerId);
     pauseDriftRef.current = true;
     suppressClickRef.current = false;
@@ -219,7 +220,6 @@ export function ClaimWheel({
     if (!d || d.pointerId !== e.pointerId) return;
     if (performance.now() - d.pauseAt > 80) velRef.current = 0;
     dragRef.current = null;
-    // Keep paused while pointer remains over the wheel (handled by leave).
   };
 
   const slots = cards.slice(0, CARD_COUNT);

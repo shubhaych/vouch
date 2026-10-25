@@ -23,6 +23,9 @@ interface DemoStore {
   decide: (action: "approve" | "decline" | "more_evidence") => void;
   simulateIncoming: () => DemoClaim;
   handoffClaimId: string | null;
+  /** Live SpacetimeDB claim id for the phone handoff (merchant result link). */
+  liveMerchantClaimId: string | null;
+  setLiveMerchantClaimId: (id: string | null) => void;
   approvalDurationMs: number | null;
   resetDemo: () => void;
 }
@@ -33,6 +36,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   const [claims, setClaims] = useState<DemoClaim[]>(() => SEED_CLAIMS.map((c) => ({ ...c })));
   const [selectedId, setSelectedId] = useState(SEED_CLAIMS[0]!.id);
   const [handoffClaimId, setHandoffClaimId] = useState<string | null>(null);
+  const [liveMerchantClaimId, setLiveMerchantClaimId] = useState<string | null>(null);
   const [handoffSubmittedAt, setHandoffSubmittedAt] = useState<number | null>(null);
   const [approvalDurationMs, setApprovalDurationMs] = useState<number | null>(null);
 
@@ -74,6 +78,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
     setClaims(SEED_CLAIMS.map((c) => ({ ...c })));
     setSelectedId(SEED_CLAIMS[0]!.id);
     setHandoffClaimId(null);
+    setLiveMerchantClaimId(null);
     setHandoffSubmittedAt(null);
     setApprovalDurationMs(null);
   }, []);
@@ -87,6 +92,8 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       decide,
       simulateIncoming,
       handoffClaimId,
+      liveMerchantClaimId,
+      setLiveMerchantClaimId,
       approvalDurationMs,
       resetDemo,
     }),
@@ -98,6 +105,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
       decide,
       simulateIncoming,
       handoffClaimId,
+      liveMerchantClaimId,
       approvalDurationMs,
       resetDemo,
     ],

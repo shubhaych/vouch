@@ -2,24 +2,26 @@
 
 export const CARD_COUNT = 34;
 export const HIDE_DEG = 88;
-export const ENTRANCE_DURATION = 2.0;
-/** Idle drift — noticeable, still readable on the central card. */
-export const DRIFT_DEG_PER_SEC = 2.15;
-export const OPENING_TURN_DEG = 14;
-/** Degrees of wheel travel per pixel of scroll while the sticky hero is active. */
-export const SCROLL_DEG_PER_PX = 0.22;
+/** Brisk deal — finishes before idle drift starts. */
+export const ENTRANCE_DURATION = 1.55;
+/** Calm baseline drift after the deal completes. */
+export const DRIFT_DEG_PER_SEC = 5.5;
+/**
+ * Scroll→wheel coupling while the sticky hero is active.
+ * Kept modest so Lenis page scroll is not fighting the cards.
+ */
+export const SCROLL_DEG_PER_PX = 0.11;
 
 export interface WheelLayout {
-  radiusStart: number;
-  radiusEnd: number;
-  pivotStart: number;
-  pivotEnd: number;
+  radius: number;
+  pivotY: number;
   cardWidth: number;
+  /** Half-arc cutoff (degrees from top) — tuned so edge cards stay fully on-screen. */
   hideDeg: number;
-  sceneScaleStart: number;
-  sceneScaleEnd: number;
-  tipStart: number;
-  tipEnd: number;
+  tip: number;
+  sceneScale: number;
+  /** Viewport half-width used for bounds checks (px). */
+  halfWidth: number;
 }
 
 export interface CardPose {
@@ -36,12 +38,9 @@ export interface CardPose {
 
 export type CardTier = "focus" | "near" | "far";
 
+/** Final seat on the full wheel — never remapped during entrance. */
 export function homeAngle(i: number): number {
   return (i * 360) / CARD_COUNT;
-}
-
-export function dealOrder(i: number): number {
-  return Math.min(i, CARD_COUNT - i);
 }
 
 export function clamp(n: number, a: number, b: number): number {
@@ -58,7 +57,7 @@ export function easeOutCubic(t: number): number {
 }
 
 export function easeEntrance(t: number): number {
-  return sampleCubicBezier(clamp(t, 0, 1), 0.45, 0, 0.15, 1);
+  return sampleCubicBezier(clamp(t, 0, 1), 0.33, 0, 0.2, 1);
 }
 
 function sampleCubicBezier(x: number, x1: number, y1: number, x2: number, y2: number): number {
@@ -88,33 +87,92 @@ export function normalizeDelta(deg: number): number {
   return d;
 }
 
+/** Left→right stagger along the settled top arc (home angles only). */
+const DEAL_RANK: number[] = (() => {
+  const idxs = Array.from({ length: CARD_COUNT }, (_, i) => i);
+  idxs.sort((a, b) => normalizeDelta(homeAngle(a)) - normalizeDelta(homeAngle(b)));
+  const rank = new Array<number>(CARD_COUNT);
+  idxs.forEach((slot, order) => {
+    rank[slot] = order;
+  });
+  return rank;
+})();
+
+export function dealOrder(i: number): number {
+  return DEAL_RANK[i] ?? i;
+}
+
 /**
- * Geometry for a top-band rainbow: pivot sits low in the stage so the visible
- * arc bows upward above the headline.
+ * Desktop: visible upper arc spans ~82–88% of hero width. Mobile keeps a tighter rainbow.
+ * `width`/`height` are the full hero positioning area (not a cropped stage).
  */
 export function layoutForFrame(width: number, height: number): WheelLayout {
   const mobile = width < 720;
-  const s = clamp(Math.min(width, height) / 480, 0.75, 1.15);
+  // Side margins so outermost visible cards stay fully on-screen (~7% each side → ~86% span).
+  const margin = mobile ? 20 : Math.max(56, width * 0.07);
+  const halfWidth = Math.max(160, width / 2 - margin);
+
+  if (mobile) {
+    const s = clamp(Math.min(width, height) / 420, 0.7, 1.05);
+    const radius = clamp(height * 0.55, 160, 280);
+    const cardWidth = clamp(100 * s, 84, 120);
+    const maxSin = Math.min(0.98, (halfWidth - cardWidth * 0.55) / radius);
+    const hideDeg = Math.min(70, (Math.asin(maxSin) * 180) / Math.PI - 2);
+    return {
+      radius,
+      pivotY: 24 * s,
+      cardWidth,
+      hideDeg: Math.max(48, hideDeg),
+      tip: 3,
+      sceneScale: 1,
+      halfWidth,
+    };
+  }
+
+  const cardWidth = clamp(width * 0.1, 136, 168);
+  const cardHalfH = (cardWidth * 16) / 9 / 2;
+  // Wider half-arc so the fan reaches farther down the sides.
+  const designTheta = 78;
+  let radius = (halfWidth - cardWidth * 0.48) / Math.sin((designTheta * Math.PI) / 180);
+  // CSS pivot ~90% — large radius, apex under nav, sides drop into the page.
+  const pivotFrac = 0.9;
+  const pivotY = height * 0.01;
+  const maxRadius = height * pivotFrac + pivotY - cardHalfH - 10;
+  radius = clamp(radius, 420, maxRadius);
+
+  // Soft cutoff: cards stay in the DOM past the chord and fade via opacity.
+  const maxSin = Math.min(0.995, (halfWidth - cardWidth * 0.35) / radius);
+  const hideDeg = clamp((Math.asin(maxSin) * 180) / Math.PI + 4, 72, 98);
+
   return {
-    radiusStart: (mobile ? 300 : 400) * s,
-    radiusEnd: (mobile ? 400 : 540) * s,
-    pivotStart: (mobile ? 40 : 56) * s,
-    pivotEnd: (mobile ? 58 : 84) * s,
-    cardWidth: (mobile ? 124 : 162) * s,
-    hideDeg: mobile ? 68 : 96,
-    sceneScaleStart: 0.98,
-    sceneScaleEnd: 1.05,
-    tipStart: 2,
-    tipEnd: 5.5,
+    radius,
+    pivotY,
+    cardWidth,
+    hideDeg,
+    tip: 2,
+    sceneScale: 1,
+    halfWidth,
   };
 }
 
+/** Edge fade — full opacity near the apex, dissolves toward the hidden half. */
+export function cardOpacity(fromTop: number, hideDeg: number): number {
+  const fadeStart = hideDeg * 0.38;
+  if (fromTop <= fadeStart) return 1;
+  const t = clamp((fromTop - fadeStart) / Math.max(1, hideDeg - fadeStart), 0, 1);
+  return lerp(1, 0.06, easeOutCubic(t));
+}
+
 export function cardTier(fromTop: number): CardTier {
-  if (fromTop < 11) return "focus";
-  if (fromTop < 36) return "near";
+  if (fromTop < 12) return "focus";
+  if (fromTop < 38) return "near";
   return "far";
 }
 
+/**
+ * Entrance animates FROM a left-hand deck TO fixed home seats.
+ * `wheelAngle` stays 0 until the deal finishes.
+ */
 export function cardPose(
   i: number,
   entranceT: number,
@@ -123,30 +181,30 @@ export function cardPose(
 ): CardPose {
   const home = homeAngle(i);
   const order = dealOrder(i);
-  const dealProgress = easeOutCubic((entranceT - order * 0.032) / 0.28);
+  const dealProgress = easeOutCubic(clamp((entranceT - order * 0.018) / 0.4, 0, 1));
 
-  const radius = lerp(layout.radiusStart, layout.radiusEnd, entranceT);
-  const pivotY = lerp(layout.pivotStart, layout.pivotEnd, entranceT);
-  const angle = home + wheelAngle + lerp(24, 0, dealProgress);
-  const flipY = lerp(90, 0, dealProgress);
-  const scale = lerp(0.92, 1, dealProgress);
+  const stackAngle = -layout.hideDeg * 0.85;
+  const angle = lerp(stackAngle, home, dealProgress) + wheelAngle;
+  const radius = lerp(layout.radius * 0.92, layout.radius, dealProgress);
+  const flipY = lerp(78, 0, dealProgress);
+  const scale = lerp(0.88, 1, dealProgress);
 
   const fromTop = Math.abs(normalizeDelta(home + wheelAngle));
-  const depth = -fromTop * 0.5;
-  const visible = dealProgress > 0.08 && fromTop <= layout.hideDeg;
+  const depth = -fromTop * 0.45;
 
-  return { angle, radius, pivotY, flipY, scale, depth, visible, dealProgress, fromTop };
-}
+  // Keep seats through the lower arc; opacity fades them out (no hard crop).
+  const visible = dealProgress > 0.05 && fromTop <= layout.hideDeg;
 
-export function sceneEntrance(entranceT: number, layout: WheelLayout): {
-  rotateX: number;
-  scale: number;
-  opening: number;
-} {
   return {
-    rotateX: lerp(layout.tipStart, layout.tipEnd, entranceT),
-    scale: lerp(layout.sceneScaleStart, layout.sceneScaleEnd, entranceT),
-    opening: -OPENING_TURN_DEG * entranceT,
+    angle,
+    radius,
+    pivotY: layout.pivotY,
+    flipY,
+    scale,
+    depth,
+    visible,
+    dealProgress,
+    fromTop,
   };
 }
 
@@ -161,7 +219,7 @@ export function poseTransform(p: CardPose): string {
 }
 
 export function promptExcerpt(prompt: string, tier: CardTier): string {
-  const max = tier === "focus" ? 96 : tier === "near" ? 52 : 36;
+  const max = tier === "focus" ? 96 : tier === "near" ? 56 : 40;
   if (prompt.length <= max) return prompt;
   const cut = prompt.slice(0, max - 1);
   const sp = cut.lastIndexOf(" ");
