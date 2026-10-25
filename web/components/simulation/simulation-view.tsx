@@ -27,7 +27,7 @@ import { TrustPanel, type TrustCounts } from "./trust-panel";
 import { FlowPanel } from "./flow-panel";
 import { EventRail } from "./event-rail";
 import { MerchantFlow } from "./merchant-flow";
-import { SpacetimeProof } from "./spacetime-proof";
+import { LiveReadings } from "./live-readings";
 
 /**
  * Judge-facing simulation: one Lenis sticky scroll scene.
@@ -108,9 +108,8 @@ function SimulationInner() {
   const [selectedBiz, setSelectedBiz] = useState<number | null>(null);
   const [selectedSeq, setSelectedSeq] = useState<bigint | null>(null);
   const [highlightRefundId, setHighlightRefundId] = useState<bigint | null>(null);
-  const [pov, setPov] = useState<Pov | null>({ lat: 28, lng: -40, altitude: 2.35 });
+  const [pov, setPov] = useState<Pov | null>({ lat: 28, lng: -40, altitude: 3.1 });
   const [layer, setLayer] = useState<"purchases" | "refunds" | "scores">("purchases");
-  const [proof, setProof] = useState(true);
 
   const selected = selectedId !== null ? agents.byId.get(selectedId) ?? null : null;
   const businessNames = useMemo(() => new Map(businessRows.map((b) => [b.id, b.name])), [businessRows]);
@@ -242,10 +241,8 @@ function SimulationInner() {
               <div className="sim-scene__merchant">
                 <MerchantFlow key={focusBiz.id} business={focusBiz} day={run?.day ?? 0} agents={agents.byId} businesses={businessNames} running={running} onClose={() => setSelectedBiz(null)} />
               </div>
-            ) : proof ? (
-              <SpacetimeProof onClose={() => setProof(false)} />
             ) : (
-              <button type="button" className="sim-flow__clear stdb-proof__open" onClick={() => setProof(true)} data-testid="stdb-proof-open">Why SpacetimeDB?</button>
+              <LiveReadings />
             )}
             <WorldGlobe
               byBand={agents.byBand}
