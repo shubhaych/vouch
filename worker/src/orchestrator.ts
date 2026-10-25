@@ -110,6 +110,9 @@ export class Orchestrator {
   handledByReviewer: ((c: Claim) => boolean) | null = null;
   /** The latest returns-pulse line for an item, from the PulseRunner, for the Risk Scorecard's item context. */
   pulseFor: ((sku: number) => { count: number; perSecond: number; baselinePerSecond: number; spike: boolean } | null) | null = null;
+  /** Called after the advisory seats ran for a video claim, so the Returns Monitor reads the current window too. */
+  onAdvised: (() => void) | null = null;
+  private advised = new Set<bigint>();
 
   constructor(private conn: DbConnection, private checkCredential: CredentialChecker) {}
 
@@ -139,9 +142,16 @@ export class Orchestrator {
   }
 
   private onClaim(c: Claim, atStartup = false) {
+    if (this.handledByReviewer?.(c)) {
+      // The video reviewer decides; every other seat still reads the same claim once so the business sees each agent's view.
+      // Not at start-up: old claims would spend credits nobody is watching.
+      if (atStartup || c.kind !== 'live' || c.frameUrls.length === 0 || this.advised.has(c.id)) return;
+      this.advised.add(c.id);
+      this.runClaim(c, true).then(() => this.onAdvised?.()).catch((e) => log(`advisory ${label.claim(c.id)} failed: ${(e as Error).message}`));
+      return;
+    }
     if (!claimNeedsWork(c, atStartup)) return;
     if (c.kind === 'showcase' && !this.liveShowcaseClaims.has(c.id)) return;
-    if (this.handledByReviewer?.(c)) return;
     const key = `claim:${c.id}`;
     if (this.busy.has(key)) return;
     this.busy.add(key);
@@ -155,8 +165,8 @@ export class Orchestrator {
   }
 
   /** Runs one seat: records the run row, streams progress steps, returns the parsed JSON (or the fail-closed fallback). */
-  private async runSeat<T extends object>(seat: Seat, caseRef: string, caseJson: unknown, fallback: T, valid: (v: Record<string, unknown>) => boolean): Promise<{ value: T; ok: boolean; handle: RunHandle }> {
-    const handle = await startRun(seat, caseJson, caseRef);
+  private async runSeat<T extends object>(seat: Seat, caseRef: string, caseJson: unknown, fallback: T, valid: (v: Record<string, unknown>) => boolean, fixtureIfMissing = false): Promise<{ value: T; ok: boolean; handle: RunHandle }> {
+    const handle = await startRun(seat, caseJson, caseRef, fixtureIfMissing);
     await call('recordRun', this.conn.reducers.recordRun({ runId: handle.runId, seat, caseRef, runUrl: handle.runUrl, conversationId: handle.conversationId, mode: handle.path === 'fixture' ? 'fixture' : 'live' }));
     const step = (s: string) => void call('runStep', this.conn.reducers.runStep({ runId: handle.runId, step: s }));
     const first: Partial<Record<Seat, string>> = { evidence_analyst: 'frames sent', pattern_analyst: 'events and histories sent', listing_matcher: 'frames and scraped listings sent', policy_checker: 'policy and checks sent', risk_scorecard: 'history, patterns and item context sent' };
@@ -172,12 +182,12 @@ export class Orchestrator {
    * Runs an optional seat for a claim, reusing a recorded result after a restart, skipping when the saved agent is
    * missing or the budget is spent, and recording the guarded JSON as evidence under the seat's name.
    */
-  private async optionalSeat<T extends object>(c: Claim, seat: Seat, caseRef: string, buildCase: () => unknown, fallback: T, valid: (v: Record<string, unknown>) => boolean, guard: (v: T) => T): Promise<T | { skipped: true; reason: string }> {
+  private async optionalSeat<T extends object>(c: Claim, seat: Seat, caseRef: string, buildCase: () => unknown, fallback: T, valid: (v: Record<string, unknown>) => boolean, guard: (v: T) => T, advisory = false): Promise<T | { skipped: true; reason: string }> {
     const existing = [...this.conn.db.evidence.iter()].find((e) => e.claimId === c.id && e.seat === seat);
     if (existing) return JSON.parse(existing.json) as T;
-    if (!seatAvailable(seat)) return { skipped: true, reason: `no saved CREAO agent "${seat.replace('_', ' ')}"` };
+    if (!seatAvailable(seat) && !advisory) return { skipped: true, reason: `no saved CREAO agent "${seat.replace('_', ' ')}"` };
     if (!this.takeBudget()) return { skipped: true, reason: `daily CREAO run limit (${config.creao.dailyRunLimit}) reached` };
-    const r = await this.runSeat<T>(seat, caseRef, buildCase(), fallback, valid);
+    const r = await this.runSeat<T>(seat, caseRef, buildCase(), fallback, valid, advisory);
     const value = guard(r.value);
     await call('recordEvidence', this.conn.reducers.recordEvidence({ claimId: c.id, seat, runId: r.handle.runId, runUrl: r.handle.runUrl, json: JSON.stringify(value), provenance: r.handle.path === 'fixture' ? 'fixture' : 'live' }));
     log(`${caseRef}: ${seat.replace('_', ' ')} done (${r.handle.path})`);
@@ -196,7 +206,8 @@ export class Orchestrator {
     return { claims_last_30d: claims, units_sold_last_30d: units };
   }
 
-  private async runClaim(c: Claim) {
+  /** advisory: the video reviewer owns the claim, so the seats only record what they see; no status change, no proposal. */
+  private async runClaim(c: Claim, advisory = false) {
     const db = this.conn.db;
     const m = mirrorOf(this.conn);
     const refund = m.refunds.get(c.refundId);
@@ -204,8 +215,8 @@ export class Orchestrator {
     const purchase = m.purchases.get(refund.purchaseId);
     const business = db.business.id.find(refund.businessId);
     if (!purchase || !business) return;
-    if (!this.agentsOn()) return this.offline(c, 'creao_enabled is off');
-    await call('setClaimStatus', this.conn.reducers.setClaimStatus({ claimId: c.id, status: 'investigating' }));
+    if (!this.agentsOn()) return advisory ? undefined : this.offline(c, 'creao_enabled is off');
+    if (!advisory) await call('setClaimStatus', this.conn.reducers.setClaimStatus({ claimId: c.id, status: 'investigating' }));
 
     const item = catalogItem(purchase.item);
     const policy = JSON.parse(business.policy) as { windowDays: number; needsVideoOverCents: number; restockingFeePct: number; storeCreditAllowed: boolean; notes: string };
@@ -220,7 +231,7 @@ export class Orchestrator {
     if (existing) {
       evidence = JSON.parse(existing.json) as EvidenceJson;
     } else if ((c.kind === 'live' || c.kind === 'showcase') && c.frameUrls.length > 0) {
-      if (!this.takeBudget()) return this.offline(c, `daily CREAO run limit (${config.creao.dailyRunLimit}) reached`);
+      if (!this.takeBudget()) return advisory ? undefined : this.offline(c, `daily CREAO run limit (${config.creao.dailyRunLimit}) reached`);
       const evCase = {
         claim_id: caseRef,
         order: { item: item?.name ?? 'item', category: purchase.category, amount: purchase.amount / 100, purchased_day: purchase.day, delivered_day: purchase.deliverDay },
@@ -242,7 +253,7 @@ export class Orchestrator {
     }
 
     // The kill switch can be flipped while a run is in flight: check again before the next hand-off.
-    if (!this.agentsOn()) return this.offline(c, 'creao_enabled was turned off mid-investigation');
+    if (!this.agentsOn()) return advisory ? undefined : this.offline(c, 'creao_enabled was turned off mid-investigation');
 
     // 1b. Listing Matcher (optional seat): the worker scrapes listings that look like the ordered item (Bright Data,
     // cached), the agent says whether the frames show that item and whether the return is eligible under the policy.
@@ -250,7 +261,7 @@ export class Orchestrator {
     const existingMatch = [...db.evidence.iter()].find((e) => e.claimId === c.id && e.seat === 'listing_matcher');
     if (existingMatch) {
       listingMatch = JSON.parse(existingMatch.json) as ListingMatchJson;
-    } else if (!seatAvailable('listing_matcher')) {
+    } else if (!seatAvailable('listing_matcher') && !advisory) {
       listingMatch = { skipped: true, reason: 'no saved CREAO agent "Vouch Listing Matcher"' };
     } else if (evidence.no_video) {
       listingMatch = { skipped: true, reason: 'no video to compare with a listing' };
@@ -272,7 +283,7 @@ export class Orchestrator {
         deterministic_checks: { within_window: withinWindow, days_since_delivery: Math.max(0, refund.day - purchase.deliverDay) },
       };
       const matchFallback: ListingMatchJson = { same_as_ordered: 'uncertain', confidence: 0, eligibility: { verdict: 'needs_person', reasons: [{ text: 'The Listing Matcher output could not be read, so the item question goes to a person.', cites: 'check:unparseable' }] }, summary: 'Unreadable Listing Matcher output.' };
-      const lm = await this.runSeat<ListingMatchJson>('listing_matcher', caseRef, matchCase, matchFallback, (v) => typeof v.same_as_ordered === 'string' && typeof v.eligibility === 'object' && v.eligibility !== null);
+      const lm = await this.runSeat<ListingMatchJson>('listing_matcher', caseRef, matchCase, matchFallback, (v) => typeof v.same_as_ordered === 'string' && typeof v.eligibility === 'object' && v.eligibility !== null, advisory);
       const guarded = guardListingMatch(lm.value, { withinWindow, unableToVerify: evidence.unable_to_verify === true, listings: scraped.items.length });
       // Fill the matched listing's details from what was scraped when the agent only gave its index.
       const idx = guarded.matched_listing?.index;
@@ -281,7 +292,7 @@ export class Orchestrator {
       listingMatch = { ...guarded, scraped_listings: matchCase.scraped_listings };
       await call('recordEvidence', this.conn.reducers.recordEvidence({ claimId: c.id, seat: 'listing_matcher', runId: lm.handle.runId, runUrl: lm.handle.runUrl, json: JSON.stringify(listingMatch), provenance: lm.handle.path === 'fixture' ? 'fixture' : 'live' }));
       log(`${caseRef}: Listing Matcher says ${String((listingMatch as ListingMatchJson).same_as_ordered)} / ${String((listingMatch as ListingMatchJson).eligibility?.verdict)} over ${scraped.items.length} ${scraped.source} listing(s)`);
-      if (!this.agentsOn()) return this.offline(c, 'creao_enabled was turned off mid-investigation');
+      if (!this.agentsOn()) return advisory ? undefined : this.offline(c, 'creao_enabled was turned off mid-investigation');
     }
     const credential = await this.checkCredential(refund.agentId, refund.id, refund.businessId).catch(() => null);
     const patterns = [...db.fraudPattern.iter()].filter((p) => p.agentIds.includes(refund.agentId)).map((p) => ({
@@ -303,8 +314,8 @@ export class Orchestrator {
       },
       listing_match: listingMatch,
     }), { outcome: 'needs_person', rules: [], summary: 'The Policy Checker output could not be read, so a person reads the policy.' },
-    (v) => typeof v.outcome === 'string' && Array.isArray(v.rules), (v) => guardPolicyCheck(v, { withinWindow, reasonAllowed, amountRequested: refund.amount / 100 }));
-    if (!this.agentsOn()) return this.offline(c, 'creao_enabled was turned off mid-investigation');
+    (v) => typeof v.outcome === 'string' && Array.isArray(v.rules), (v) => guardPolicyCheck(v, { withinWindow, reasonAllowed, amountRequested: refund.amount / 100 }), advisory);
+    if (!this.agentsOn()) return advisory ? undefined : this.offline(c, 'creao_enabled was turned off mid-investigation');
 
     // 1d. Risk Scorecard (optional seat): every behavioural, identity and item indicator read as supports, neutral or caution.
     const skuContext = this.skuContext(purchase.business, purchase.item, day);
@@ -322,8 +333,9 @@ export class Orchestrator {
       },
       evidence_summary: String(evidence.summary ?? ''),
     }), { caution: 'unknown', indicators: [], summary: 'The Risk Scorecard output could not be read; the Investigator weighs the history itself.' },
-    (v) => typeof v.caution === 'string' && Array.isArray(v.indicators), guardScorecard);
-    if (!this.agentsOn()) return this.offline(c, 'creao_enabled was turned off mid-investigation');
+    (v) => typeof v.caution === 'string' && Array.isArray(v.indicators), guardScorecard, advisory);
+    if (advisory) { log(`${caseRef}: advisory seats done`); return; }
+    if (!this.agentsOn()) return advisory ? undefined : this.offline(c, 'creao_enabled was turned off mid-investigation');
     if (!this.takeBudget()) return this.offline(c, `daily CREAO run limit (${config.creao.dailyRunLimit}) reached`);
 
     // 2. Refund Investigator

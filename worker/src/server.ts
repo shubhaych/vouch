@@ -344,6 +344,7 @@ async function main() {
   const pulse = new PulseRunner(conn, { creaoOn: () => conn.db.control.key.find('creao_enabled')?.value === 'true', takeBudget: () => orchestrator.takeBudget() });
   pulse.start();
   orchestrator.pulseFor = (sku) => pulse.latest?.items.find((i) => i.sku === sku) ?? null;
+  orchestrator.onAdvised = () => void pulse.runMonitor('manual', undefined, true).catch((e: Error) => log(`Returns Monitor: ${e.message}`));
   new Poster(poster.conn).start();
   const lab = new LabRunner(conn);
   lab.start();

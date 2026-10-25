@@ -100,8 +100,9 @@ export async function resolveAgents(): Promise<Record<Seat, string>> {
 }
 
 /** Starts a run. The case is sent as JSON text in one input named "case". */
-export async function startRun(seat: Seat, caseJson: unknown, caseRef: string): Promise<RunHandle> {
-  const path = seatPath(seat);
+/** fixtureIfMissing: a seat with no app key runs on its recorded fixture (labelled fixture) instead of failing. */
+export async function startRun(seat: Seat, caseJson: unknown, caseRef: string, fixtureIfMissing = false): Promise<RunHandle> {
+  const path = seatPath(seat) === 'none' && fixtureIfMissing ? 'fixture' : seatPath(seat);
   const text = JSON.stringify(caseJson);
   if (path === 'none') throw new Error(`CREAO seat ${seat} has no app id and key`);
   if (path === 'fixture') {

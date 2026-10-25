@@ -124,10 +124,10 @@ export class PulseRunner {
   }
 
   /** One Returns Monitor run over the given (or latest) window. Returns false when it could not start. */
-  async runMonitor(trigger: 'schedule' | 'spike' | 'manual', pulse = this.latest): Promise<boolean> {
+  async runMonitor(trigger: 'schedule' | 'spike' | 'manual', pulse = this.latest, fixtureIfMissing = false): Promise<boolean> {
     if (!pulse || this.running) return false;
     if (!this.deps.creaoOn()) { log('Returns Monitor: CREAO kill switch is off'); return false; }
-    if (!seatAvailable('returns_monitor')) { log('Returns Monitor: no saved CREAO agent "Vouch Returns Monitor"'); return false; }
+    if (!seatAvailable('returns_monitor') && !fixtureIfMissing) { log('Returns Monitor: no saved CREAO agent "Vouch Returns Monitor"'); return false; }
     if (!this.deps.takeBudget()) { log('Returns Monitor: daily CREAO run limit reached'); return false; }
     this.running = true;
     try {
@@ -156,7 +156,7 @@ export class PulseRunner {
       };
       const fallback: MonitorJson = { narrative: 'The Returns Monitor output could not be read; the pulse numbers stand on their own and nothing is flagged.', anomalies: [], items_to_watch: [] };
       const r = await runSeat<MonitorJson>(this.conn, 'returns_monitor', `pulse-${new Date().toISOString().slice(11, 19)}`, caseJson, fallback,
-        (v) => typeof v.narrative === 'string' && Array.isArray(v.anomalies), (s) => log(`Returns Monitor: ${s}`), 'pulse window and web signals sent');
+        (v) => typeof v.narrative === 'string' && Array.isArray(v.anomalies), (s) => log(`Returns Monitor: ${s}`), 'pulse window and web signals sent', fixtureIfMissing);
       const note = { ...guardMonitor(r.value), trigger, given: { window: caseJson.window, items: caseJson.items, businesses: caseJson.businesses, cohorts: caseJson.cohorts } };
       await call('recordMonitorNote', this.conn.reducers.recordMonitorNote({ runId: r.handle.runId, runUrl: r.handle.runUrl, trigger, json: JSON.stringify(note), provenance: r.handle.path === 'fixture' ? 'fixture' : 'live' }));
       log(`Returns Monitor (${trigger}): ${note.anomalies.length} anomaly(ies), ${note.items_to_watch.length} to watch (${r.handle.path})`);
