@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { agentLabel, businessLabel, money, titleCase } from "@/lib/format";
 import { businessDef, catalogItem } from "@vouch/module/world";
 import { CredentialStepper } from "./credential-stepper";
+import { IdentityPanel } from "./identity-panel";
 import { mediaUrl } from "@/lib/stdb/config";
 import { AgentCards, AgentLanes, MetricGrid, SafeVideo, hms, seatFlow, type Moment } from "./agent-flow";
 
@@ -105,6 +106,8 @@ export function Investigation({ claim, refund, purchase, evidence, frame, onFram
       ) : null}
 
       <AgentCards contributors={flow.contributors} metrics={flow.metrics} onMoment={ok.length ? onMoment : undefined} />
+
+      {claim.kind === "simulated" ? null : <IdentityPanel row={screenings[0]} />}
 
       <div className="flex flex-wrap gap-1.5" data-testid="check-chips">
         {checks.fresh !== undefined ? <Chip ok={checks.fresh} label="Freshness" detail={checks.uploaded_after_s !== undefined ? `uploaded ${checks.uploaded_after_s}s after the claim` : undefined} /> : null}

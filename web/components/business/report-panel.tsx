@@ -12,6 +12,7 @@ import { STEP_KEYS, STEP_LABEL, type DroidSessionSummary, type Report, type Repo
 import { TIER_LABEL } from "@vouch/module/review-score";
 import type { SpokenClaim } from "@vouch/module/review-score";
 import { parse } from "./investigation";
+import { IdentityPanel } from "./identity-panel";
 import { mediaUrl } from "@/lib/stdb/config";
 import { AgentCards, AgentLanes, MetricGrid, SafeVideo, hms, reportFlow, type Moment, type ScoreContext } from "./agent-flow";
 
@@ -187,6 +188,8 @@ export function ReportContent({ report: stored, claimId, auditPassed, autoDecide
       ) : null}
 
       <AgentCards contributors={flow.contributors} metrics={flow.metrics} onMoment={seekable ? onMoment : undefined} />
+
+      <IdentityPanel row={score.identity} />
 
       <section className="glass min-w-0 space-y-3 p-4" data-testid="customer-request">
         <div className="flex flex-wrap items-center justify-between gap-2">
