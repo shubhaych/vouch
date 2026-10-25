@@ -112,7 +112,7 @@ function LiveResult({ claimId }: { claimId: bigint }) {
               <button className="btn btn--primary btn--sm">Take seat</button>
             </form>
           )}
-          <Link href="/network" className="btn btn--ghost-dark btn--sm">
+          <Link href="/shop" className="btn btn--ghost-dark btn--sm">
             Company network →
           </Link>
         </div>
@@ -274,7 +274,7 @@ function Selected({
 
       <p className="text-center text-sm text-ink-soft-dark">
         Next:{" "}
-        <Link href="/network" className="underline">
+        <Link href="/shop" className="underline">
           explore the merchant network
         </Link>{" "}
         ·{" "}
@@ -354,7 +354,7 @@ function FixtureResult() {
       </div>
 
       <p className="text-center text-sm text-ink-soft">
-        <Link href="/network" className="underline">
+        <Link href="/shop" className="underline">
           Company network →
         </Link>
       </p>
