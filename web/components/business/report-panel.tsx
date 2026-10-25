@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useTable } from "spacetimedb/react";
 import Link from "next/link";
 import { tables } from "@/module_bindings";
-import type { AnalysisJob, Claim, Report as ReportRow, ScoreReview } from "@/module_bindings/types";
+import type { AnalysisJob, Claim, Report as ReportRow } from "@/module_bindings/types";
 import { Badge } from "@/components/ui/badge";
 import { claimLabel, money, pct, titleCase } from "@/lib/format";
 import { STEP_KEYS, STEP_LABEL, type DroidSessionSummary, type Report, type ReportArtifact, type ReportFinding } from "@vouch/module/review-types";
@@ -13,7 +13,7 @@ import { TIER_LABEL } from "@vouch/module/review-score";
 import type { SpokenClaim } from "@vouch/module/review-score";
 import { parse } from "./investigation";
 import { mediaUrl } from "@/lib/stdb/config";
-import { AgentCards, AgentLanes, MetricGrid, SafeVideo, hms, reportFlow, type Moment } from "./agent-flow";
+import { AgentCards, AgentLanes, MetricGrid, SafeVideo, hms, reportFlow, type Moment, type ScoreContext } from "./agent-flow";
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 /** Stored links can name localhost; the browser may be on a tunnel, so every media link goes through mediaUrl. */
@@ -68,6 +68,8 @@ export function ReportPanel({ claim, row, order, actions }: { claim: Claim; row:
   const [recs] = useTable(tables.recommendation.where((r) => r.claimId.eq(claim.id)));
   const rec = recs.find((r) => r.jobId === row.jobId);
   const [scores] = useTable(tables.scoreReview.where((r) => r.refundId.eq(claim.refundId)));
+  const [shoppers] = useTable(tables.agent.where((r) => r.id.eq(claim.agentId)));
+  const [runs] = useTable(tables.agentRun.where((r) => r.caseRef.eq(`C-${claim.id}`)));
   if (!report) return <div className="glass p-4 text-sm text-review" data-testid="report-panel">The report for this claim could not be read.</div>;
   return (
     <div className="min-w-0 space-y-3">
@@ -76,7 +78,7 @@ export function ReportPanel({ claim, row, order, actions }: { claim: Claim; row:
           <Link className="btn btn--secondary btn--sm" href={`/desk?claim=${claim.id}&refund=${claim.refundId}`}>Finance impact</Link>
         </div>
       ) : null}
-      <ReportContent key={String(row.jobId)} report={report.order || !order ? report : { ...report, order }} claimId={claim.id} auditPassed={row.auditPassed} autoDecided={!!rec?.autoDecided} fallbackReel={row.proofReelUrl} scoreReview={scores[0]} actions={actions} />
+      <ReportContent key={String(row.jobId)} report={report.order || !order ? report : { ...report, order }} claimId={claim.id} auditPassed={row.auditPassed} autoDecided={!!rec?.autoDecided} fallbackReel={row.proofReelUrl} score={{ review: scores[0], shopper: shoppers[0], runs }} actions={actions} />
     </div>
   );
 }
@@ -84,7 +86,7 @@ export function ReportPanel({ claim, row, order, actions }: { claim: Claim; row:
 type OpenImage = (list: ReportArtifact[], index: number) => void;
 
 /** Presentational report, also used by browser regression fixtures without a live database. */
-export function ReportContent({ report: stored, claimId, auditPassed, autoDecided = false, fallbackReel = "", scoreReview, actions }: { report: Report; claimId: bigint; auditPassed: boolean; autoDecided?: boolean; fallbackReel?: string; scoreReview?: ScoreReview; actions?: ReactNode }) {
+export function ReportContent({ report: stored, claimId, auditPassed, autoDecided = false, fallbackReel = "", score = { runs: [] }, actions }: { report: Report; claimId: bigint; auditPassed: boolean; autoDecided?: boolean; fallbackReel?: string; score?: ScoreContext; actions?: ReactNode }) {
   const [active, setActive] = useState<number | null>(null);
   const [viewer, setViewer] = useState<{ list: ReportArtifact[]; index: number } | null>(null);
   // "failed" removes the player entirely; timestamps only seek once the video has really loaded.
@@ -93,7 +95,7 @@ export function ReportContent({ report: stored, claimId, auditPassed, autoDecide
   const reelRef = useRef<HTMLVideoElement>(null);
   const [reelOk, setReelOk] = useState(true);
   const report = useMemo(() => publicMedia(stored), [stored]);
-  const flow = useMemo(() => reportFlow(report, scoreReview), [report, scoreReview]);
+  const flow = useMemo(() => reportFlow(report, score), [report, score]);
   const R = report.recommendation;
   const A = report.factoryAssessment;
   const arts = new Map(report.artifacts.map((a) => [a.id, a]));

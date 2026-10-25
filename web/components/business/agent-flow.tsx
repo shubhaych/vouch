@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode, type RefObject, type VideoHTMLAttributes } from "react";
-import type { Claim, Decision, Evidence, ScoreReview } from "@/module_bindings/types";
+import type { AgentRun, Claim, Decision, Evidence, ScoreReview } from "@/module_bindings/types";
 import { Badge, type Prov } from "@/components/ui/badge";
 import { money, pct, titleCase } from "@/lib/format";
 import type { Report } from "@vouch/module/review-types";
@@ -76,7 +76,10 @@ interface CardJson { caution?: string; indicators?: { name: string; value: unkno
 interface InvJson { what_would_change_my_mind?: string; history_considered?: string; offline?: boolean }
 interface Reason { text: string; cites: string }
 
-export function seatFlow({ claim, evidence, proposal, review }: { claim: Claim; evidence: readonly Evidence[]; proposal?: Decision; review?: ScoreReview }) {
+/** The shopper's live Vouch score and the CREAO runs on this claim, for the score section. */
+export interface ScoreContext { review?: ScoreReview; shopper?: { score: number; band: string }; runs: readonly AgentRun[] }
+
+export function seatFlow({ claim, evidence, proposal, review, shopper, runs }: { claim: Claim; evidence: readonly Evidence[]; proposal?: Decision } & ScoreContext) {
   const checks = parse<{ frame_times?: number[] }>(claim.checksJson, {});
   const timeOf = (frame: number) => checks.frame_times?.[frame];
   const row = (seat: string) => evidence.find((e) => e.seat === seat);
@@ -200,13 +203,13 @@ export function seatFlow({ claim, evidence, proposal, review }: { claim: Claim; 
     });
   }
 
-  scoreContributor(review, out, metrics);
+  scoreContributor({ review, shopper, runs }, null, out, metrics);
   return { contributors: out, metrics };
 }
 
 // ---- the video reviewer path ----
 
-export function reportFlow(report: Report, review?: ScoreReview) {
+export function reportFlow(report: Report, { review, shopper, runs }: ScoreContext) {
   const out: Contributor[] = [];
   const metrics: Metric[] = [];
   const S = report.score;
@@ -251,20 +254,57 @@ export function reportFlow(report: Report, review?: ScoreReview) {
     { key: "history", label: "Shopper history", from: ["check"], prov: "live", value: sign(C.history), tone: (C.history ?? 0) < 0 ? "review" : "neutral", note: `${report.history.refunds365} refunds in 365 days` },
   );
 
-  scoreContributor(review, out, metrics);
+  scoreContributor({ review, shopper, runs }, report, out, metrics);
   return { contributors: out, metrics };
 }
 
-/** The CREAO Score Reviewer, after a decision; a rule-only score change is not an agent's work, so it is not listed. */
-function scoreContributor(review: ScoreReview | undefined, out: Contributor[], metrics: Metric[]) {
-  if (!review || (review.provenance !== "live" && review.provenance !== "fixture")) return;
+/** score_review.decision: "accepted"/"declined" after a person decided, "creao_accept"/"creao_decline" for the CREAO verdict before one. */
+const verdictText = (d: string) => (d.startsWith("creao_") ? `CREAO ${d.slice("creao_".length)} verdict` : d === "accepted" ? "accept decision" : d === "declined" ? "decline decision" : titleCase(d));
+
+const SCORE_SEAT: Record<string, string> = { score_reviewer: "Score Reviewer", refund_investigator: "Refund Investigator", risk_scorecard: "Risk Scorecard" };
+
+/**
+ * The shopper's Vouch score. The change is judged by CREAO after the verdict: the saved Score Reviewer
+ * ("live"/"fixture") or, without it, a panel of the Refund Investigator and Risk Scorecard ("panel_*"),
+ * each given the analysis below (worker/src/review/score-review.ts). Until then, and when only the fallback
+ * rule answered, the score is shown without crediting an agent.
+ */
+function scoreContributor({ review, shopper, runs }: ScoreContext, report: Report | null, out: Contributor[], metrics: Metric[]) {
+  const panel = !!review?.provenance.startsWith("panel_");
+  const mode = panel ? review!.provenance.slice("panel_".length) : review?.provenance;
+  if (!review || (mode !== "live" && mode !== "fixture")) {
+    if (review) metrics.push({ key: "vouch", label: "Shopper Vouch score", from: [], prov: "live", value: `${review.before} → ${review.after}`, tone: review.delta > 0 ? "honest" : review.delta < 0 ? "fraud" : "neutral", note: "set by the fallback rule: no CREAO agent answered" });
+    else if (shopper) metrics.push({ key: "vouch", label: "Shopper Vouch score", from: [], prov: "live", value: String(shopper.score), tone: "neutral", note: `${shopper.band} band now · CREAO agents judge the change once the verdict is in` });
+    return;
+  }
+  const ids = new Set(review.runId.split(",").filter(Boolean));
+  const used = runs.filter((r) => ids.has(r.runId));
+  // What the agents were given from the analysis, mirrored from the worker's ScoreInput, so the number reads as grounded in it.
+  const A = report?.factoryAssessment;
+  const flags = report?.integrity.flags.map((f) => f.kind) ?? [];
+  const challenge = flags.includes("challenge_failed") ? "failed" : flags.includes("challenge_unclear") ? "unclear" : report ? "passed" : null;
+  const contradicts = report?.findings.filter((f) => f.kind === "contradicts").length ?? 0;
+  const given = [
+    `the ${verdictText(review.decision)}`,
+    A ? `Factory's ${A.action.replace("_", " ")} recommendation` : null,
+    challenge ? `finger challenge ${challenge}` : null,
+    report ? `${contradicts} contradicting finding${contradicts === 1 ? "" : "s"}` : null,
+    `the shopper's history and a starting score of ${review.before}`,
+  ].filter(Boolean);
+  const sign = review.delta > 0 ? "+" : "";
   out.push({
-    key: "score_reviewer", name: "Score Reviewer", sponsor: "CREAO", prov: provOf(review.provenance),
-    role: "After a CREAO verdict that is not on hold (or a decision), judges how this claim should move the shopper's Vouch score, within fixed bounds.",
-    insight: review.reason, moments: [], source: `The decision (${review.decision}) and the shopper's history`, details: [],
-    feeds: [{ metric: "vouch", how: `moved the score ${review.delta >= 0 ? "+" : ""}${review.delta}` }],
+    key: "score_reviewer", name: panel ? "Vouch score panel" : "Score Reviewer", sponsor: "CREAO", prov: provOf(mode),
+    runUrl: used.find((r) => r.runUrl)?.runUrl || undefined,
+    role: panel
+      ? "The Refund Investigator and Risk Scorecard, run side by side once the claim has a verdict, judge how it should move the shopper's Vouch score. Code checks the answer and keeps it within fixed bounds."
+      : "After the verdict, judges how this claim should move the shopper's Vouch score. Code checks the answer and keeps it within fixed bounds.",
+    insight: `${review.before} → ${review.after} (${sign}${review.delta}). ${review.reason}`,
+    moments: (report?.findings ?? []).filter((f) => f.auditStatus === "passed").map((f) => ({ t: f.tStart, tEnd: f.tEnd, text: f.observation, tone: f.kind as Tone, findingId: f.id })),
+    source: `Given ${given.join(", ")}`,
+    details: used.map((r) => <>{SCORE_SEAT[r.seat] ?? titleCase(r.seat)} · {r.status} · {r.mode}{r.runUrl ? <> · <a className="text-accent underline" href={r.runUrl} target="_blank" rel="noreferrer">run</a></> : <span className="font-mono text-ink-soft-dark"> · {r.runId.slice(0, 14)}</span>}</>),
+    feeds: [{ metric: "vouch", how: `moved it ${sign}${review.delta}` }],
   });
-  metrics.push({ key: "vouch", label: "Shopper Vouch score", from: ["score_reviewer"], prov: provOf(review.provenance), value: `${review.before} → ${review.after}`, tone: review.delta > 0 ? "honest" : review.delta < 0 ? "fraud" : "neutral", note: `${review.delta >= 0 ? "+" : ""}${review.delta} after ${review.decision}` });
+  metrics.push({ key: "vouch", label: "Shopper Vouch score", from: ["score_reviewer"], prov: provOf(mode), value: `${review.before} → ${review.after}`, tone: review.delta > 0 ? "honest" : review.delta < 0 ? "fraud" : "neutral", note: `${sign}${review.delta} after the ${verdictText(review.decision)}` });
 }
 
 // ---- views ----
@@ -300,10 +340,12 @@ export function MetricGrid({ metrics, contributors, onMoment }: { metrics: Metri
               <div className={`mt-1 font-display text-2xl font-semibold leading-tight tracking-[-0.02em] tabular-nums ${TONE_TEXT[m.tone]}`}>{m.value}</div>
               {m.bar !== undefined ? <div className="mt-1 h-1.5 rounded-full bg-white/10"><div className="h-full rounded-full bg-accent" style={{ width: `${Math.round(Math.min(1, Math.max(0, m.bar)) * 100)}%` }} /></div> : null}
               {m.note ? <div className="mt-1 text-[0.7rem] text-ink-soft-dark">{m.note}</div> : null}
-              <div className="mt-2 flex flex-wrap items-center gap-1">
-                <span className="font-mono text-[0.6rem] uppercase tracking-[0.08em] text-ink-soft-dark">from</span>
-                {from.map((k) => <AgentChip key={k} c={byKey.get(k)} contributors={contributors} onClick={() => focusAgent(k)} />)}
-              </div>
+              {from.length ? (
+                <div className="mt-2 flex flex-wrap items-center gap-1">
+                  <span className="font-mono text-[0.6rem] uppercase tracking-[0.08em] text-ink-soft-dark">from</span>
+                  {from.map((k) => <AgentChip key={k} c={byKey.get(k)} contributors={contributors} onClick={() => focusAgent(k)} />)}
+                </div>
+              ) : null}
               {onMoment && moments.length ? (
                 <div className="mt-1 flex flex-wrap items-center gap-1 text-[0.65rem]">
                   <span className="font-mono text-[0.6rem] uppercase tracking-[0.08em] text-ink-soft-dark">grounded at</span>
@@ -393,7 +435,8 @@ export function AgentCards({ contributors, metrics, onMoment }: { contributors: 
                   </li>
                 ))}
               </ul>
-            ) : c.source ? <p className="text-xs text-ink-soft-dark"><span className="font-mono text-[0.6rem] uppercase tracking-[0.08em]">Works from</span> {c.source}</p> : null}
+            ) : null}
+            {c.source ? <p className="text-xs text-ink-soft-dark"><span className="font-mono text-[0.6rem] uppercase tracking-[0.08em]">Works from</span> {c.source}</p> : null}
             {c.details.length ? (
               <details>
                 <summary className="cursor-pointer text-xs text-ink-soft-dark">Its full reasoning ({c.details.length})</summary>
