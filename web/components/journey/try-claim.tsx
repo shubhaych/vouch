@@ -296,7 +296,7 @@ function LiveHandoff() {
     if (liveStatus !== "result_ready" || navigated.current) return;
     navigated.current = true;
     const href =
-      fixture || !claimId ? "/merchant/claim/fixture" : `/merchant/claim/${claimId.toString()}`;
+      fixture || !claimId ? "/merchant/claim/fixture" : `/business?claim=${claimId.toString()}`;
     const t = window.setTimeout(() => router.push(href), 1000);
     return () => window.clearTimeout(t);
   }, [liveStatus, fixture, claimId, router]);

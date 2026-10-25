@@ -7,9 +7,9 @@ import { fillFromChat, parseVerdict, startRun, waitForRun, type RunHandle } from
 import { call } from './stdb';
 
 export async function runSeat<T extends object>(
-  conn: DbConnection, seat: Seat, caseRef: string, caseJson: unknown, fallback: T, valid: (v: Record<string, unknown>) => boolean, onStep: (s: string) => void, firstStep = 'case sent',
+  conn: DbConnection, seat: Seat, caseRef: string, caseJson: unknown, fallback: T, valid: (v: Record<string, unknown>) => boolean, onStep: (s: string) => void, firstStep = 'case sent', fixtureIfMissing = false,
 ): Promise<{ value: T; ok: boolean; handle: RunHandle }> {
-  const handle = await startRun(seat, caseJson, caseRef);
+  const handle = await startRun(seat, caseJson, caseRef, fixtureIfMissing);
   await call('recordRun', conn.reducers.recordRun({ runId: handle.runId, seat, caseRef, runUrl: handle.runUrl, conversationId: handle.conversationId, mode: handle.path === 'fixture' ? 'fixture' : 'live' }));
   const step = (s: string) => { onStep(s); void call('runStep', conn.reducers.runStep({ runId: handle.runId, step: s })); };
   step(firstStep);

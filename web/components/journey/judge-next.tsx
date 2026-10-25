@@ -7,7 +7,7 @@ import { useDemo } from "@/lib/demo/demo-store";
 export function JudgeNext() {
   const { liveMerchantClaimId } = useDemo();
   const merchantHref = liveMerchantClaimId
-    ? `/merchant/claim/${liveMerchantClaimId}`
+    ? `/business?claim=${liveMerchantClaimId}`
     : null;
 
   return (
@@ -26,7 +26,7 @@ export function JudgeNext() {
       <ol className="chapter-path">
         <li className="chapter-path__item chapter-path__item--primary">
           {merchantHref ? (
-            <Link href="/business" className="chapter-path__link" data-testid="chapter-merchant-live">
+            <Link href={merchantHref} className="chapter-path__link" data-testid="chapter-merchant-live">
               <span className="chapter-path__n">01</span>
               <span className="chapter-path__body">
                 <span className="chapter-path__label">
