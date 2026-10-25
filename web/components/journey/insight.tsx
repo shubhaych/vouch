@@ -127,7 +127,7 @@ function VouchReveal({ reduced }: { reduced: boolean }) {
     >
       <div>
         <span className="feature__kicker feature__kicker--marigold">What Vouch is</span>
-        <h3 className="section__title">A portable refund reliability signal.</h3>
+        <h3 className="section__title">A standardized, global refund reliability score.</h3>
         <p className="vouch-reveal__lede">
           Built only from <strong>confirmed</strong> refund outcomes across merchants — not from an
           AI flag alone.
