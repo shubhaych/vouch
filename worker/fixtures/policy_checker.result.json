@@ -1,0 +1,9 @@
+{
+  "_fixture": "Hand-written to the Policy Checker schema in docs/CREAO.md (Agent 8). Rules are filled from the deterministic checks the worker sends; only the window and the reason can make a claim not eligible.",
+  "claim_id": "{{claim_id}}",
+  "outcome": "{{outcome}}",
+  "rules": "{{rules}}",
+  "refund_shape": { "max_amount": "{{max_amount}}", "restocking_fee_pct": "{{restocking_fee_pct}}", "store_credit_only": "{{store_credit_only}}" },
+  "exception_note": "{{exception_note}}",
+  "summary": "{{summary}}"
+}

@@ -230,6 +230,433 @@ export const Evidence = __t.object("Evidence", {
 });
 export type Evidence = __Infer<typeof Evidence>;
 
+export const FinanceAccount = __t.object("FinanceAccount", {
+  code: __t.string(),
+  name: __t.string(),
+  type: __t.string(),
+  note: __t.string(),
+});
+export type FinanceAccount = __Infer<typeof FinanceAccount>;
+
+export const FinanceAgentRun = __t.object("FinanceAgentRun", {
+  runId: __t.string(),
+  seat: __t.string(),
+  companyId: __t.u16(),
+  caseRef: __t.string(),
+  status: __t.string(),
+  mode: __t.string(),
+  inputJson: __t.string(),
+  outputJson: __t.string(),
+  valid: __t.bool(),
+  rejectReason: __t.string(),
+  runUrl: __t.string(),
+  agentId: __t.string(),
+  ms: __t.u32(),
+  at: __t.timestamp(),
+});
+export type FinanceAgentRun = __Infer<typeof FinanceAgentRun>;
+
+export const FinanceAudit = __t.object("FinanceAudit", {
+  id: __t.u64(),
+  companyId: __t.u16(),
+  rule: __t.string(),
+  actorRole: __t.string(),
+  who: __t.identity(),
+  target: __t.string(),
+  detail: __t.string(),
+  refused: __t.bool(),
+  at: __t.timestamp(),
+});
+export type FinanceAudit = __Infer<typeof FinanceAudit>;
+
+export const FinanceBridge = __t.object("FinanceBridge", {
+  id: __t.u64(),
+  companyId: __t.u16(),
+  period: __t.string(),
+  cause: __t.string(),
+  cents: __t.i64(),
+  orders: __t.u32(),
+  winner: __t.string(),
+  why: __t.string(),
+  explained: __t.bool(),
+  clusterId: __t.u64(),
+});
+export type FinanceBridge = __Infer<typeof FinanceBridge>;
+
+export const FinanceClose = __t.object("FinanceClose", {
+  key: __t.string(),
+  companyId: __t.u16(),
+  period: __t.string(),
+  ledgerCents: __t.i64(),
+  processorCents: __t.i64(),
+  bankCents: __t.i64(),
+  events: __t.u32(),
+  matched: __t.u32(),
+  exceptions: __t.u32(),
+  closedByPlaybook: __t.u32(),
+  toInvestigator: __t.u32(),
+  toController: __t.u32(),
+  unexplainedCents: __t.i64(),
+  status: __t.string(),
+  source: __t.string(),
+  memo: __t.string(),
+  at: __t.timestamp(),
+});
+export type FinanceClose = __Infer<typeof FinanceClose>;
+
+export const FinanceCluster = __t.object("FinanceCluster", {
+  id: __t.u64(),
+  companyId: __t.u16(),
+  period: __t.string(),
+  cls: __t.string(),
+  status: __t.string(),
+  cents: __t.i64(),
+  orders: __t.u32(),
+  winner: __t.string(),
+  reason: __t.string(),
+  playbook: __t.string(),
+  proposalJson: __t.string(),
+  explanation: __t.string(),
+  sampleRefs: __t.string(),
+  at: __t.timestamp(),
+});
+export type FinanceCluster = __Infer<typeof FinanceCluster>;
+
+export const FinanceCompany = __t.object("FinanceCompany", {
+  id: __t.u16(),
+  slug: __t.string(),
+  name: __t.string(),
+  category: __t.string(),
+  size: __t.u8(),
+  tagline: __t.string(),
+  featured: __t.bool(),
+  status: __t.string(),
+});
+export type FinanceCompany = __Infer<typeof FinanceCompany>;
+
+export const FinanceCompanyState = __t.object("FinanceCompanyState", {
+  companyId: __t.u16(),
+  orders: __t.u32(),
+  orderCents: __t.u64(),
+  claims: __t.u32(),
+  claimCents: __t.u64(),
+  refundedCents: __t.u64(),
+  flags: __t.u32(),
+  investigations: __t.u32(),
+  verifiedFraud: __t.u32(),
+  falseFlags: __t.u32(),
+  crossCompanyCatches: __t.u32(),
+  scoreSum: __t.u64(),
+  scoreN: __t.u32(),
+  cashCents: __t.i64(),
+  openObligations: __t.u32(),
+  openLeg2Cents: __t.u64(),
+  unrecoveredLeg1Cents: __t.u64(),
+  delayedByPause: __t.u32(),
+  delayHoursSum: __t.u64(),
+  goodsBackUnits: __t.u32(),
+  goodsBackCents: __t.u64(),
+  rung: __t.string(),
+  rungSinceHour: __t.u32(),
+  signalsJson: __t.string(),
+  updatedHour: __t.u32(),
+});
+export type FinanceCompanyState = __Infer<typeof FinanceCompanyState>;
+
+export const FinanceEntry = __t.object("FinanceEntry", {
+  id: __t.u64(),
+  companyId: __t.u16(),
+  period: __t.string(),
+  kind: __t.string(),
+  memo: __t.string(),
+  sourceRef: __t.string(),
+  requestId: __t.u64(),
+  status: __t.string(),
+  cents: __t.u64(),
+  requestedBy: __t.identity(),
+  preparedBy: __t.identity(),
+  preparerRole: __t.string(),
+  approvedBy: __t.option(__t.identity()),
+  decisionRef: __t.string(),
+  formulaVersion: __t.string(),
+  evidenceIds: __t.string(),
+  processorRef: __t.string(),
+  priorPeriodMemo: __t.string(),
+  autoPosted: __t.bool(),
+  at: __t.timestamp(),
+});
+export type FinanceEntry = __Infer<typeof FinanceEntry>;
+
+export const FinanceExposureLog = __t.object("FinanceExposureLog", {
+  id: __t.u64(),
+  companyId: __t.u16(),
+  fromRung: __t.string(),
+  toRung: __t.string(),
+  by: __t.string(),
+  reason: __t.string(),
+  signalsJson: __t.string(),
+  simHour: __t.u32(),
+  at: __t.timestamp(),
+});
+export type FinanceExposureLog = __Infer<typeof FinanceExposureLog>;
+
+export const FinanceExposureProposal = __t.object("FinanceExposureProposal", {
+  companyId: __t.u16(),
+  proposedRung: __t.string(),
+  allowedJson: __t.string(),
+  reason: __t.string(),
+  customerNotice: __t.string(),
+  expiresInHours: __t.u32(),
+  runId: __t.string(),
+  mode: __t.string(),
+  accepted: __t.bool(),
+  simHour: __t.u32(),
+});
+export type FinanceExposureProposal = __Infer<typeof FinanceExposureProposal>;
+
+export const FinanceLine = __t.object("FinanceLine", {
+  id: __t.u64(),
+  entryId: __t.u64(),
+  companyId: __t.u16(),
+  account: __t.string(),
+  debit: __t.u64(),
+  credit: __t.u64(),
+});
+export type FinanceLine = __Infer<typeof FinanceLine>;
+
+export const FinanceObligation = __t.object("FinanceObligation", {
+  id: __t.u64(),
+  companyId: __t.u16(),
+  orderRef: __t.string(),
+  claimRef: __t.string(),
+  decisionRef: __t.string(),
+  tier: __t.string(),
+  category: __t.string(),
+  sku: __t.string(),
+  leg1Cents: __t.u32(),
+  leg2Cents: __t.u32(),
+  costCents: __t.u32(),
+  status: __t.string(),
+  openedHour: __t.u32(),
+  dueHour: __t.u32(),
+  closedHour: __t.u32(),
+  outcomeNote: __t.string(),
+  accruedCents: __t.u32(),
+  accruedPeriod: __t.string(),
+  requestedBy: __t.identity(),
+});
+export type FinanceObligation = __Infer<typeof FinanceObligation>;
+
+export const FinancePeriod = __t.object("FinancePeriod", {
+  key: __t.string(),
+  companyId: __t.u16(),
+  period: __t.string(),
+  status: __t.string(),
+  lockedBy: __t.option(__t.identity()),
+  lockedAt: __t.option(__t.timestamp()),
+  autoPostedCents: __t.u64(),
+});
+export type FinancePeriod = __Infer<typeof FinancePeriod>;
+
+export const FinancePrecedent = __t.object("FinancePrecedent", {
+  id: __t.u64(),
+  companyId: __t.u16(),
+  key: __t.string(),
+  decision: __t.string(),
+  reason: __t.string(),
+  by: __t.identity(),
+  queueId: __t.u64(),
+  citedCount: __t.u32(),
+  at: __t.timestamp(),
+});
+export type FinancePrecedent = __Infer<typeof FinancePrecedent>;
+
+export const FinanceProduct = __t.object("FinanceProduct", {
+  sku: __t.string(),
+  companyId: __t.u16(),
+  name: __t.string(),
+  description: __t.string(),
+  priceCents: __t.u32(),
+  category: __t.string(),
+  active: __t.bool(),
+});
+export type FinanceProduct = __Infer<typeof FinanceProduct>;
+
+export const FinanceQueue = __t.object("FinanceQueue", {
+  id: __t.u64(),
+  companyId: __t.u16(),
+  kind: __t.string(),
+  title: __t.string(),
+  detailJson: __t.string(),
+  targetRef: __t.string(),
+  status: __t.string(),
+  answer: __t.string(),
+  reason: __t.string(),
+  requestedBy: __t.identity(),
+  decidedBy: __t.option(__t.identity()),
+  precedentId: __t.u64(),
+  at: __t.timestamp(),
+  decidedAt: __t.option(__t.timestamp()),
+});
+export type FinanceQueue = __Infer<typeof FinanceQueue>;
+
+export const FinanceRequest = __t.object("FinanceRequest", {
+  id: __t.u64(),
+  companyId: __t.u16(),
+  kind: __t.string(),
+  cents: __t.u64(),
+  period: __t.string(),
+  memo: __t.string(),
+  sourceRef: __t.string(),
+  decisionRef: __t.string(),
+  formulaVersion: __t.string(),
+  evidenceIds: __t.string(),
+  processorRef: __t.string(),
+  requestedBy: __t.identity(),
+  requesterRole: __t.string(),
+  status: __t.string(),
+  at: __t.timestamp(),
+});
+export type FinanceRequest = __Infer<typeof FinanceRequest>;
+
+export const FinanceReserve = __t.object("FinanceReserve", {
+  id: __t.u64(),
+  companyId: __t.u16(),
+  period: __t.string(),
+  openCount: __t.u32(),
+  openLeg2Cents: __t.u64(),
+  accruedCents: __t.u64(),
+  avgRateBp: __t.u32(),
+  resolvedAccruedCents: __t.u64(),
+  actualCents: __t.u64(),
+  trueUpCents: __t.i64(),
+  ratesJson: __t.string(),
+  at: __t.timestamp(),
+});
+export type FinanceReserve = __Infer<typeof FinanceReserve>;
+
+export const FinanceReturnPlan = __t.object("FinanceReturnPlan", {
+  obligationId: __t.u64(),
+  hour: __t.u32(),
+  outcome: __t.string(),
+});
+export type FinanceReturnPlan = __Infer<typeof FinanceReturnPlan>;
+
+export const FinanceScore = __t.object("FinanceScore", {
+  key: __t.string(),
+  label: __t.string(),
+  value: __t.string(),
+  detail: __t.string(),
+  at: __t.timestamp(),
+});
+export type FinanceScore = __Infer<typeof FinanceScore>;
+
+export const FinanceSimClaim = __t.object("FinanceSimClaim", {
+  id: __t.u64(),
+  companyId: __t.u16(),
+  agentId: __t.u32(),
+  sku: __t.string(),
+  cents: __t.u32(),
+  tier: __t.string(),
+  score: __t.u16(),
+  band: __t.string(),
+  riskBp: __t.u32(),
+  flagged: __t.bool(),
+  reasons: __t.string(),
+  investigated: __t.bool(),
+  outcome: __t.string(),
+  contradicted: __t.bool(),
+  clusterHash: __t.string(),
+  crossCompany: __t.bool(),
+  simHour: __t.u32(),
+  resolveHour: __t.u32(),
+  obligationId: __t.u64(),
+  source: __t.string(),
+});
+export type FinanceSimClaim = __Infer<typeof FinanceSimClaim>;
+
+export const FinanceSimEvent = __t.object("FinanceSimEvent", {
+  id: __t.u64(),
+  kind: __t.string(),
+  companyIds: __t.array(__t.u16()),
+  startHour: __t.u32(),
+  endHour: __t.u32(),
+  paramsJson: __t.string(),
+  plantedBy: __t.string(),
+  at: __t.timestamp(),
+});
+export type FinanceSimEvent = __Infer<typeof FinanceSimEvent>;
+
+export const FinanceSimState = __t.object("FinanceSimState", {
+  id: __t.u8(),
+  running: __t.bool(),
+  hoursPerTick: __t.u8(),
+  seed: __t.u64(),
+  simHour: __t.u32(),
+  rngState: __t.u64(),
+  ticks: __t.u64(),
+  seeded: __t.bool(),
+  epochMs: __t.u64(),
+  lastTickMs: __t.u64(),
+  rowsLastTick: __t.u32(),
+  msLastTick: __t.u32(),
+});
+export type FinanceSimState = __Infer<typeof FinanceSimState>;
+
+export const FinanceSimTruth = __t.object("FinanceSimTruth", {
+  claimId: __t.u64(),
+  archetype: __t.string(),
+  fraud: __t.bool(),
+  ringId: __t.u32(),
+  eventId: __t.u64(),
+});
+export type FinanceSimTruth = __Infer<typeof FinanceSimTruth>;
+
+export const FinanceStatsHourly = __t.object("FinanceStatsHourly", {
+  id: __t.u64(),
+  companyId: __t.u16(),
+  simHour: __t.u32(),
+  orders: __t.u32(),
+  orderCents: __t.u64(),
+  claims: __t.u32(),
+  claimCents: __t.u64(),
+  flags: __t.u32(),
+  investigations: __t.u32(),
+  verifiedFraud: __t.u32(),
+  contradicted: __t.u32(),
+  ringCents: __t.u64(),
+  crossCompanyCatches: __t.u32(),
+  scoreSum: __t.u32(),
+  scoreN: __t.u32(),
+  refundOutCents: __t.u64(),
+});
+export type FinanceStatsHourly = __Infer<typeof FinanceStatsHourly>;
+
+export const FinanceTickSchedule = __t.object("FinanceTickSchedule", {
+  scheduledId: __t.u64(),
+  scheduledAt: __t.scheduleAt(),
+});
+export type FinanceTickSchedule = __Infer<typeof FinanceTickSchedule>;
+
+export const FinanceVouchLedger = __t.object("FinanceVouchLedger", {
+  id: __t.u64(),
+  shopperHash: __t.string(),
+  companyId: __t.u16(),
+  outcome: __t.string(),
+  scoreDelta: __t.i32(),
+  evidenceHash: __t.string(),
+  simHour: __t.u32(),
+});
+export type FinanceVouchLedger = __Infer<typeof FinanceVouchLedger>;
+
+export const FinanceVouchSignal = __t.object("FinanceVouchSignal", {
+  hash: __t.string(),
+  companyId: __t.u16(),
+  simHour: __t.u32(),
+  hits: __t.u32(),
+});
+export type FinanceVouchSignal = __Infer<typeof FinanceVouchSignal>;
+
 export const Finding = __t.object("Finding", {
   id: __t.u64(),
   jobId: __t.u64(),
@@ -347,6 +774,17 @@ export const Metrics = __t.object("Metrics", {
   rowCounts: __t.string(),
 });
 export type Metrics = __Infer<typeof Metrics>;
+
+export const MonitorNote = __t.object("MonitorNote", {
+  id: __t.u64(),
+  runId: __t.string(),
+  runUrl: __t.string(),
+  trigger: __t.string(),
+  json: __t.string(),
+  provenance: __t.string(),
+  at: __t.timestamp(),
+});
+export type MonitorNote = __Infer<typeof MonitorNote>;
 
 export const MyAgent = __t.object("MyAgent", {});
 export type MyAgent = __Infer<typeof MyAgent>;
@@ -472,6 +910,20 @@ export const Report = __t.object("Report", {
   at: __t.timestamp(),
 });
 export type Report = __Infer<typeof Report>;
+
+export const ReturnsPulse = __t.object("ReturnsPulse", {
+  id: __t.u8(),
+  windowSeconds: __t.u16(),
+  returns: __t.u32(),
+  perSecond: __t.f64(),
+  baselinePerSecond: __t.f64(),
+  itemsJson: __t.string(),
+  businessesJson: __t.string(),
+  cohortsJson: __t.string(),
+  spikes: __t.u16(),
+  computedAt: __t.timestamp(),
+});
+export type ReturnsPulse = __Infer<typeof ReturnsPulse>;
 
 export const Role = __t.object("Role", {
   who: __t.identity(),

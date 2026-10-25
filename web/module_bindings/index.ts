@@ -40,6 +40,7 @@ import AppendLabEventReducer from "./append_lab_event_reducer";
 import AttachVideoReducer from "./attach_video_reducer";
 import AuditFindingReducer from "./audit_finding_reducer";
 import AutoDecideReducer from "./auto_decide_reducer";
+import BootstrapFinanceSeatReducer from "./bootstrap_finance_seat_reducer";
 import BootstrapPosterReducer from "./bootstrap_poster_reducer";
 import BootstrapWorkerReducer from "./bootstrap_worker_reducer";
 import BuyReducer from "./buy_reducer";
@@ -48,6 +49,27 @@ import DecideReducer from "./decide_reducer";
 import EnqueueLabReducer from "./enqueue_lab_reducer";
 import EnqueueLabTriggerReducer from "./enqueue_lab_trigger_reducer";
 import FastForwardReducer from "./fast_forward_reducer";
+import FinanceAccrueReducer from "./finance_accrue_reducer";
+import FinanceAdvanceReducer from "./finance_advance_reducer";
+import FinanceApplyReturnReducer from "./finance_apply_return_reducer";
+import FinanceApproveEntryReducer from "./finance_approve_entry_reducer";
+import FinanceAskControllerReducer from "./finance_ask_controller_reducer";
+import FinanceCloseLiteReducer from "./finance_close_lite_reducer";
+import FinanceConfirmPauseReducer from "./finance_confirm_pause_reducer";
+import FinanceDecideQueueReducer from "./finance_decide_queue_reducer";
+import FinanceEditEntryReducer from "./finance_edit_entry_reducer";
+import FinanceInjectEventReducer from "./finance_inject_event_reducer";
+import FinanceLockPeriodReducer from "./finance_lock_period_reducer";
+import FinanceOpenObligationReducer from "./finance_open_obligation_reducer";
+import FinancePrepareEntryReducer from "./finance_prepare_entry_reducer";
+import FinanceRecordAgentRunReducer from "./finance_record_agent_run_reducer";
+import FinanceRecordCloseReducer from "./finance_record_close_reducer";
+import FinanceRecordGuardianReducer from "./finance_record_guardian_reducer";
+import FinanceRequestEntryReducer from "./finance_request_entry_reducer";
+import FinanceResolveClusterReducer from "./finance_resolve_cluster_reducer";
+import FinanceScorePortfolioReducer from "./finance_score_portfolio_reducer";
+import FinanceSeedPortfolioReducer from "./finance_seed_portfolio_reducer";
+import FinanceSetRunningReducer from "./finance_set_running_reducer";
 import FinishAnalysisReducer from "./finish_analysis_reducer";
 import FinishLabJobReducer from "./finish_lab_job_reducer";
 import FinishRunReducer from "./finish_run_reducer";
@@ -61,6 +83,7 @@ import PostReducer from "./post_reducer";
 import ProposeReducer from "./propose_reducer";
 import RecordBenchReducer from "./record_bench_reducer";
 import RecordEvidenceReducer from "./record_evidence_reducer";
+import RecordMonitorNoteReducer from "./record_monitor_note_reducer";
 import RecordRunReducer from "./record_run_reducer";
 import RecordVerificationReducer from "./record_verification_reducer";
 import RequestRefundReducer from "./request_refund_reducer";
@@ -68,6 +91,7 @@ import RequestVerificationReducer from "./request_verification_reducer";
 import ReviewCandidateReducer from "./review_candidate_reducer";
 import RevokeCredentialReducer from "./revoke_credential_reducer";
 import RunStepReducer from "./run_step_reducer";
+import SeedFinanceCatalogReducer from "./seed_finance_catalog_reducer";
 import SeedWorldReducer from "./seed_world_reducer";
 import SetClaimStatusReducer from "./set_claim_status_reducer";
 import SetControlReducer from "./set_control_reducer";
@@ -81,6 +105,7 @@ import StartAnalysisReducer from "./start_analysis_reducer";
 import StartLabJobReducer from "./start_lab_job_reducer";
 import SwitchBusinessReducer from "./switch_business_reducer";
 import TakeBusinessSeatReducer from "./take_business_seat_reducer";
+import WritePulseReducer from "./write_pulse_reducer";
 import WriteRecommendationReducer from "./write_recommendation_reducer";
 import WriteReportReducer from "./write_report_reducer";
 import WriteScoreReducer from "./write_score_reducer";
@@ -104,6 +129,31 @@ import CreditEventRow from "./credit_event_table";
 import DecisionRow from "./decision_table";
 import EventFeedRow from "./event_feed_table";
 import EvidenceRow from "./evidence_table";
+import FinanceAccountRow from "./finance_account_table";
+import FinanceAgentRunRow from "./finance_agent_run_table";
+import FinanceAuditRow from "./finance_audit_table";
+import FinanceBridgeRow from "./finance_bridge_table";
+import FinanceCloseRow from "./finance_close_table";
+import FinanceClusterRow from "./finance_cluster_table";
+import FinanceCompanyRow from "./finance_company_table";
+import FinanceCompanyStateRow from "./finance_company_state_table";
+import FinanceEntryRow from "./finance_entry_table";
+import FinanceExposureLogRow from "./finance_exposure_log_table";
+import FinanceExposureProposalRow from "./finance_exposure_proposal_table";
+import FinanceLineRow from "./finance_line_table";
+import FinanceObligationRow from "./finance_obligation_table";
+import FinancePeriodRow from "./finance_period_table";
+import FinancePrecedentRow from "./finance_precedent_table";
+import FinanceProductRow from "./finance_product_table";
+import FinanceQueueRow from "./finance_queue_table";
+import FinanceRequestRow from "./finance_request_table";
+import FinanceReserveRow from "./finance_reserve_table";
+import FinanceScoreRow from "./finance_score_table";
+import FinanceSimClaimRow from "./finance_sim_claim_table";
+import FinanceSimStateRow from "./finance_sim_state_table";
+import FinanceStatsHourlyRow from "./finance_stats_hourly_table";
+import FinanceVouchLedgerRow from "./finance_vouch_ledger_table";
+import FinanceVouchSignalRow from "./finance_vouch_signal_table";
 import FindingRow from "./finding_table";
 import FraudPatternRow from "./fraud_pattern_table";
 import JournalEntryRow from "./journal_entry_table";
@@ -113,6 +163,7 @@ import LabJobRow from "./lab_job_table";
 import LatencyPingRow from "./latency_ping_table";
 import MerchantFlowDayRow from "./merchant_flow_day_table";
 import MetricsRow from "./metrics_table";
+import MonitorNoteRow from "./monitor_note_table";
 import MyAgentRow from "./my_agent_table";
 import PatternEventRow from "./pattern_event_table";
 import PurchaseRow from "./purchase_table";
@@ -120,6 +171,7 @@ import RecommendationRow from "./recommendation_table";
 import RefundRow from "./refund_table";
 import RegionStatRow from "./region_stat_table";
 import ReportRow from "./report_table";
+import ReturnsPulseRow from "./returns_pulse_table";
 import RoleRow from "./role_table";
 import SimRunRow from "./sim_run_table";
 import VerificationRow from "./verification_table";
@@ -317,6 +369,372 @@ const tablesSchema = __schema({
       { name: 'evidence_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, EvidenceRow),
+  financeAccount: __table({
+    name: 'finance_account',
+    indexes: [
+      { accessor: 'code', name: 'finance_account_code_idx_btree', algorithm: 'btree', columns: [
+        'code',
+      ] },
+    ],
+    constraints: [
+      { name: 'finance_account_code_key', constraint: 'unique', columns: ['code'] },
+    ],
+  }, FinanceAccountRow),
+  financeAgentRun: __table({
+    name: 'finance_agent_run',
+    indexes: [
+      { accessor: 'caseRef', name: 'finance_agent_run_case_ref_idx_btree', algorithm: 'btree', columns: [
+        'caseRef',
+      ] },
+      { accessor: 'companyId', name: 'finance_agent_run_company_id_idx_btree', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { accessor: 'runId', name: 'finance_agent_run_run_id_idx_btree', algorithm: 'btree', columns: [
+        'runId',
+      ] },
+    ],
+    constraints: [
+      { name: 'finance_agent_run_run_id_key', constraint: 'unique', columns: ['runId'] },
+    ],
+  }, FinanceAgentRunRow),
+  financeAudit: __table({
+    name: 'finance_audit',
+    indexes: [
+      { accessor: 'companyId', name: 'finance_audit_company_id_idx_btree', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { accessor: 'id', name: 'finance_audit_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'finance_audit_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, FinanceAuditRow),
+  financeBridge: __table({
+    name: 'finance_bridge',
+    indexes: [
+      { accessor: 'companyId', name: 'finance_bridge_company_id_idx_btree', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { accessor: 'id', name: 'finance_bridge_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'finance_bridge_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, FinanceBridgeRow),
+  financeClose: __table({
+    name: 'finance_close',
+    indexes: [
+      { accessor: 'companyId', name: 'finance_close_company_id_idx_btree', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { accessor: 'key', name: 'finance_close_key_idx_btree', algorithm: 'btree', columns: [
+        'key',
+      ] },
+    ],
+    constraints: [
+      { name: 'finance_close_key_key', constraint: 'unique', columns: ['key'] },
+    ],
+  }, FinanceCloseRow),
+  financeCluster: __table({
+    name: 'finance_cluster',
+    indexes: [
+      { accessor: 'companyId', name: 'finance_cluster_company_id_idx_btree', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { accessor: 'id', name: 'finance_cluster_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'finance_cluster_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, FinanceClusterRow),
+  financeCompany: __table({
+    name: 'finance_company',
+    indexes: [
+      { accessor: 'id', name: 'finance_company_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'slug', name: 'finance_company_slug_idx_btree', algorithm: 'btree', columns: [
+        'slug',
+      ] },
+    ],
+    constraints: [
+      { name: 'finance_company_id_key', constraint: 'unique', columns: ['id'] },
+      { name: 'finance_company_slug_key', constraint: 'unique', columns: ['slug'] },
+    ],
+  }, FinanceCompanyRow),
+  financeCompanyState: __table({
+    name: 'finance_company_state',
+    indexes: [
+      { accessor: 'companyId', name: 'finance_company_state_company_id_idx_btree', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+    ],
+    constraints: [
+      { name: 'finance_company_state_company_id_key', constraint: 'unique', columns: ['companyId'] },
+    ],
+  }, FinanceCompanyStateRow),
+  financeEntry: __table({
+    name: 'finance_entry',
+    indexes: [
+      { accessor: 'companyId', name: 'finance_entry_company_id_idx_btree', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { accessor: 'id', name: 'finance_entry_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'sourceRef', name: 'finance_entry_source_ref_idx_btree', algorithm: 'btree', columns: [
+        'sourceRef',
+      ] },
+    ],
+    constraints: [
+      { name: 'finance_entry_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, FinanceEntryRow),
+  financeExposureLog: __table({
+    name: 'finance_exposure_log',
+    indexes: [
+      { accessor: 'companyId', name: 'finance_exposure_log_company_id_idx_btree', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { accessor: 'id', name: 'finance_exposure_log_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'finance_exposure_log_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, FinanceExposureLogRow),
+  financeExposureProposal: __table({
+    name: 'finance_exposure_proposal',
+    indexes: [
+      { accessor: 'companyId', name: 'finance_exposure_proposal_company_id_idx_btree', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+    ],
+    constraints: [
+      { name: 'finance_exposure_proposal_company_id_key', constraint: 'unique', columns: ['companyId'] },
+    ],
+  }, FinanceExposureProposalRow),
+  financeLine: __table({
+    name: 'finance_line',
+    indexes: [
+      { accessor: 'companyId', name: 'finance_line_company_id_idx_btree', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { accessor: 'entryId', name: 'finance_line_entry_id_idx_btree', algorithm: 'btree', columns: [
+        'entryId',
+      ] },
+      { accessor: 'id', name: 'finance_line_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'finance_line_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, FinanceLineRow),
+  financeObligation: __table({
+    name: 'finance_obligation',
+    indexes: [
+      { accessor: 'claimRef', name: 'finance_obligation_claim_ref_idx_btree', algorithm: 'btree', columns: [
+        'claimRef',
+      ] },
+      { accessor: 'companyId', name: 'finance_obligation_company_id_idx_btree', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { accessor: 'dueHour', name: 'finance_obligation_due_hour_idx_btree', algorithm: 'btree', columns: [
+        'dueHour',
+      ] },
+      { accessor: 'id', name: 'finance_obligation_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'status', name: 'finance_obligation_status_idx_btree', algorithm: 'btree', columns: [
+        'status',
+      ] },
+    ],
+    constraints: [
+      { name: 'finance_obligation_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, FinanceObligationRow),
+  financePeriod: __table({
+    name: 'finance_period',
+    indexes: [
+      { accessor: 'companyId', name: 'finance_period_company_id_idx_btree', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { accessor: 'key', name: 'finance_period_key_idx_btree', algorithm: 'btree', columns: [
+        'key',
+      ] },
+    ],
+    constraints: [
+      { name: 'finance_period_key_key', constraint: 'unique', columns: ['key'] },
+    ],
+  }, FinancePeriodRow),
+  financePrecedent: __table({
+    name: 'finance_precedent',
+    indexes: [
+      { accessor: 'companyId', name: 'finance_precedent_company_id_idx_btree', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { accessor: 'id', name: 'finance_precedent_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'key', name: 'finance_precedent_key_idx_btree', algorithm: 'btree', columns: [
+        'key',
+      ] },
+    ],
+    constraints: [
+      { name: 'finance_precedent_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, FinancePrecedentRow),
+  financeProduct: __table({
+    name: 'finance_product',
+    indexes: [
+      { accessor: 'companyId', name: 'finance_product_company_id_idx_btree', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { accessor: 'sku', name: 'finance_product_sku_idx_btree', algorithm: 'btree', columns: [
+        'sku',
+      ] },
+    ],
+    constraints: [
+      { name: 'finance_product_sku_key', constraint: 'unique', columns: ['sku'] },
+    ],
+  }, FinanceProductRow),
+  financeQueue: __table({
+    name: 'finance_queue',
+    indexes: [
+      { accessor: 'companyId', name: 'finance_queue_company_id_idx_btree', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { accessor: 'id', name: 'finance_queue_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'finance_queue_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, FinanceQueueRow),
+  financeRequest: __table({
+    name: 'finance_request',
+    indexes: [
+      { accessor: 'companyId', name: 'finance_request_company_id_idx_btree', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { accessor: 'id', name: 'finance_request_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'sourceRef', name: 'finance_request_source_ref_idx_btree', algorithm: 'btree', columns: [
+        'sourceRef',
+      ] },
+    ],
+    constraints: [
+      { name: 'finance_request_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, FinanceRequestRow),
+  financeReserve: __table({
+    name: 'finance_reserve',
+    indexes: [
+      { accessor: 'companyId', name: 'finance_reserve_company_id_idx_btree', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { accessor: 'id', name: 'finance_reserve_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'finance_reserve_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, FinanceReserveRow),
+  financeScore: __table({
+    name: 'finance_score',
+    indexes: [
+      { accessor: 'key', name: 'finance_score_key_idx_btree', algorithm: 'btree', columns: [
+        'key',
+      ] },
+    ],
+    constraints: [
+      { name: 'finance_score_key_key', constraint: 'unique', columns: ['key'] },
+    ],
+  }, FinanceScoreRow),
+  financeSimClaim: __table({
+    name: 'finance_sim_claim',
+    indexes: [
+      { accessor: 'companyId', name: 'finance_sim_claim_company_id_idx_btree', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { accessor: 'id', name: 'finance_sim_claim_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'resolveHour', name: 'finance_sim_claim_resolve_hour_idx_btree', algorithm: 'btree', columns: [
+        'resolveHour',
+      ] },
+      { accessor: 'simHour', name: 'finance_sim_claim_sim_hour_idx_btree', algorithm: 'btree', columns: [
+        'simHour',
+      ] },
+    ],
+    constraints: [
+      { name: 'finance_sim_claim_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, FinanceSimClaimRow),
+  financeSimState: __table({
+    name: 'finance_sim_state',
+    indexes: [
+      { accessor: 'id', name: 'finance_sim_state_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'finance_sim_state_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, FinanceSimStateRow),
+  financeStatsHourly: __table({
+    name: 'finance_stats_hourly',
+    indexes: [
+      { accessor: 'companyId', name: 'finance_stats_hourly_company_id_idx_btree', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { accessor: 'id', name: 'finance_stats_hourly_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+      { accessor: 'simHour', name: 'finance_stats_hourly_sim_hour_idx_btree', algorithm: 'btree', columns: [
+        'simHour',
+      ] },
+    ],
+    constraints: [
+      { name: 'finance_stats_hourly_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, FinanceStatsHourlyRow),
+  financeVouchLedger: __table({
+    name: 'finance_vouch_ledger',
+    indexes: [
+      { accessor: 'companyId', name: 'finance_vouch_ledger_company_id_idx_btree', algorithm: 'btree', columns: [
+        'companyId',
+      ] },
+      { accessor: 'id', name: 'finance_vouch_ledger_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'finance_vouch_ledger_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, FinanceVouchLedgerRow),
+  financeVouchSignal: __table({
+    name: 'finance_vouch_signal',
+    indexes: [
+      { accessor: 'hash', name: 'finance_vouch_signal_hash_idx_btree', algorithm: 'btree', columns: [
+        'hash',
+      ] },
+    ],
+    constraints: [
+      { name: 'finance_vouch_signal_hash_key', constraint: 'unique', columns: ['hash'] },
+    ],
+  }, FinanceVouchSignalRow),
   finding: __table({
     name: 'finding',
     indexes: [
@@ -438,6 +856,17 @@ const tablesSchema = __schema({
       { name: 'metrics_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, MetricsRow),
+  monitorNote: __table({
+    name: 'monitor_note',
+    indexes: [
+      { accessor: 'id', name: 'monitor_note_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'monitor_note_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, MonitorNoteRow),
   patternEvent: __table({
     name: 'pattern_event',
     indexes: [
@@ -540,6 +969,17 @@ const tablesSchema = __schema({
       { name: 'report_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, ReportRow),
+  returnsPulse: __table({
+    name: 'returns_pulse',
+    indexes: [
+      { accessor: 'id', name: 'returns_pulse_id_idx_btree', algorithm: 'btree', columns: [
+        'id',
+      ] },
+    ],
+    constraints: [
+      { name: 'returns_pulse_id_key', constraint: 'unique', columns: ['id'] },
+    ],
+  }, ReturnsPulseRow),
   role: __table({
     name: 'role',
     indexes: [
@@ -590,6 +1030,7 @@ const reducersSchema = __reducers(
   __reducerSchema("attach_video", AttachVideoReducer),
   __reducerSchema("audit_finding", AuditFindingReducer),
   __reducerSchema("auto_decide", AutoDecideReducer),
+  __reducerSchema("bootstrap_finance_seat", BootstrapFinanceSeatReducer),
   __reducerSchema("bootstrap_poster", BootstrapPosterReducer),
   __reducerSchema("bootstrap_worker", BootstrapWorkerReducer),
   __reducerSchema("buy", BuyReducer),
@@ -598,6 +1039,27 @@ const reducersSchema = __reducers(
   __reducerSchema("enqueue_lab", EnqueueLabReducer),
   __reducerSchema("enqueue_lab_trigger", EnqueueLabTriggerReducer),
   __reducerSchema("fast_forward", FastForwardReducer),
+  __reducerSchema("finance_accrue", FinanceAccrueReducer),
+  __reducerSchema("finance_advance", FinanceAdvanceReducer),
+  __reducerSchema("finance_apply_return", FinanceApplyReturnReducer),
+  __reducerSchema("finance_approve_entry", FinanceApproveEntryReducer),
+  __reducerSchema("finance_ask_controller", FinanceAskControllerReducer),
+  __reducerSchema("finance_close_lite", FinanceCloseLiteReducer),
+  __reducerSchema("finance_confirm_pause", FinanceConfirmPauseReducer),
+  __reducerSchema("finance_decide_queue", FinanceDecideQueueReducer),
+  __reducerSchema("finance_edit_entry", FinanceEditEntryReducer),
+  __reducerSchema("finance_inject_event", FinanceInjectEventReducer),
+  __reducerSchema("finance_lock_period", FinanceLockPeriodReducer),
+  __reducerSchema("finance_open_obligation", FinanceOpenObligationReducer),
+  __reducerSchema("finance_prepare_entry", FinancePrepareEntryReducer),
+  __reducerSchema("finance_record_agent_run", FinanceRecordAgentRunReducer),
+  __reducerSchema("finance_record_close", FinanceRecordCloseReducer),
+  __reducerSchema("finance_record_guardian", FinanceRecordGuardianReducer),
+  __reducerSchema("finance_request_entry", FinanceRequestEntryReducer),
+  __reducerSchema("finance_resolve_cluster", FinanceResolveClusterReducer),
+  __reducerSchema("finance_score_portfolio", FinanceScorePortfolioReducer),
+  __reducerSchema("finance_seed_portfolio", FinanceSeedPortfolioReducer),
+  __reducerSchema("finance_set_running", FinanceSetRunningReducer),
   __reducerSchema("finish_analysis", FinishAnalysisReducer),
   __reducerSchema("finish_lab_job", FinishLabJobReducer),
   __reducerSchema("finish_run", FinishRunReducer),
@@ -611,6 +1073,7 @@ const reducersSchema = __reducers(
   __reducerSchema("propose", ProposeReducer),
   __reducerSchema("record_bench", RecordBenchReducer),
   __reducerSchema("record_evidence", RecordEvidenceReducer),
+  __reducerSchema("record_monitor_note", RecordMonitorNoteReducer),
   __reducerSchema("record_run", RecordRunReducer),
   __reducerSchema("record_verification", RecordVerificationReducer),
   __reducerSchema("request_refund", RequestRefundReducer),
@@ -618,6 +1081,7 @@ const reducersSchema = __reducers(
   __reducerSchema("review_candidate", ReviewCandidateReducer),
   __reducerSchema("revoke_credential", RevokeCredentialReducer),
   __reducerSchema("run_step", RunStepReducer),
+  __reducerSchema("seed_finance_catalog", SeedFinanceCatalogReducer),
   __reducerSchema("seed_world", SeedWorldReducer),
   __reducerSchema("set_claim_status", SetClaimStatusReducer),
   __reducerSchema("set_control", SetControlReducer),
@@ -631,6 +1095,7 @@ const reducersSchema = __reducers(
   __reducerSchema("start_lab_job", StartLabJobReducer),
   __reducerSchema("switch_business", SwitchBusinessReducer),
   __reducerSchema("take_business_seat", TakeBusinessSeatReducer),
+  __reducerSchema("write_pulse", WritePulseReducer),
   __reducerSchema("write_recommendation", WriteRecommendationReducer),
   __reducerSchema("write_report", WriteReportReducer),
   __reducerSchema("write_score", WriteScoreReducer),

@@ -99,7 +99,7 @@ function WorldInner() {
       for (const p of patterns) {
         if (p.status === "dismissed") continue;
         const first = agents.byId.get(p.agentIds[0] ?? -1);
-        if (first) r.push({ id: `fp${p.id}`, lat: first.lat, lng: first.lng, color: p.status === "confirmed" ? "#f87171" : "#fbbf24", max: 2 + Math.min(8, p.agentIds.length), speed: 1.5 });
+        if (first) r.push({ id: `fp${p.id}`, lat: first.lat, lng: first.lng, color: p.status === "confirmed" || p.status === "simulated_confirmed" ? "#f87171" : "#fbbf24", max: 2 + Math.min(8, p.agentIds.length), speed: 1.5 });
       }
     }
     return r;

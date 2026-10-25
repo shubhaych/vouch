@@ -1,4 +1,10 @@
 import { schema, table, t } from 'spacetimedb/server';
+import {
+  financeAccount, financeAgentRun, financeAudit, financeBridge, financeClose, financeCluster, financeCompany, financeCompanyState, financeEntry,
+  financeExposureLog, financeExposureProposal, financeLine, financeObligation, financePeriod, financePrecedent, financeProduct, financeQueue,
+  financeRequest, financeReserve, financeReturnPlan, financeScore, financeSimClaim, financeSimEvent, financeSimState, financeSimTruth,
+  financeStatsHourly, financeTickSchedule, financeVouchLedger, financeVouchSignal,
+} from './finance-schema';
 
 // One schema() call for the whole module. The economy's tables match the row
 // types in simdb.ts column for column, because the same engine (sim.ts) runs
@@ -473,10 +479,40 @@ const recommendation = table({ name: 'recommendation', public: true }, {
   at: t.timestamp(),
 });
 
+// ---- the returns pulse and the Returns Monitor's notes (worker-written; see pulse.ts)
+
+const returnsPulse = table({ name: 'returns_pulse', public: true }, {
+  id: t.u8().primaryKey(), // 1: the latest window
+  windowSeconds: t.u16(),
+  returns: t.u32(), // refund rows that arrived in the window (wall clock)
+  perSecond: t.f64(),
+  baselinePerSecond: t.f64(), // the ten minutes before the window
+  itemsJson: t.string(), // [{ sku, name, count, perSecond, baselinePerSecond, spike }]
+  businessesJson: t.string(), // [{ id, name, count }]
+  cohortsJson: t.string(), // [{ band, count }] by the shopper's credit band
+  spikes: t.u16(),
+  computedAt: t.timestamp(),
+});
+
+const monitorNote = table({ name: 'monitor_note', public: true }, {
+  id: t.u64().primaryKey().autoInc(),
+  runId: t.string(),
+  runUrl: t.string(),
+  trigger: t.string(), // schedule | spike | manual
+  json: t.string(), // the Returns Monitor's JSON plus the scraped context it was given
+  provenance: t.string(), // live | fixture
+  at: t.timestamp(),
+});
+
 export const spacetimedb = schema({
   role, seatCode, counter, simRun, simTick, agent, agentTruth, shopperLink, business, purchase, refundIntent, refund,
   creditEvent, eventFeed, regionStat, merchantFlowDay, fraudPattern, patternEvent, claim, evidence, agentRun, control, decision,
   journalEntry, journalLine, credential, verification, labJob, labEvent, metrics, latencyPing, benchResult,
-  analysisJob, analysisStep, artifact, finding, report, claimScore, recommendation,
+  analysisJob, analysisStep, artifact, finding, report, claimScore, recommendation, returnsPulse, monitorNote,
+  // The Refund Finance Desk (finance-schema.ts). Nothing above reads these.
+  financeCompany, financeProduct, financeAccount, financePeriod, financeRequest, financeEntry, financeLine, financeObligation,
+  financeAudit, financeQueue, financePrecedent, financeReserve, financeClose, financeBridge, financeCluster,
+  financeSimState, financeTickSchedule, financeStatsHourly, financeCompanyState, financeSimClaim, financeSimTruth, financeReturnPlan,
+  financeSimEvent, financeVouchLedger, financeVouchSignal, financeExposureLog, financeExposureProposal, financeAgentRun, financeScore,
 });
 export default spacetimedb;

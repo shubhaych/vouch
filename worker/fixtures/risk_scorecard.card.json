@@ -1,0 +1,11 @@
+{
+  "_fixture": "Hand-written to the Risk Scorecard schema in docs/CREAO.md (Agent 9). Indicators are read from the case; the card is context for the Investigator and never a decision.",
+  "claim_id": "{{claim_id}}",
+  "caution": "{{caution}}",
+  "indicators": "{{indicators}}",
+  "strongest_support": "{{strongest_support}}",
+  "strongest_caution": "{{strongest_caution}}",
+  "innocent_explanation_considered": "{{innocent}}",
+  "signals_not_used": "Shared region, business or product alone was not treated as evidence; nothing about the person beyond their purchase and return record was used.",
+  "summary": "{{summary}}"
+}

@@ -93,7 +93,7 @@ export function AgentPanel({ agent, highlightCause, onClose, onPattern }: { agen
           {regionsShopped.slice(0, 4).map((r) => <span key={r} className="chip">{r}</span>)}
           {bizCounts.slice(0, 4).map(([bid, n]) => <span key={bid} className="chip chip--accent">{bizName(bid)} ×{n}</span>)}
           {myPatterns.map((p) => (
-            <button key={p.id} className={`chip ${p.status === "confirmed" ? "chip--fraud" : "chip--review"}`} onClick={() => onPattern(p.id)}>{patternLabel(p.id)} {p.status}</button>
+            <button key={p.id} className={`chip ${p.status === "confirmed" || p.status === "simulated_confirmed" ? "chip--fraud" : "chip--review"}`} onClick={() => onPattern(p.id)}>{patternLabel(p.id)} {p.status === "simulated_confirmed" ? "simulated confirmation" : p.status}</button>
           ))}
         </div>
 

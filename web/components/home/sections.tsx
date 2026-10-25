@@ -20,7 +20,7 @@ export function HeroCounters() {
       <Stat label="Agents" value={ready ? counts.agent ?? 0 : null} prov="live" />
       <Stat label="Purchases" value={ready ? counts.purchase ?? 0 : null} prov="live" />
       <Stat label="Investigated" value={ready ? claims.length : null} prov="live" />
-      <Stat label="Fraud confirmed" value={ready ? patterns.filter((p) => p.status === "confirmed").length : null} prov="live" />
+      <Stat label="Simulated fraud signs" value={ready ? patterns.filter((p) => p.status === "simulated_confirmed").length : null} prov="simulated" />
     </div>
   );
 }
@@ -130,7 +130,7 @@ export function BuiltOn() {
   const cards = [
     { kicker: "CREAO", title: "Three agents do the investigating", body: "Remove them and nothing gets decided: claims wait as “investigator offline”, and no fraud pattern can be confirmed.", value: runs.length, label: "agent runs recorded", prov: runs.some((r) => r.mode === "live") ? "live" as const : "fixture" as const },
     { kicker: "SpacetimeDB", title: "The whole economy lives in the database", body: "10,000 agents stepping inside a scheduled reducer; every screen is a live subscription.", value: m ? Number(m.eventsTotal) : null, label: "economic events written", prov: "live" as const },
-    { kicker: "Factory", title: "Droid improves the detectors", body: "Fenced to one folder and two commands; every plan, tool call, diff and score is a row on /lab.", value: labEvents.length, label: "lab jobs queued", prov: "live" as const },
+    { kicker: "Factory", title: "Droid improves the detectors", body: "Detector jobs are fenced to one folder and two commands; a person reviews every candidate.", value: labEvents.length, label: "lab jobs queued", prov: "live" as const },
   ];
   return (
     <motion.section {...reveal} className="section section--compact">

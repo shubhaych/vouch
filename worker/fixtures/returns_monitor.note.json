@@ -1,0 +1,9 @@
+{
+  "_fixture": "Hand-written to the Returns Monitor schema in docs/CREAO.md (Agent 7). The numbers are filled from the pulse window it was given.",
+  "narrative": "{{narrative}}",
+  "anomalies": "{{anomalies}}",
+  "items_to_watch": "{{items_to_watch}}",
+  "innocent_explanation_considered": "{{innocent}}",
+  "real_world_context": "{{real_world_context}}",
+  "suggested_detector_change": ""
+}

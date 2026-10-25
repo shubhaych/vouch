@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { useTable } from "spacetimedb/react";
 import type { FraudPattern } from "@/module_bindings/types";
 import { tables as t } from "@/module_bindings";
@@ -9,15 +8,14 @@ import { Badge } from "@/components/ui/badge";
 import { patternLabel, timeAgo, titleCase } from "@/lib/format";
 
 const KINDS = ["coordinated", "false_defect", "refund_frequency"] as const;
-const STATUSES = ["detected", "reviewing", "confirmed", "dismissed"] as const;
+const STATUSES = ["detected", "reviewing", "confirmed", "simulated_confirmed", "dismissed"] as const;
 
 export const STATUS_CHIP: Record<string, string> = {
-  detected: "chip--review", reviewing: "chip--accent", confirmed: "chip--fraud", dismissed: "chip--honest", needs_review: "chip--credential", awaiting_review: "chip",
+  detected: "chip--review", reviewing: "chip--accent", confirmed: "chip--fraud", simulated_confirmed: "chip--fraud", dismissed: "chip--honest", needs_review: "chip--credential", awaiting_review: "chip",
 };
 export const STATUS_LABEL: Record<string, string> = {
-  detected: "Detected", reviewing: "Under review", confirmed: "Confirmed", dismissed: "Dismissed", needs_review: "Needs review", awaiting_review: "Awaiting review",
+  detected: "Detected", reviewing: "Under review", confirmed: "Confirmed by CREAO", simulated_confirmed: "Simulated confirmation", dismissed: "Dismissed", needs_review: "Needs review", awaiting_review: "Awaiting review",
 };
-
 
 export function PatternsRail({ patterns, selectedId, onOpen }: { patterns: readonly FraudPattern[]; selectedId: number | null; onOpen: (id: number) => void }) {
   const [kind, setKind] = useState<string | null>(null);
@@ -75,28 +73,6 @@ export function PatternsRail({ patterns, selectedId, onOpen }: { patterns: reado
           })}
         </ol>
       </div>
-      <DroidMini />
     </div>
-  );
-}
-
-function DroidMini() {
-  const [jobs] = useTable(t.labJob);
-  const last = [...jobs].sort((a, b) => b.id - a.id)[0];
-  return (
-    <Link href="/lab" className="glass block px-3 py-2 transition hover:border-accent/40" data-testid="droid-mini">
-      <div className="flex items-center justify-between">
-        <span className="panel-title">Droid Detector Lab</span>
-        <Badge kind="live" />
-      </div>
-      {last ? (
-        <div className="mt-1 text-xs">
-          <span className="font-mono">Job {last.id}</span> · {last.trigger} trigger · <span className="text-accent">{titleCase(last.status)}</span>
-          <div className="truncate text-ink-soft-dark">{last.goal}</div>
-        </div>
-      ) : (
-        <div className="mt-1 text-xs text-ink-soft-dark">No lab jobs yet.</div>
-      )}
-    </Link>
   );
 }

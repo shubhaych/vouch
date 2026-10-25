@@ -149,6 +149,9 @@ export function Investigation({ claim, refund, purchase, evidence, frame, onFram
         <AgentMini agentId={refund.agentId} />
       </div>
 
+      <ListingMatch row={evidence.find((e) => e.seat === "listing_matcher")} />
+      <Eligibility policy={evidence.find((e) => e.seat === "policy_checker")} card={evidence.find((e) => e.seat === "risk_scorecard")} />
+
       <CredentialStepper refundId={refund.id} />
     </div>
   );
@@ -180,6 +183,92 @@ function AgentMini({ agentId }: { agentId: number }) {
           ) : <span className="text-xs text-ink-soft-dark">no credit history yet</span>}
         </div>
       </div>
+    </div>
+  );
+}
+
+interface ListingMatchJson {
+  matched_listing?: { index?: number; title?: string; seller?: string; price?: number | null; url?: string } | null;
+  same_as_ordered?: string; confidence?: number; differences?: string[]; summary?: string;
+  eligibility?: { within_window?: boolean; policy_rule?: string; condition_consistent?: string; verdict?: string; reasons?: { text: string; cites: string }[] };
+  scraped_listings?: { source?: string; query?: string; fetched_at?: string; cached?: boolean; error?: string | null; items?: { title: string; seller: string; price: number | null; url: string }[] };
+  skipped?: boolean; reason?: string;
+}
+
+/** What the Listing Matcher found: the scraped listing it matched, whether it is the ordered item, and the policy eligibility it derived. */
+function ListingMatch({ row }: { row?: Evidence }) {
+  if (!row) return null;
+  const lm = parse<ListingMatchJson>(row.json, {});
+  const e = lm.eligibility ?? {};
+  const scraped = lm.scraped_listings;
+  const live = scraped?.source === "bright_data_serp";
+  const verdictCls = e.verdict === "eligible" ? "chip chip--honest" : e.verdict === "ineligible" ? "chip chip--fraud" : "chip chip--review";
+  return (
+    <div className="glass p-3 text-sm" data-testid="listing-match">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <span className="panel-title">Listing match</span>
+        <Badge kind={row.provenance === "fixture" ? "fixture" : "live"} />
+        {scraped ? <span className={`chip ${live ? "chip--accent" : ""}`} title={live ? `Google Shopping via Bright Data, fetched ${scraped.fetched_at}${scraped.cached ? " (cached)" : ""}` : "Fixture listings built from the catalogue"}>{live ? `${scraped.items?.length ?? 0} listings via Bright Data` : `${scraped.items?.length ?? 0} fixture listings`}</span> : null}
+        {e.verdict ? <span className={verdictCls} data-testid="listing-verdict">{titleCase(e.verdict)}</span> : null}
+        {lm.same_as_ordered ? <span className="chip">same as ordered: {lm.same_as_ordered}{typeof lm.confidence === "number" ? ` · ${Math.round(lm.confidence * 100)}%` : ""}</span> : null}
+      </div>
+      {lm.matched_listing ? (
+        <p className="text-xs">Closest listing: <span className="font-semibold">{lm.matched_listing.title}</span>{lm.matched_listing.seller ? ` from ${lm.matched_listing.seller}` : ""}{lm.matched_listing.price != null ? ` at ${money(Math.round(Number(lm.matched_listing.price) * 100))}` : ""}{lm.matched_listing.url ? <> · <a className="text-accent underline" href={lm.matched_listing.url} target="_blank" rel="noreferrer">open</a></> : null}</p>
+      ) : null}
+      {lm.summary ? <p className="mt-1 text-xs text-ink-soft-dark">{lm.summary}</p> : null}
+      {lm.differences?.length ? <p className="mt-1 text-xs text-ink-soft-dark">Differences: {lm.differences.join("; ")}</p> : null}
+      {e.reasons?.length ? (
+        <ul className="mt-2 space-y-0.5 text-xs">
+          {e.reasons.map((r, i) => <li key={i}>· {r.text} <span className="font-mono text-ink-soft-dark">[{r.cites}]</span></li>)}
+        </ul>
+      ) : null}
+      {scraped?.error ? <p className="mt-1 text-xs text-review">Scrape note: {scraped.error}</p> : null}
+    </div>
+  );
+}
+
+interface PolicyJson { outcome?: string; rules?: { rule: string; result: string; detail: string; cites: string }[]; refund_shape?: { max_amount?: number; restocking_fee_pct?: number; store_credit_only?: boolean }; exception_note?: string; summary?: string; skipped?: boolean }
+interface CardJson { caution?: string; indicators?: { name: string; value: unknown; reading: string; weight: number; why: string; cites: string }[]; strongest_support?: string; strongest_caution?: string; innocent_explanation_considered?: string; summary?: string; skipped?: boolean }
+
+/** The eligibility layer: the Policy Checker's rule-by-rule result and the Risk Scorecard's indicators. Context for the person; neither decides. */
+function Eligibility({ policy, card }: { policy?: Evidence; card?: Evidence }) {
+  if (!policy && !card) return null;
+  const p = parse<PolicyJson>(policy?.json, {});
+  const c = parse<CardJson>(card?.json, {});
+  const outcomeCls = p.outcome === "eligible" ? "chip chip--honest" : p.outcome === "not_eligible" ? "chip chip--fraud" : "chip chip--review";
+  const cautionCls = c.caution === "low" ? "chip chip--honest" : c.caution === "high" ? "chip chip--fraud" : "chip chip--review";
+  const ruleMark = (r: string) => (r === "pass" ? "✓" : r === "fail" ? "✕" : r === "unclear" ? "?" : "–");
+  const readMark = (r: string) => (r === "supports" ? <span className="text-honest">▲</span> : r === "caution" ? <span className="text-review">▼</span> : <span className="text-ink-soft-dark">•</span>);
+  return (
+    <div className="grid gap-4 md:grid-cols-2" data-testid="eligibility">
+      {policy ? (
+        <div className="glass p-3 text-sm" data-testid="policy-check">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span className="panel-title">Policy check</span>
+            <Badge kind={policy.provenance === "fixture" ? "fixture" : "live"} />
+            {p.outcome ? <span className={outcomeCls} data-testid="policy-outcome">{titleCase(p.outcome)}</span> : null}
+          </div>
+          <ul className="space-y-0.5 text-xs">
+            {(p.rules ?? []).map((r, i) => <li key={i} className={r.result === "fail" ? "text-fraud" : r.result === "unclear" ? "text-review" : r.result === "not_applicable" ? "text-ink-soft-dark" : ""}><span className="font-mono">{ruleMark(r.result)}</span> {titleCase(r.rule)}: {r.detail}</li>)}
+          </ul>
+          {p.refund_shape ? <p className="mt-2 text-xs text-ink-soft-dark">Refund shape: up to {money(Math.round(Number(p.refund_shape.max_amount ?? 0) * 100))}{p.refund_shape.restocking_fee_pct ? ` after a ${p.refund_shape.restocking_fee_pct}% fee` : ""}{p.refund_shape.store_credit_only ? ", store credit only" : ""}.</p> : null}
+          {p.summary ? <p className="mt-1 text-xs text-ink-soft-dark">{p.summary} {p.exception_note}</p> : null}
+        </div>
+      ) : null}
+      {card ? (
+        <div className="glass p-3 text-sm" data-testid="risk-scorecard">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span className="panel-title">Risk scorecard</span>
+            <Badge kind={card.provenance === "fixture" ? "fixture" : "live"} />
+            {c.caution ? <span className={cautionCls} data-testid="scorecard-caution">caution: {c.caution}</span> : null}
+          </div>
+          <ul className="space-y-0.5 text-xs">
+            {(c.indicators ?? []).map((i, k) => <li key={k} title={i.why}>{readMark(i.reading)} {titleCase(i.name)} <span className="font-mono text-ink-soft-dark">{String(i.value)}</span> <span className="text-ink-soft-dark">· {i.why}</span></li>)}
+          </ul>
+          {c.innocent_explanation_considered ? <p className="mt-2 text-xs text-ink-soft-dark"><span className="font-semibold">Innocent explanation considered:</span> {c.innocent_explanation_considered}</p> : null}
+          {c.summary ? <p className="mt-1 text-xs text-ink-soft-dark">{c.summary}</p> : null}
+        </div>
+      ) : null}
     </div>
   );
 }

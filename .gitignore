@@ -13,6 +13,7 @@ web/next-env.d.ts
 worker/.keys/
 worker/media/
 worker/.lab/
+worker/.cache/
 # One case folder per reviewed claim: the video, frames, probes, proof clips and Droid logs
 worker/cases/
 __pycache__/
@@ -30,3 +31,6 @@ playwright-report/
 # spacetime publish build output
 module/dist/
 .stdb/
+
+# Finance Desk: the generated DuckDB book (rebuild with npm run desk:book)
+worker/data/

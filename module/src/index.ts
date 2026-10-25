@@ -18,5 +18,14 @@ export { enqueueLab, enqueueLabTrigger, startLabJob, appendLabEvent, finishLabJo
 export {
   startAnalysis, setStep, addArtifact, addFinding, auditFinding, writeReport, writeScore, writeRecommendation, finishAnalysis, autoDecide,
 } from './review';
+export { writePulse, recordMonitorNote } from './pulse';
 export { my_agent } from './views';
 export { exportTruth } from './truth';
+// The Refund Finance Desk (finance-*.ts). The main refund flow above never calls these.
+export {
+  seedFinanceCatalog, bootstrapFinanceSeat, financeRequestEntry, financePrepareEntry, financeApproveEntry, financeDecideQueue, financeEditEntry,
+  financeLockPeriod, financeAskController, financeRecordAgentRun,
+} from './finance-ledger';
+export { financeOpenObligation, financeApplyReturn, financeAccrue, financeCloseLite, financeRecordClose, financeResolveCluster } from './finance-obligations';
+export { financeSeedPortfolio, financeAdvance, financeTick, financeSetRunning, financeInjectEvent, financeConfirmPause, financeRecordGuardian } from './finance-sim';
+export { financeScorePortfolio } from './finance-score';
