@@ -70,6 +70,7 @@ export function ReportPanel({ claim, row, order, actions }: { claim: Claim; row:
   const [scores] = useTable(tables.scoreReview.where((r) => r.refundId.eq(claim.refundId)));
   const [shoppers] = useTable(tables.agent.where((r) => r.id.eq(claim.agentId)));
   const [runs] = useTable(tables.agentRun.where((r) => r.caseRef.eq(`C-${claim.id}`)));
+  const [screenings] = useTable(tables.identityScreening.where((r) => r.claimId.eq(claim.id)));
   if (!report) return <div className="glass p-4 text-sm text-review" data-testid="report-panel">The report for this claim could not be read.</div>;
   return (
     <div className="min-w-0 space-y-3">
@@ -78,7 +79,7 @@ export function ReportPanel({ claim, row, order, actions }: { claim: Claim; row:
           <Link className="btn btn--secondary btn--sm" href={`/desk?claim=${claim.id}&refund=${claim.refundId}`}>Finance impact</Link>
         </div>
       ) : null}
-      <ReportContent key={String(row.jobId)} report={report.order || !order ? report : { ...report, order }} claimId={claim.id} auditPassed={row.auditPassed} autoDecided={!!rec?.autoDecided} fallbackReel={row.proofReelUrl} score={{ review: scores[0], shopper: shoppers[0], runs }} actions={actions} />
+      <ReportContent key={String(row.jobId)} report={report.order || !order ? report : { ...report, order }} claimId={claim.id} auditPassed={row.auditPassed} autoDecided={!!rec?.autoDecided} fallbackReel={row.proofReelUrl} score={{ review: scores[0], shopper: shoppers[0], runs, identity: screenings[0] }} actions={actions} />
     </div>
   );
 }

@@ -13,6 +13,7 @@ import type { Refund } from '../../module_bindings/types';
 import type { Report } from '@vouch/module/review-types';
 import { businessDef, catalogItem } from '@vouch/module/world';
 import { config, log, type Seat } from '../env';
+import { identityCase } from '../identity';
 import { fillFromChat, parseVerdict, seatAvailable, seatPath, startRun, waitForRun, type RunHandle } from '../creao';
 import { historySummary } from '../history';
 import { call } from '../stdb';
@@ -117,6 +118,7 @@ export class ScoreReviewer {
     const policy = businessDef(r.businessId)?.policy;
     const history = await historySummary(this.conn, r.agentId);
     const patterns = [...db.fraudPattern.iter()].filter((p) => p.agentIds.includes(r.agentId)).map((p) => ({ id: `FR-${p.id}`, kind: p.kind, status: p.status }));
+    const claim = [...db.claim.iter()].find((c) => c.refundId === r.id);
     const A = report?.factoryAssessment;
     const evidence = {
       unable_to_verify: !report || A?.status === 'unavailable',
@@ -137,7 +139,7 @@ export class ScoreReviewer {
     };
     const scorecard = {
       claim_id: caseRef, amount_requested: r.amount / 100, history, credential, patterns,
-      identity: { status: 'not_run', reason: config.crs.configured ? 'no CRS persona is linked to this shopper' : 'CRS is not configured' },
+      identity: identityCase(claim ? db.identityScreening.claimId.find(claim.id) : null),
       item_context: { sku: `SKU-${purchase?.item ?? 0}`, name: item?.name ?? 'item', pulse: null, business_context: {} },
       video_checks: { fresh: true, frame_reuse_count: 0, still_image: false, challenge_passed: evidence.challenge.passed, capture_flags: evidence.capture_flags, unable_to_verify: evidence.unable_to_verify },
       evidence_summary: evidence.summary,

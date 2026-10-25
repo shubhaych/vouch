@@ -21,7 +21,7 @@ An agent buys something → asks for a refund with a video → CREAO agents anal
 - `web/` Next.js 16 App Router + Tailwind 4 + motion + react-globe.gl + Recharts. Routes: `/ /world /shop /claim/[id] /business /lab /system`.
 - `detectors/` live detectors, `candidates/` (the only folder Droid may write), `eval.ts` (fixed evaluator).
 - Not in the stack: Convex, Fetch, Coinbase/x402, Nessie, any second database.
-- CRS (identity and contact-risk screening) is backend-only and not yet in the claim flow: the worker can call the CRS sandbox (`worker/src/crs.ts`). Read [docs/CRS.md](docs/CRS.md) before using or extending it.
+- CRS (identity and contact-risk screening) screens each real claim's shopper as a sandbox persona (`worker/src/identity.ts`, table `identity_screening`); the Risk Scorecard reads it and `/business` shows it. It routes identity checks only, never a refund decision. Read [docs/CRS.md](docs/CRS.md) before changing it.
 
 ## Hard rules
 - Scraped data says so on screen: a chip reads "via Bright Data" with the fetch time when it was fetched live and "fixture" otherwise. Return signals are context for a person, never a rate and never evidence against a shopper.

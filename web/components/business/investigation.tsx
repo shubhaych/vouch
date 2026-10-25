@@ -44,8 +44,9 @@ export function Investigation({ claim, refund, purchase, evidence, frame, onFram
   const [scores] = useTable(tables.scoreReview.where((r) => r.refundId.eq(refund.id)));
   const [shoppers] = useTable(tables.agent.where((r) => r.id.eq(refund.agentId)));
   const [runs] = useTable(tables.agentRun.where((r) => r.caseRef.eq(`C-${claim.id}`)));
+  const [screenings] = useTable(tables.identityScreening.where((r) => r.claimId.eq(claim.id)));
   const proposal = [...decisions].filter((d) => d.status !== "superseded").sort((a, b) => Number(b.id - a.id))[0];
-  const flow = useMemo(() => seatFlow({ claim, evidence, proposal, review: scores[0], shopper: shoppers[0], runs }), [claim, evidence, proposal, scores, shoppers, runs]);
+  const flow = useMemo(() => seatFlow({ claim, evidence, proposal, review: scores[0], shopper: shoppers[0], runs, identity: screenings[0] }), [claim, evidence, proposal, scores, shoppers, runs, screenings]);
   const frames = claim.frameUrls.map(mediaUrl);
   // Frames that fail to load are dropped, and the viewer goes away when none load, so nothing broken is shown.
   const [bad, setBad] = useState<ReadonlySet<string>>(new Set());

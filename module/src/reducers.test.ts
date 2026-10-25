@@ -9,6 +9,7 @@ import { confirmPatternImpl, flagPatternImpl } from './patterns';
 import { openInvestigationImpl } from './claims';
 import { LAB_CAP_PER_RUN, enqueueLabJob } from './lab';
 import { applyScoreReviewImpl } from './review';
+import { recordIdentityScreeningImpl } from './identity';
 import type { Ctx } from './ctx';
 
 const worker = who('worker');
@@ -251,5 +252,30 @@ describe('refusals reach the caller as SenderError', () => {
       expect(err, msg).toBeInstanceOf(SenderError);
       expect((err as Error).message, msg).toContain(msg);
     }
+  });
+});
+
+describe('CRS identity screening', () => {
+  const screening = (claimId: bigint, over: Partial<Parameters<typeof recordIdentityScreeningImpl>[1]> = {}) => ({
+    claimId, personaId: 'P12', source: 'fixture', contactRiskScore: 85, contactRiskBand: 'review', identityStatus: 'discrepancy',
+    messageCodes: ['2201'], route: 'merchant_identity_review', reasonsJson: JSON.stringify(['score 85 is 70 or more']), failed: false, ...over,
+  });
+
+  it('only the worker records it, one redacted row per claim, and a re-screen replaces it', () => {
+    const k = world();
+    const { claim, agentId } = liveClaim(k);
+    expect(() => k.as(biz, (ctx) => recordIdentityScreeningImpl(ctx, screening(claim.id)))).toThrow(SenderError);
+    k.as(worker, (ctx) => recordIdentityScreeningImpl(ctx, screening(claim.id)));
+    k.as(worker, (ctx) => recordIdentityScreeningImpl(ctx, screening(claim.id, { personaId: 'P01', contactRiskScore: 11, contactRiskBand: 'low', identityStatus: 'match', messageCodes: [], route: 'refund_investigator' })));
+    const rows = [...k.db.identityScreening.iter()];
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ claimId: claim.id, agentId, personaId: 'P01', route: 'refund_investigator' });
+  });
+
+  it('refuses anything but the four sandbox personas, so no other personal data can reach CRS', () => {
+    const k = world();
+    const { claim } = liveClaim(k);
+    expect(() => k.as(worker, (ctx) => recordIdentityScreeningImpl(ctx, screening(claim.id, { personaId: 'Jane Doe' })))).toThrow(/persona/);
+    expect(() => k.as(worker, (ctx) => recordIdentityScreeningImpl(ctx, screening(claim.id, { route: 'decline' })))).toThrow(/route/);
   });
 });

@@ -694,6 +694,22 @@ export const FraudPattern = __t.object("FraudPattern", {
 });
 export type FraudPattern = __Infer<typeof FraudPattern>;
 
+export const IdentityScreening = __t.object("IdentityScreening", {
+  claimId: __t.u64(),
+  agentId: __t.u32(),
+  personaId: __t.string(),
+  source: __t.string(),
+  contactRiskScore: __t.i32(),
+  contactRiskBand: __t.string(),
+  identityStatus: __t.string(),
+  messageCodes: __t.array(__t.string()),
+  route: __t.string(),
+  reasonsJson: __t.string(),
+  failed: __t.bool(),
+  checkedAt: __t.timestamp(),
+});
+export type IdentityScreening = __Infer<typeof IdentityScreening>;
+
 export const JournalEntry = __t.object("JournalEntry", {
   id: __t.u64(),
   decisionId: __t.u64(),

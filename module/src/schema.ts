@@ -527,6 +527,26 @@ const returnsPulse = table({ name: 'returns_pulse', public: true }, {
   computedAt: t.timestamp(),
 });
 
+/**
+ * CRS identity and contact-risk screening of a claim's shopper (docs/CRS.md). Redacted: a sandbox persona id,
+ * the score, statuses, message codes and Vouch's routing reasons only; never names, SSNs, birth dates or vendor
+ * payloads. It routes the identity question to a person; it never approves or declines a refund.
+ */
+const identityScreening = table({ name: 'identity_screening', public: true }, {
+  claimId: t.u64().primaryKey(),
+  agentId: t.u32().index(),
+  personaId: t.string(), // P01 | P12 | P13 | P16: simulated shoppers are mapped onto a CRS sandbox persona
+  source: t.string(), // sandbox | fixture
+  contactRiskScore: t.i32(), // Fraud Finder 0..100, or -1 when unavailable
+  contactRiskBand: t.string(), // low | review | unavailable
+  identityStatus: t.string(), // match | discrepancy | additional_verification | unavailable
+  messageCodes: t.array(t.string()),
+  route: t.string(), // refund_investigator | merchant_identity_review | additional_verification
+  reasonsJson: t.string(), // string[]: the plain-language rules that produced the route
+  failed: t.bool(), // a CRS call failed: says nothing about the shopper
+  checkedAt: t.timestamp(),
+});
+
 const monitorNote = table({ name: 'monitor_note', public: true }, {
   id: t.u64().primaryKey().autoInc(),
   runId: t.string(),
@@ -541,7 +561,7 @@ export const spacetimedb = schema({
   role, seatCode, counter, simRun, simTick, agent, agentTruth, shopperLink, business, purchase, refundIntent, refund,
   creditEvent, eventFeed, regionStat, merchantFlowDay, fraudPattern, patternEvent, claim, evidence, agentRun, control, decision,
   journalEntry, journalLine, credential, verification, labJob, labEvent, metrics, latencyPing, benchResult,
-  analysisJob, analysisStep, artifact, finding, report, claimScore, recommendation, partnerOrder, scoreReview, returnsPulse, monitorNote,
+  analysisJob, analysisStep, artifact, finding, report, claimScore, recommendation, partnerOrder, scoreReview, returnsPulse, monitorNote, identityScreening,
   // The Refund Finance Desk (finance-schema.ts). Nothing above reads these.
   financeCompany, financeProduct, financeAccount, financePeriod, financeRequest, financeEntry, financeLine, financeObligation,
   financeAudit, financeQueue, financePrecedent, financeReserve, financeClose, financeBridge, financeCluster,

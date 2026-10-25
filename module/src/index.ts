@@ -19,6 +19,7 @@ export {
   startAnalysis, setStep, addArtifact, addFinding, auditFinding, writeReport, writeScore, writeRecommendation, finishAnalysis, autoDecide, applyScoreReview,
 } from './review';
 export { writePulse, recordMonitorNote } from './pulse';
+export { recordIdentityScreening } from './identity';
 export { my_agent } from './views';
 export { exportTruth } from './truth';
 // The Refund Finance Desk (finance-*.ts). The main refund flow above never calls these.

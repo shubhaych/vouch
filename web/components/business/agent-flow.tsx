@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode, type RefObject, type VideoHTMLAttributes } from "react";
-import type { AgentRun, Claim, Decision, Evidence, ScoreReview } from "@/module_bindings/types";
+import type { AgentRun, Claim, Decision, Evidence, IdentityScreening, ScoreReview } from "@/module_bindings/types";
 import { Badge, type Prov } from "@/components/ui/badge";
 import { money, pct, titleCase } from "@/lib/format";
 import type { Report } from "@vouch/module/review-types";
@@ -77,9 +77,9 @@ interface InvJson { what_would_change_my_mind?: string; history_considered?: str
 interface Reason { text: string; cites: string }
 
 /** The shopper's live Vouch score and the CREAO runs on this claim, for the score section. */
-export interface ScoreContext { review?: ScoreReview; shopper?: { score: number; band: string }; runs: readonly AgentRun[] }
+export interface ScoreContext { review?: ScoreReview; shopper?: { score: number; band: string }; runs: readonly AgentRun[]; identity?: IdentityScreening }
 
-export function seatFlow({ claim, evidence, proposal, review, shopper, runs }: { claim: Claim; evidence: readonly Evidence[]; proposal?: Decision } & ScoreContext) {
+export function seatFlow({ claim, evidence, proposal, review, shopper, runs, identity }: { claim: Claim; evidence: readonly Evidence[]; proposal?: Decision } & ScoreContext) {
   const checks = parse<{ frame_times?: number[] }>(claim.checksJson, {});
   const timeOf = (frame: number) => checks.frame_times?.[frame];
   const row = (seat: string) => evidence.find((e) => e.seat === seat);
@@ -203,13 +203,14 @@ export function seatFlow({ claim, evidence, proposal, review, shopper, runs }: {
     });
   }
 
-  scoreContributor({ review, shopper, runs }, null, out, metrics);
+  identityMetric(identity, metrics);
+  scoreContributor({ review, shopper, runs, identity }, null, out, metrics);
   return { contributors: out, metrics };
 }
 
 // ---- the video reviewer path ----
 
-export function reportFlow(report: Report, { review, shopper, runs }: ScoreContext) {
+export function reportFlow(report: Report, { review, shopper, runs, identity }: ScoreContext) {
   const out: Contributor[] = [];
   const metrics: Metric[] = [];
   const S = report.score;
@@ -254,12 +255,34 @@ export function reportFlow(report: Report, { review, shopper, runs }: ScoreConte
     { key: "history", label: "Shopper history", from: ["check"], prov: "live", value: sign(C.history), tone: (C.history ?? 0) < 0 ? "review" : "neutral", note: `${report.history.refunds365} refunds in 365 days` },
   );
 
-  scoreContributor({ review, shopper, runs }, report, out, metrics);
+  identityMetric(identity, metrics);
+  scoreContributor({ review, shopper, runs, identity }, report, out, metrics);
   return { contributors: out, metrics };
 }
 
 /** score_review.decision: "accepted"/"declined" after a person decided, "creao_accept"/"creao_decline" for the CREAO verdict before one. */
 const verdictText = (d: string) => (d.startsWith("creao_") ? `CREAO ${d.slice("creao_".length)} verdict` : d === "accepted" ? "accept decision" : d === "declined" ? "decline decision" : titleCase(d));
+
+const ROUTE_TEXT: Record<string, string> = {
+  refund_investigator: "Clear: no identity check needed",
+  merchant_identity_review: "Merchant identity review",
+  additional_verification: "More verification needed",
+};
+
+/**
+ * CRS identity and contact-risk screening (docs/CRS.md). It routes the identity question to a person and never
+ * approves or declines, so it is never shown in the fraud colour. Not an agent: its "from" names the CRS sandbox.
+ */
+function identityMetric(row: IdentityScreening | undefined, metrics: Metric[]) {
+  if (!row || row.failed) return;
+  const score = row.contactRiskScore < 0 ? "unavailable" : `${row.contactRiskScore}/100`;
+  metrics.push({
+    key: "identity", label: "Identity screening (CRS)", from: ["crs"], prov: row.source === "sandbox" ? "live" : "fixture",
+    value: ROUTE_TEXT[row.route] ?? titleCase(row.route), tone: row.route === "refund_investigator" ? "honest" : "review",
+    bar: row.contactRiskScore < 0 ? undefined : row.contactRiskScore / 100,
+    note: `contact risk ${score} · identity ${titleCase(row.identityStatus)}${row.messageCodes.length ? ` · codes ${row.messageCodes.join(", ")}` : ""} · sandbox persona ${row.personaId}`,
+  });
+}
 
 const SCORE_SEAT: Record<string, string> = { score_reviewer: "Score Reviewer", refund_investigator: "Refund Investigator", risk_scorecard: "Risk Scorecard" };
 
@@ -269,7 +292,7 @@ const SCORE_SEAT: Record<string, string> = { score_reviewer: "Score Reviewer", r
  * each given the analysis below (worker/src/review/score-review.ts). Until then, and when only the fallback
  * rule answered, the score is shown without crediting an agent.
  */
-function scoreContributor({ review, shopper, runs }: ScoreContext, report: Report | null, out: Contributor[], metrics: Metric[]) {
+function scoreContributor({ review, shopper, runs, identity }: ScoreContext, report: Report | null, out: Contributor[], metrics: Metric[]) {
   const panel = !!review?.provenance.startsWith("panel_");
   const mode = panel ? review!.provenance.slice("panel_".length) : review?.provenance;
   if (!review || (mode !== "live" && mode !== "fixture")) {
@@ -289,6 +312,8 @@ function scoreContributor({ review, shopper, runs }: ScoreContext, report: Repor
     A ? `Factory's ${A.action.replace("_", " ")} recommendation` : null,
     challenge ? `finger challenge ${challenge}` : null,
     report ? `${contradicts} contradicting finding${contradicts === 1 ? "" : "s"}` : null,
+    // The Risk Scorecard in the panel reads the screening; one stored after the score was judged was not part of it.
+    panel && identity && !identity.failed && identity.checkedAt.microsSinceUnixEpoch <= review.at.microsSinceUnixEpoch ? `CRS identity screening (${ROUTE_TEXT[identity.route]?.toLowerCase() ?? identity.route})` : null,
     `the shopper's history and a starting score of ${review.before}`,
   ].filter(Boolean);
   const sign = review.delta > 0 ? "+" : "";
@@ -309,8 +334,10 @@ function scoreContributor({ review, shopper, runs }: ScoreContext, report: Repor
 
 // ---- views ----
 
-function AgentChip({ c, contributors, onClick }: { c?: Contributor; contributors: Contributor[]; onClick?: () => void }) {
-  if (!c) return <span className="chip text-[0.65rem]">Automated check</span>;
+const SOURCE_LABEL: Record<string, string> = { check: "Automated check", crs: "CRS sandbox" };
+
+function AgentChip({ c, k, contributors, onClick }: { c?: Contributor; k: string; contributors: Contributor[]; onClick?: () => void }) {
+  if (!c) return <span className="chip text-[0.65rem]">{SOURCE_LABEL[k] ?? titleCase(k)}</span>;
   return (
     <button type="button" onClick={onClick} className="chip text-[0.65rem] hover:border-accent/60" title={`Jump to the ${c.name}`}>
       <span aria-hidden className="mr-1 inline-block h-2 w-2 rounded-full" style={{ background: colorOf(contributors, c.key) }} />{c.name}
@@ -343,7 +370,7 @@ export function MetricGrid({ metrics, contributors, onMoment }: { metrics: Metri
               {from.length ? (
                 <div className="mt-2 flex flex-wrap items-center gap-1">
                   <span className="font-mono text-[0.6rem] uppercase tracking-[0.08em] text-ink-soft-dark">from</span>
-                  {from.map((k) => <AgentChip key={k} c={byKey.get(k)} contributors={contributors} onClick={() => focusAgent(k)} />)}
+                  {from.map((k) => <AgentChip key={k} k={k} c={byKey.get(k)} contributors={contributors} onClick={() => focusAgent(k)} />)}
                 </div>
               ) : null}
               {onMoment && moments.length ? (

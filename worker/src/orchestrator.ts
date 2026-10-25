@@ -9,6 +9,7 @@ import type { DbConnection } from '../module_bindings/index';
 import type { Claim, FraudPattern } from '../module_bindings/types';
 import { catalogItem } from '@vouch/module/world';
 import { config, log, type Seat } from './env';
+import { identityCase, screenClaim } from './identity';
 import { call } from './stdb';
 import { fillFromChat, parseVerdict, seatAvailable, startRun, waitForRun, type RunHandle } from './creao';
 import { searchListings } from './brightdata';
@@ -308,13 +309,14 @@ export class Orchestrator {
 
     // 1d. Risk Scorecard (optional seat): every behavioural, identity and item indicator read as supports, neutral or caution.
     const skuContext = this.skuContext(purchase.business, purchase.item, day);
+    const identity = identityCase(await screenClaim(this.conn, c));
     const scorecard = await this.optionalSeat<ScorecardJson>(c, 'risk_scorecard', caseRef, () => ({
       claim_id: caseRef,
       amount_requested: refund.amount / 100,
       history,
       credential: credential ?? { presented: false, verified: false, failed_step: null, issuer: null, claims: {} },
       patterns,
-      identity: { status: 'not_run', reason: config.crs.configured ? 'no CRS persona is linked to this shopper' : 'CRS is not configured (docs/CRS.md)' },
+      identity,
       item_context: { sku: `SKU-${purchase.item}`, name: item?.name ?? 'item', pulse: this.pulseFor?.(purchase.item) ?? null, business_context: skuContext },
       video_checks: {
         fresh: checks.fresh ?? null, frame_reuse_count: ((checks.frame_reuse as unknown[] | undefined) ?? []).length, still_image: checks.still_image ?? false,

@@ -1,6 +1,8 @@
-# CRS: shopper identity and contact-risk screening (backend ready, not wired into the product)
+# CRS: shopper identity and contact-risk screening
 
-Read this before adding CRS to any part of Vouch. The worker can already call the CRS sandbox; nothing in the claim flow, the database or the web app uses it yet.
+Read this before changing how Vouch uses CRS.
+
+**Wired in (2026-10-25).** Each real claim's shopper is mapped onto a sandbox persona (`personaFor` in `worker/src/identity.ts`: about 85% P01, 5% each P12, P13, P16) and screened once by `screenClaim`, which the Desk Lead calls before the Risk Scorecard and the video reviewer calls while building the case; the worker also backfills older claims at startup. The redacted result is stored in the public `identity_screening` table (written only by the worker through `recordIdentityScreening`). The Risk Scorecard reads it as its `identity` indicator, in the claim investigation and in the Vouch score panel, so a screening can move caution and through it the score change. `/business` shows it as the "Identity screening (CRS)" metric. It never approves or declines a refund and never feeds the video evidence score.
 
 ## What CRS is for in Vouch
 

@@ -16,6 +16,7 @@ import { catalogItem, type Policy } from '@vouch/module/world';
 import { DEFAULT_AUTO_APPROVE_CENTS, FORMULA_VERSION, TIER_LABEL, type Band, type IntegrityFlag, type Tier, type VerifiedIdentity } from '@vouch/module/review-score';
 import type { DroidSessionSummary, StepKey } from '@vouch/module/review-types';
 import { config, log } from '../env';
+import { screenClaim } from '../identity';
 import { label } from '../history';
 import { mirrorOf } from '../mirror';
 import type { CredentialChecker } from '../orchestrator';
@@ -228,7 +229,10 @@ export class ReviewRunner {
       const policy = JSON.parse(business.policy) as Policy & { autoApproveLimitCents?: number };
       const credential = await this.checkCredential(refund.agentId, refund.id, refund.businessId).catch(() => null);
       const verified: VerifiedIdentity = credential?.verified ? 'verified' : credential?.presented ? 'unverified' : 'unknown';
-      if (!config.crs.configured) limits.push('Identity verification (CRS) is not configured; a verified Vouch credential from another store counts instead.');
+      // CRS screens the shopper for the business page and the score panel; it never feeds the evidence score.
+      const screening = await screenClaim(this.conn, c);
+      if (!screening) limits.push('Identity screening (CRS) could not run; identity is unknown, which is not a reason for caution.');
+      else if (screening.source !== 'sandbox') limits.push('Identity screening (CRS) used recorded fixture answers for a sandbox persona, not a live CRS call.');
       const hist = historyFor(this.conn, purchase, refund, policy.windowDays, verified);
       const facts: CaseFacts = {
         caseRef,

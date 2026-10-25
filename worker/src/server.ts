@@ -27,6 +27,7 @@ import type { DbConnection } from '../module_bindings';
 import { POLICY } from '../../module/src/finance/policy';
 import { allowedRungs as allowedFinanceRungs, zeroSignals, type Signals } from '../../module/src/finance/exposure';
 import { isPersonaId, sandboxReady, screen, type PersonaId } from './crs';
+import { screenClaim } from './identity';
 import { PulseRunner } from './pulse';
 import { brightdataReady, scrapesUsedToday } from './brightdata';
 
@@ -340,6 +341,8 @@ async function main() {
   scoreReviewer.start();
   keepSimRunning(conn);
   orchestrator.start();
+  // Real claims filed before CRS was wired in get one screening; sandbox answers are cached per persona, so this is at most four CRS calls.
+  void (async () => { for (const c of [...conn.db.claim.iter()]) if (c.kind !== 'simulated' && !conn.db.identityScreening.claimId.find(c.id)) await screenClaim(conn, c); })();
   new DetectorRunner(conn).start();
   const pulse = new PulseRunner(conn, { creaoOn: () => conn.db.control.key.find('creao_enabled')?.value === 'true', takeBudget: () => orchestrator.takeBudget() });
   pulse.start();

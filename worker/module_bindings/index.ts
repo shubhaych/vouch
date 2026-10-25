@@ -85,6 +85,7 @@ import PostReducer from "./post_reducer";
 import ProposeReducer from "./propose_reducer";
 import RecordBenchReducer from "./record_bench_reducer";
 import RecordEvidenceReducer from "./record_evidence_reducer";
+import RecordIdentityScreeningReducer from "./record_identity_screening_reducer";
 import RecordMonitorNoteReducer from "./record_monitor_note_reducer";
 import RecordRunReducer from "./record_run_reducer";
 import RecordVerificationReducer from "./record_verification_reducer";
@@ -158,6 +159,7 @@ import FinanceVouchLedgerRow from "./finance_vouch_ledger_table";
 import FinanceVouchSignalRow from "./finance_vouch_signal_table";
 import FindingRow from "./finding_table";
 import FraudPatternRow from "./fraud_pattern_table";
+import IdentityScreeningRow from "./identity_screening_table";
 import JournalEntryRow from "./journal_entry_table";
 import JournalLineRow from "./journal_line_table";
 import LabEventRow from "./lab_event_table";
@@ -768,6 +770,20 @@ const tablesSchema = __schema({
       { name: 'fraud_pattern_signature_key', constraint: 'unique', columns: ['signature'] },
     ],
   }, FraudPatternRow),
+  identityScreening: __table({
+    name: 'identity_screening',
+    indexes: [
+      { accessor: 'agentId', name: 'identity_screening_agent_id_idx_btree', algorithm: 'btree', columns: [
+        'agentId',
+      ] },
+      { accessor: 'claimId', name: 'identity_screening_claim_id_idx_btree', algorithm: 'btree', columns: [
+        'claimId',
+      ] },
+    ],
+    constraints: [
+      { name: 'identity_screening_claim_id_key', constraint: 'unique', columns: ['claimId'] },
+    ],
+  }, IdentityScreeningRow),
   journalEntry: __table({
     name: 'journal_entry',
     indexes: [
@@ -1104,6 +1120,7 @@ const reducersSchema = __reducers(
   __reducerSchema("propose", ProposeReducer),
   __reducerSchema("record_bench", RecordBenchReducer),
   __reducerSchema("record_evidence", RecordEvidenceReducer),
+  __reducerSchema("record_identity_screening", RecordIdentityScreeningReducer),
   __reducerSchema("record_monitor_note", RecordMonitorNoteReducer),
   __reducerSchema("record_run", RecordRunReducer),
   __reducerSchema("record_verification", RecordVerificationReducer),
