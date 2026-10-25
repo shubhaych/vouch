@@ -795,6 +795,17 @@ export const MyAgentRow = __t.object("MyAgentRow", {
 });
 export type MyAgentRow = __Infer<typeof MyAgentRow>;
 
+export const PartnerOrder = __t.object("PartnerOrder", {
+  purchaseId: __t.u64(),
+  companyId: __t.u16(),
+  companyName: __t.string(),
+  sku: __t.string(),
+  name: __t.string(),
+  description: __t.string(),
+  priceCents: __t.u32(),
+});
+export type PartnerOrder = __Infer<typeof PartnerOrder>;
+
 export const PatternEvent = __t.object("PatternEvent", {
   id: __t.u64(),
   patternId: __t.u32(),

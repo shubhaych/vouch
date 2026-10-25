@@ -465,6 +465,21 @@ const claimScore = table({ name: 'claim_score', public: true }, {
   formulaVersion: t.string(),
 });
 
+/**
+ * A purchase of one of the 100 partner companies' products. The purchase itself runs through a
+ * main-world store of the same category, so the claim, video review and phone flow are unchanged;
+ * this row says which partner product it really was, and is the reviewer's ground truth for it.
+ */
+const partnerOrder = table({ name: 'partner_order', public: true }, {
+  purchaseId: t.u64().primaryKey(),
+  companyId: t.u16(),
+  companyName: t.string(),
+  sku: t.string(),
+  name: t.string(),
+  description: t.string(),
+  priceCents: t.u32(),
+});
+
 const recommendation = table({ name: 'recommendation', public: true }, {
   claimId: t.u64().primaryKey(),
   jobId: t.u64(),
@@ -508,7 +523,7 @@ export const spacetimedb = schema({
   role, seatCode, counter, simRun, simTick, agent, agentTruth, shopperLink, business, purchase, refundIntent, refund,
   creditEvent, eventFeed, regionStat, merchantFlowDay, fraudPattern, patternEvent, claim, evidence, agentRun, control, decision,
   journalEntry, journalLine, credential, verification, labJob, labEvent, metrics, latencyPing, benchResult,
-  analysisJob, analysisStep, artifact, finding, report, claimScore, recommendation, returnsPulse, monitorNote,
+  analysisJob, analysisStep, artifact, finding, report, claimScore, recommendation, partnerOrder, returnsPulse, monitorNote,
   // The Refund Finance Desk (finance-schema.ts). Nothing above reads these.
   financeCompany, financeProduct, financeAccount, financePeriod, financeRequest, financeEntry, financeLine, financeObligation,
   financeAudit, financeQueue, financePrecedent, financeReserve, financeClose, financeBridge, financeCluster,

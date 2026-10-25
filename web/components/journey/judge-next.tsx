@@ -59,12 +59,12 @@ export function JudgeNext() {
         </li>
 
         <li className="chapter-path__item">
-          <Link href="/network" className="chapter-path__link" data-testid="chapter-network">
+          <Link href="/shop" className="chapter-path__link" data-testid="chapter-network">
             <span className="chapter-path__n">02</span>
             <span className="chapter-path__body">
               <span className="chapter-path__label">Company network</span>
               <span className="chapter-path__detail">
-                100 merchants with products and policies — portable history without raw videos.
+                100 merchants and their products: buy one, or return it through the same phone flow.
               </span>
             </span>
             <span className="chapter-path__arrow" aria-hidden>

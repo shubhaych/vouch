@@ -3,6 +3,30 @@ import { spacetimedb } from './schema';
 import { asSenderError, myAgentId, nextCounter, requireRole, worldOf, type Ctx } from './ctx';
 import { SHOWCASE_AGENT_ID, agentLabel, createLiveAgent, deliverNow, fileRefund, recordPurchase } from './sim';
 import { REASONS } from './text';
+import { BUSINESSES, CATALOG, type Category } from './world';
+import { companyById } from './finance/companies';
+
+/** Which main-world store category handles a partner category's returns (policy window, video threshold). */
+const PARTNER_CATEGORY: Record<string, Category> = {
+  ELEC: 'electronics', MKT: 'electronics', GEN: 'electronics', OFFICE: 'electronics', AUTO: 'electronics', MEDIA: 'electronics',
+  APP: 'apparel', DEPT: 'apparel', FOOT: 'apparel', ACC: 'apparel', BAG: 'apparel', LUX: 'apparel',
+  HOME: 'home', DIY: 'home', GROC: 'home', PET: 'home', BEAUTY: 'beauty', ATH: 'sporting goods', OUT: 'sporting goods', TOY: 'toys',
+};
+
+/** Buys one partner product: a main-world purchase at the partner's price, plus the partner_order row naming the real product. */
+export function buyPartnerFor(ctx: Ctx, agentId: number, companyId: number, sku: string) {
+  const company = companyById(companyId);
+  const product = company?.products.find((p) => p.sku === sku);
+  if (!company || !product) throw new SenderError('unknown partner product');
+  const category = PARTNER_CATEGORY[company.category] ?? 'electronics';
+  const store = BUSINESSES.find((b) => b.category === category)!;
+  const standIn = CATALOG.find((c) => c.category === category)!;
+  const p = buyFor(ctx, agentId, store.id, standIn.sku, 'live');
+  const row = ctx.db.purchase.id.find(p.id)!;
+  ctx.db.purchase.id.update({ ...row, amount: product.priceCents });
+  ctx.db.partnerOrder.insert({ purchaseId: p.id, companyId, companyName: company.name, sku, name: product.name, description: product.description, priceCents: product.priceCents });
+  return p;
+}
 
 // The judge as a shopper: join, buy, fast-forward to the refund window and
 // file a claim. The same functions let the worker play the showcase agent
@@ -59,6 +83,10 @@ export function requestRefundFor(ctx: Ctx, agentId: number, purchaseId: bigint, 
 
 export const buy = spacetimedb.reducer({ businessId: t.u16(), sku: t.u16() }, (ctx, a) => {
   buyFor(ctx, myAgentId(ctx), a.businessId, a.sku, 'live');
+});
+
+export const buyPartner = spacetimedb.reducer({ companyId: t.u16(), sku: t.string() }, (ctx, a) => {
+  buyPartnerFor(ctx, myAgentId(ctx), a.companyId, a.sku);
 });
 
 /** Marks the purchase delivered and inside its refund window, so the judge does not wait. */

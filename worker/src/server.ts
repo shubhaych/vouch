@@ -33,7 +33,7 @@ const WORKER_QUERIES = [
   'SELECT * FROM sim_run', 'SELECT * FROM metrics', 'SELECT * FROM control', 'SELECT * FROM agent', 'SELECT * FROM business',
   'SELECT * FROM purchase', 'SELECT * FROM refund', 'SELECT * FROM claim', 'SELECT * FROM evidence', 'SELECT * FROM agent_run',
   'SELECT * FROM decision', 'SELECT * FROM fraud_pattern', 'SELECT * FROM pattern_event', 'SELECT * FROM credential',
-  'SELECT * FROM verification', 'SELECT * FROM lab_job',
+  'SELECT * FROM verification', 'SELECT * FROM lab_job', 'SELECT * FROM partner_order',
   'SELECT * FROM analysis_job', 'SELECT * FROM analysis_step', 'SELECT * FROM artifact', 'SELECT * FROM finding', 'SELECT * FROM report',
   'SELECT * FROM claim_score', 'SELECT * FROM recommendation',
 ];

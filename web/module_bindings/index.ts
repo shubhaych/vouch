@@ -44,6 +44,7 @@ import BootstrapFinanceSeatReducer from "./bootstrap_finance_seat_reducer";
 import BootstrapPosterReducer from "./bootstrap_poster_reducer";
 import BootstrapWorkerReducer from "./bootstrap_worker_reducer";
 import BuyReducer from "./buy_reducer";
+import BuyPartnerReducer from "./buy_partner_reducer";
 import ConfirmPatternReducer from "./confirm_pattern_reducer";
 import DecideReducer from "./decide_reducer";
 import EnqueueLabReducer from "./enqueue_lab_reducer";
@@ -165,6 +166,7 @@ import MerchantFlowDayRow from "./merchant_flow_day_table";
 import MetricsRow from "./metrics_table";
 import MonitorNoteRow from "./monitor_note_table";
 import MyAgentRow from "./my_agent_table";
+import PartnerOrderRow from "./partner_order_table";
 import PatternEventRow from "./pattern_event_table";
 import PurchaseRow from "./purchase_table";
 import RecommendationRow from "./recommendation_table";
@@ -867,6 +869,17 @@ const tablesSchema = __schema({
       { name: 'monitor_note_id_key', constraint: 'unique', columns: ['id'] },
     ],
   }, MonitorNoteRow),
+  partnerOrder: __table({
+    name: 'partner_order',
+    indexes: [
+      { accessor: 'purchaseId', name: 'partner_order_purchase_id_idx_btree', algorithm: 'btree', columns: [
+        'purchaseId',
+      ] },
+    ],
+    constraints: [
+      { name: 'partner_order_purchase_id_key', constraint: 'unique', columns: ['purchaseId'] },
+    ],
+  }, PartnerOrderRow),
   patternEvent: __table({
     name: 'pattern_event',
     indexes: [
@@ -1034,6 +1047,7 @@ const reducersSchema = __reducers(
   __reducerSchema("bootstrap_poster", BootstrapPosterReducer),
   __reducerSchema("bootstrap_worker", BootstrapWorkerReducer),
   __reducerSchema("buy", BuyReducer),
+  __reducerSchema("buy_partner", BuyPartnerReducer),
   __reducerSchema("confirm_pattern", ConfirmPatternReducer),
   __reducerSchema("decide", DecideReducer),
   __reducerSchema("enqueue_lab", EnqueueLabReducer),

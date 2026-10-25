@@ -15,6 +15,9 @@ export interface ClaimHint {
   business?: number;
   cents?: number;
   reason?: string;
+  /** A partner company's product (company id and sku), when the order was one. */
+  partnerCompany?: number;
+  partnerSku?: string;
 }
 
 /** Path and query for one claim; prefix it with the site origin for a QR code. */
@@ -22,10 +25,12 @@ export function claimHref(
   claim: { id: bigint; nonce: string; fingerCount: number; refundId: bigint; agentId: number },
   purchase?: { id: bigint; item: number; business: number },
   refund?: { amount: number; reasonCode: string },
+  partner?: { companyId: number; sku: string },
 ): string {
   const q = new URLSearchParams({ n: claim.nonce, f: String(claim.fingerCount), r: String(claim.refundId), a: String(claim.agentId) });
   if (purchase) { q.set("p", String(purchase.id)); q.set("s", String(purchase.item)); q.set("b", String(purchase.business)); }
   if (refund) { q.set("c", String(refund.amount)); q.set("why", refund.reasonCode); }
+  if (partner) { q.set("pc", String(partner.companyId)); q.set("ps", partner.sku); }
   return `/claim/${claim.id}?${q}`;
 }
 
@@ -44,6 +49,7 @@ export function parseHint(s: Search): ClaimHint | null {
     nonce, fingers,
     refundId: big(one(s, "r")), purchaseId: big(one(s, "p")), agentId: int(one(s, "a")),
     sku: int(one(s, "s")), business: int(one(s, "b")), cents: int(one(s, "c")),
+    partnerCompany: int(one(s, "pc")), partnerSku: /^[a-z0-9-]{1,64}$/.test(one(s, "ps") ?? "") ? one(s, "ps") : undefined,
     reason: why && /^[a-z_]{1,40}$/.test(why) ? why : undefined,
   };
 }

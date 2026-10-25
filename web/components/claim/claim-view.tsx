@@ -10,6 +10,7 @@ import { Recorder } from "./recorder";
 import { agentLabel, money, titleCase } from "@/lib/format";
 import { hintFromProps, type HintProps } from "@/lib/claim-link";
 import { businessDef, catalogItem } from "@vouch/module/world";
+import { companyById } from "@vouch/module/finance/companies";
 import { STEP_KEYS, STEP_LABEL } from "@vouch/module/review-types";
 
 
@@ -34,8 +35,14 @@ export function ClaimView({ idParam, hint: hintProps }: { idParam: string; hint:
   const [jobs] = useTable(tables.analysisJob.where((r) => r.claimId.eq(id)));
   const job = [...jobs].sort((a, b) => Number(b.id - a.id))[0];
   const [analysisSteps] = useTable(tables.analysisStep.where((r) => r.jobId.eq(job?.id ?? 0n)), { enabled: !!job });
+  // A partner company's product: its own listing names the item and the store, not the stand-in it was routed through.
+  const [partnerRows] = useTable(tables.partnerOrder.where((r) => r.purchaseId.eq(purchaseId)), { enabled: purchaseId !== 0n });
+  const partnerRow = partnerRows.find((r) => r.purchaseId === purchaseId);
+  const partnerDef = hint?.partnerCompany ? companyById(hint.partnerCompany) : undefined;
+  const partnerProduct = partnerDef?.products.find((p) => p.sku === hint?.partnerSku);
+  const partner = partnerRow ? { name: partnerRow.name, store: partnerRow.companyName } : partnerProduct && partnerDef ? { name: partnerProduct.name, store: partnerDef.name } : null;
   const sku = purchase?.item ?? hint?.sku;
-  const item = sku !== undefined ? catalogItem(sku) : undefined;
+  const item = partner ? { name: partner.name } : sku !== undefined ? catalogItem(sku) : undefined;
   const businessId = purchase?.business ?? hint?.business;
 
   // Until the live rows arrive, the link's values stand in; the recorder sits at the same place either way,
@@ -74,7 +81,7 @@ export function ClaimView({ idParam, hint: hintProps }: { idParam: string; hint:
       <div className="space-y-1">
         <div className="text-xs font-semibold uppercase tracking-wider text-ink-soft">Claim C-{id.toString()} {early ? <span className="normal-case tracking-normal" data-testid="claim-connecting">· connecting for live progress…</span> : <Badge kind="live" />}</div>
         <h1 className="text-xl font-bold">{item?.name ?? "Your item"}</h1>
-        <p className="text-sm text-ink-soft">{[reason ? titleCase(reason) : "", amount !== undefined ? money(amount) : "", businessId !== undefined ? businessDef(businessId)?.name : ""].filter(Boolean).join(" · ")}</p>
+        <p className="text-sm text-ink-soft">{[reason ? titleCase(reason) : "", amount !== undefined ? money(amount) : "", partner ? partner.store : businessId !== undefined ? businessDef(businessId)?.name : ""].filter(Boolean).join(" · ")}</p>
         {agentId ? <p className="text-xs text-ink-soft" data-testid="claim-agent">Your agent {agentLabel(agentId)}{agent ? <> · score <span className="font-mono">{agent.score}</span></> : null}</p> : null}
       </div>
       {status === "offline" ? <div className="rounded-lg border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">The investigators are offline right now. The business can only ask you for more evidence; nothing is declined automatically.</div> : null}

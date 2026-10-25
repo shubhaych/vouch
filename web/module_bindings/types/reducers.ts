@@ -16,6 +16,7 @@ import BootstrapFinanceSeatReducer from "../bootstrap_finance_seat_reducer";
 import BootstrapPosterReducer from "../bootstrap_poster_reducer";
 import BootstrapWorkerReducer from "../bootstrap_worker_reducer";
 import BuyReducer from "../buy_reducer";
+import BuyPartnerReducer from "../buy_partner_reducer";
 import ConfirmPatternReducer from "../confirm_pattern_reducer";
 import DecideReducer from "../decide_reducer";
 import EnqueueLabReducer from "../enqueue_lab_reducer";
@@ -92,6 +93,7 @@ export type BootstrapFinanceSeatParams = __Infer<typeof BootstrapFinanceSeatRedu
 export type BootstrapPosterParams = __Infer<typeof BootstrapPosterReducer>;
 export type BootstrapWorkerParams = __Infer<typeof BootstrapWorkerReducer>;
 export type BuyParams = __Infer<typeof BuyReducer>;
+export type BuyPartnerParams = __Infer<typeof BuyPartnerReducer>;
 export type ConfirmPatternParams = __Infer<typeof ConfirmPatternReducer>;
 export type DecideParams = __Infer<typeof DecideReducer>;
 export type EnqueueLabParams = __Infer<typeof EnqueueLabReducer>;

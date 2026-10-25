@@ -209,7 +209,9 @@ export class ReviewRunner {
       await step('integrity', 'done', integ.doc.notes.length ? integ.doc.notes.join(' ') : 'Nothing flagged by the automated checks (internally consistent, not proof of authenticity).');
 
       // 3. spoken claims
-      const item = catalogItem(purchase.item);
+      // A partner company's product is ground-truthed by its own listing, not by the stand-in catalog item it was routed through.
+      const partner = this.conn.db.partnerOrder.purchaseId.find(purchase.id);
+      const item = partner ? { name: partner.name, description: partner.description, parts: [] as string[] } : catalogItem(purchase.item);
       const claimsRes = await extractClaims(
         { transcript: tr.transcript, reasonText: refund.reasonText, reasonCode: refund.reasonCode, itemName: item?.name ?? 'the item', durationS: ing.meta.durationS },
         droidOk && config.review.droidClaims && this.budget.take(), dir,
@@ -228,7 +230,7 @@ export class ReviewRunner {
       const hist = historyFor(this.conn, purchase, refund, policy.windowDays, verified);
       const facts: CaseFacts = {
         caseRef,
-        business: { name: business.name, id: label.business(business.id), category: business.category },
+        business: partner ? { name: partner.companyName, id: `partner ${partner.companyId}`, category: business.category } : { name: business.name, id: label.business(business.id), category: business.category },
         order: { item: item?.name ?? `SKU-${purchase.item}`, description: item?.description ?? '', parts: item?.parts ?? [], priceCents: purchase.amount, purchasedDay: purchase.day, deliveredDay: purchase.deliverDay, claimDay: refund.day },
         claim: { reasonCode: refund.reasonCode, reasonText: refund.reasonText, amountCents: refund.amount, fingerCount: c.fingerCount },
         policy: policy as unknown as Record<string, unknown>,

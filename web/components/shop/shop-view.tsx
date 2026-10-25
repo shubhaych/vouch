@@ -15,6 +15,7 @@ import { BUSINESS_A, BUSINESS_B, CATALOG, businessDef, catalogItem, type Catalog
 import { REASONS } from "@vouch/module/text";
 import { claimHref } from "@/lib/claim-link";
 import { DISCLAIMER } from "@vouch/module/finance/companies";
+import { PartnerCheckout } from "./partner-checkout";
 
 const BAND_TEXT: Record<string, string> = { red: "text-red-600", amber: "text-amber-600", neutral: "text-slate-600", green: "text-emerald-600" };
 const SHOPS = [BUSINESS_A, BUSINESS_B];
@@ -41,6 +42,7 @@ function PartnerDirectory() {
   const [products] = useTable(tables.financeProduct);
   const [states] = useTable(tables.financeCompanyState);
   const [category, setCategory] = useState("all");
+  const [picked, setPicked] = useState<{ companyId: number; sku: string } | null>(null);
   const categories = useMemo(() => [...new Set(companies.map((c) => c.category))].sort(), [companies]);
   const visible = useMemo(() => [...companies]
     .filter((c) => category === "all" || c.category === category)
@@ -52,7 +54,7 @@ function PartnerDirectory() {
         <div>
           <p className="section__eyebrow">The partner network · SpacetimeDB</p>
           <h2 className="text-2xl font-bold">100 simulated shops</h2>
-          <p className="mt-1 text-sm text-ink-soft">Every shop has a four-product catalog and live portfolio activity. Select one to inspect its Refund Finance Desk.</p>
+          <p className="mt-1 text-sm text-ink-soft">Every shop has a four-product catalog and live portfolio activity. Click a product to mock-buy it or start a return.</p>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-ink-soft"><Badge kind="simulated" /> {companies.length} stores · {products.length} products</span>
@@ -78,7 +80,12 @@ function PartnerDirectory() {
               </div>
               <p className="text-sm text-ink-soft">{company.tagline}</p>
               <div className="grid grid-cols-2 gap-2">
-                {catalog.slice(0, 4).map((p) => <div key={p.sku} className="rounded-lg border border-line/70 p-2"><p className="truncate text-xs font-semibold">{p.name}</p><p className="mt-1 text-xs text-ink-soft">{money(p.priceCents)}</p></div>)}
+                {catalog.slice(0, 4).map((p) => (
+                  <button key={p.sku} type="button" onClick={() => setPicked({ companyId: company.id, sku: p.sku })} data-testid={`product-${p.sku}`}
+                    className="rounded-lg border border-line/70 p-2 text-left transition hover:border-cyan-700 hover:bg-cyan-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-700">
+                    <p className="truncate text-xs font-semibold">{p.name}</p><p className="mt-1 text-xs text-ink-soft">{money(p.priceCents)} · buy or return</p>
+                  </button>
+                ))}
               </div>
               <div className="mt-auto flex items-center justify-between border-t border-line/70 pt-3 text-xs text-ink-soft">
                 <span><Badge kind="simulated" /> {state ? `${state.orders.toLocaleString()} orders · ${state.flags.toLocaleString()} flags` : "Awaiting first finance tick"}</span>
@@ -88,6 +95,7 @@ function PartnerDirectory() {
           );
         })}
       </div>
+      {picked ? <PartnerCheckout companyId={picked.companyId} sku={picked.sku} onClose={() => setPicked(null)} /> : null}
     </section>
   );
 }

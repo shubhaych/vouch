@@ -9,7 +9,7 @@ export { init, seedWorld, tick } from './economy';
 export {
   bootstrapWorker, bootstrapPoster, setSeatCodes, takeBusinessSeat, switchBusiness, setControl, setSim, ping, recordBench,
 } from './control';
-export { joinAsShopper, buy, fastForward, requestRefund, showcaseAct } from './consumer';
+export { joinAsShopper, buy, buyPartner, fastForward, requestRefund, showcaseAct } from './consumer';
 export { attachVideo, setClaimStatus, recordRun, runStep, finishRun, recordEvidence, openInvestigation } from './claims';
 export { propose, decide, post } from './desk';
 export { flagPattern, setPatternStatus, confirmPattern } from './patterns';
