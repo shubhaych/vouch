@@ -68,6 +68,8 @@ npx tsx scripts/claim-flow.ts qa/videos/S02-fresh.mp4   # or a phone video; prin
 - **T1.5:** on the demo laptop, `/world` keeps 45 fps or better. Check with Chrome DevTools, Rendering, Frame rendering stats.
 - **Videos:** record V01–V07, V15 and V16 on a phone into `qa/videos/` (the list is in `qa/checklist.md`). Then rerun the video matrix in live mode and paste the table into QA_REPORT.md.
 
+- UNVERIFIED-LIVE: factory: extra-clip flow on a phone (no finger challenge → "Add more evidence" → second clip joined on the business timeline): `npm run worker`
+
 ## 5. Fill in and ship
 
 - Replace every `<fill in>` in README.md and docs/CREAO.md with real ids and links.

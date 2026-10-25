@@ -1,6 +1,7 @@
 // The worker process: privileged SpacetimeDB identities plus the HTTP routes
 // the phone and CREAO need. Everything slow, secret or heavy happens here.
-import { createReadStream, existsSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { sendMedia } from './media-response';
 import { resolve } from 'node:path';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
@@ -89,7 +90,7 @@ async function main() {
     } catch (e) {
       const status = e instanceof UploadError ? e.status : (e as { code?: string }).code === 'FST_REQ_FILE_TOO_LARGE' ? 413 : 500;
       if (status === 500) log('upload failed', (e as Error).message);
-      return reply.code(status).send({ ok: false, error: status === 413 ? 'That video is too large. Please record again at a lower quality.' : (e as Error).message });
+      return reply.code(status).send({ ok: false, error: status === 413 ? 'That video is too large. Please record again at a lower quality.' : (e as Error).message, ...(e instanceof UploadError && e.code ? { code: e.code } : {}) });
     }
   });
 
@@ -102,7 +103,7 @@ async function main() {
     const file = resolve(config.mediaDir, req.params.claimId, req.params.file);
     if (!existsSync(file)) return reply.code(404).send({ error: 'not found' });
     const type = file.endsWith('.jpg') ? 'image/jpeg' : file.endsWith('.webm') ? 'video/webm' : file.endsWith('.mov') ? 'video/quicktime' : 'video/mp4';
-    return reply.type(type).header('Cache-Control', 'private, max-age=600').send(createReadStream(file));
+    return sendMedia(reply, file, type, req.headers.range);
   });
 
   // Case files (frames, mosaics, proof clips, probe charts, droid.log, report.md) at signed, expiring URLs; nested paths, never outside the case.
@@ -116,7 +117,7 @@ async function main() {
     const file = resolve(root, rel);
     if (!file.startsWith(root + '/') || !existsSync(file)) return reply.code(404).send({ error: 'not found' });
     const type = CASE_TYPES[file.split('.').pop()?.toLowerCase() ?? ''] ?? 'application/octet-stream';
-    return reply.type(type).header('Cache-Control', 'private, max-age=600').send(createReadStream(file));
+    return sendMedia(reply, file, type, req.headers.range);
   });
 
   // CREAO webhooks (laptop only; at least once, answered fast, deduped).

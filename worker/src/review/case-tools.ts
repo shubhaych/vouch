@@ -10,6 +10,7 @@ import type { Role } from './fence';
 import { MCP_TOOLS } from './fence';
 import { relCase } from './paths';
 import type { CaseState } from './state';
+import { AssessmentDraftSchema, AssessmentFields, type AssessmentDraft } from './assessment';
 
 type Sdk = typeof import('@factory/droid-sdk/node');
 export type McpServer = ReturnType<Sdk['createSdkMcpServer']>;
@@ -88,6 +89,16 @@ export async function buildCaseServer(sdk: Sdk, role: Role, ctx: CaseContext): P
     set_live_note: sdk.tool('set_live_note', 'One short progress line the customer sees on their phone right now (what you are checking, not what you found). Call it before each step.',
       { text: z.string().min(3).max(140) },
       async ({ text }: { text: string }) => { await ctx.liveNote(text); state.log(`live note: ${text}`); return 'shown'; }),
+    recommend_refund: sdk.tool('recommend_refund', 'Analyst only: propose accept (full/partial), decline, or more_evidence with an amount in cents, cited evidence for/against, and analysis of EVERY customer statement. This is a recommendation, never a payment or denial. Cite finding IDs, not artifact IDs. Missing evidence is specific, not a default.',
+      AssessmentFields, async (input: AssessmentDraft) => {
+        const draft = AssessmentDraftSchema.parse(input);
+        const ids = [...draft.forRefund, ...draft.againstRefund].map((x) => x.findingId).concat(draft.statements.flatMap((s) => s.findingIds));
+        if (ids.some((id) => !state.findings.has(BigInt(id)))) return 'recommend_refund refused: cite only IDs from list_findings.';
+        if (ctx.claims.some((c) => draft.statements.filter((s) => s.claimId === c.id).length !== 1)) return 'recommend_refund refused: analyse each claim exactly once.';
+        state.assessment = draft;
+        state.log(`Factory recommendation: ${draft.action}, ${draft.amountCents} cents (pending audit)`);
+        return 'Recommendation recorded, pending the independent audit and human/automatic-payment checks.';
+      }),
     audit_finding: sdk.tool('audit_finding', 'Auditor only: pass or reject one finding with a reason. A rejected finding is excluded from the score.',
       { id: z.string(), status: z.enum(['passed', 'rejected']), note: z.string().max(600) },
       async ({ id, status, note }: { id: string; status: 'passed' | 'rejected'; note: string }) => {

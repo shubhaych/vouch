@@ -9,7 +9,8 @@ import { FORMULA_VERSION, TIER_LABEL, type SpokenClaim } from '@vouch/module/rev
 import type { DroidSessionSummary, Report, ReportArtifact, ReportFinding, TimelineEntry } from '@vouch/module/review-types';
 import { label } from '../history';
 import type { IngestResult } from './ingest';
-import type { IntegrityDoc } from './lanes';
+import type { IntegrityDoc, TranscriptLane } from './lanes';
+import { FactoryAssessmentSchema } from './assessment';
 import { hms } from './paths';
 import type { ScoreResult } from './score-claim';
 import type { CaseState, FindingRec } from './state';
@@ -28,7 +29,13 @@ const Session = z.object({
 /** Every report the worker writes passes this; the web can trust the shape. */
 export const ReportSchema = z.object({
   claimId: z.string(), retailerId: z.string(), generatedAt: z.string(), formulaVersion: z.string(),
-  video: z.object({ durationS: z.number(), resolution: z.string(), audio: z.boolean(), sha256: z.string(), proofReelUrl: z.string() }),
+  video: z.object({
+    durationS: z.number(), resolution: z.string(), audio: z.boolean(), sha256: z.string(), proofReelUrl: z.string(), sourceUrl: z.string().optional(), audioUrl: z.string().optional(),
+    clips: z.array(z.object({ n: z.number(), tStart: z.number(), tEnd: z.number(), audio: z.boolean() })).optional(),
+  }),
+  order: z.object({ item: z.string(), description: z.string(), priceCents: z.number(), requestedCents: z.number() }).optional(),
+  transcript: z.object({ status: z.enum(['done', 'no_audio', 'no_speech', 'failed']), note: z.string(), language: z.string().optional(), segments: z.array(z.object({ start: z.number(), end: z.number(), text: z.string() })) }).optional(),
+  factoryAssessment: FactoryAssessmentSchema.optional(),
   claimSummary: z.object({ reasonCode: z.string(), reasonText: z.string(), claimsFrom: z.enum(['transcript', 'written']), spokenClaims: z.array(z.object({ id: z.string(), text: z.string(), kind: z.enum(['defect', 'condition', 'functional', 'context']), tSaid: z.number() })) }),
   findings: z.array(Finding), rejectedFindings: z.array(Finding),
   artifacts: z.array(z.object({ id: z.number().int(), kind: z.string(), path: z.string(), url: z.string(), tStart: z.number(), tEnd: z.number(), label: z.string(), sha256: z.string() })),
@@ -57,6 +64,7 @@ export interface AssembleInput {
   claims: SpokenClaim[];
   reasonCode: string;
   reasonText: string;
+  order?: Report['order'];
   integrity: IntegrityDoc;
   score: ScoreResult;
   sessions: DroidSessionSummary[];
@@ -64,6 +72,8 @@ export interface AssembleInput {
   limits: string[];
   reel: string | null;
   transcribed: boolean;
+  transcript?: TranscriptLane;
+  factoryAssessment?: Report['factoryAssessment'];
   creaoReview?: Report['creaoReview'];
 }
 
@@ -108,7 +118,11 @@ export function assembleReport(i: AssembleInput): Report {
     retailerId: label.business(i.businessId),
     generatedAt: new Date().toISOString(),
     formulaVersion: FORMULA_VERSION,
-    video: { durationS: i.ing.meta.durationS, resolution: `${i.ing.meta.width}×${i.ing.meta.height}`, audio: i.ing.meta.hasAudio, sha256: i.ing.sha256, proofReelUrl: i.reel ? i.state.url(i.reel) : '' },
+    video: { durationS: i.ing.meta.durationS, resolution: Math.abs(i.ing.meta.rotation) % 180 === 90 ? `${i.ing.meta.height}×${i.ing.meta.width}` : `${i.ing.meta.width}×${i.ing.meta.height}`, audio: i.ing.meta.hasAudio, sha256: i.ing.sha256, proofReelUrl: i.reel ? i.state.url(i.reel) : '', sourceUrl: i.state.url('video.mp4'), ...(i.ing.meta.hasAudio ? { audioUrl: i.state.url('audio.wav') } : {}),
+      ...(i.ing.clips.length > 1 ? { clips: i.ing.clips.map((c) => ({ n: c.n, tStart: c.tStart, tEnd: c.tEnd, audio: c.meta.hasAudio })) } : {}) },
+    ...(i.order ? { order: i.order } : {}),
+    ...(i.transcript ? { transcript: { status: i.transcript.status, note: i.transcript.limit ?? 'Machine transcript. Check the recording for uncertain words.', ...(i.transcript.transcript?.language ? { language: i.transcript.transcript.language } : {}), segments: i.transcript.transcript?.segments ?? [] } } : {}),
+    ...(i.factoryAssessment ? { factoryAssessment: i.factoryAssessment } : {}),
     claimSummary: { reasonCode: i.reasonCode, reasonText: i.reasonText, claimsFrom: i.transcribed ? 'transcript' : 'written', spokenClaims: i.claims },
     findings: kept.map(toFinding),
     rejectedFindings: rejected.map(toFinding),
@@ -148,6 +162,20 @@ export function reportMarkdown(r: Report): string {
   const lines = [
     `# Report ${r.claimId} (${r.retailerId})`, '',
     `Generated ${r.generatedAt}; formula ${r.formulaVersion}. ${r.method.lanesOnly ? '**Automated checks only (Droid did not run).**' : ''}`, '',
+    ...(r.factoryAssessment ? [
+      `## Factory recommendation: ${r.factoryAssessment.action} (${r.factoryAssessment.status})`,
+      `Recommended total: ${money(r.factoryAssessment.amountCents)} of ${money(r.factoryAssessment.requestedCents)} requested. Not a payment or final decision.`,
+      r.factoryAssessment.rationale,
+      ...r.factoryAssessment.forRefund.map((e) => `- For refund: ${e.reason} (finding ${e.findingId})`),
+      ...r.factoryAssessment.againstRefund.map((e) => `- Against refund: ${e.reason} (finding ${e.findingId})`),
+      ...r.factoryAssessment.statements.map((s) => `- ${s.claimId}: ${s.analysis} (findings ${s.findingIds.join(', ')})`),
+      ...r.factoryAssessment.missingEvidence.map((s) => `- Missing: ${s}`),
+      ...r.factoryAssessment.guardNotes.map((s) => `- Review required: ${s}`), '',
+    ] : []),
+    ...(r.transcript ? [
+      `## Audio transcript (${r.transcript.status})`, r.transcript.note,
+      ...r.transcript.segments.map((s) => `- ${hms(s.start)}–${hms(s.end)}: ${s.text}`), '',
+    ] : []),
     `## Recommendation: ${r.recommendation.tier} — ${TIER_LABEL[r.recommendation.tier]}`,
     `- Refund now ${money(r.recommendation.refundNow)}; on return ${money(r.recommendation.refundOnReturn)}; return required: ${r.recommendation.returnRequired ? 'yes' : 'no'}`,
     ...r.recommendation.reasons.map((x) => `- ${x.text} _(${x.cites})_`),

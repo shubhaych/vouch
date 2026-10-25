@@ -40,12 +40,37 @@ export interface DroidSessionSummary {
   note?: string;
 }
 
+/** Factory proposes; audited citations constrain it. This is never a payment or denial. */
+export interface FactoryAssessment {
+  action: 'accept' | 'decline' | 'more_evidence';
+  amountCents: number;
+  requestedCents: number;
+  confidence: number;
+  rationale: string;
+  forRefund: { findingId: string; reason: string }[];
+  againstRefund: { findingId: string; reason: string }[];
+  statements: { claimId: string; findingIds: string[]; analysis: string }[];
+  missingEvidence: string[];
+  /** more_evidence only: ask the customer for their one extra clip, or hand the case to a person. */
+  nextStep?: 'extra_clip' | 'human_review';
+  status: 'validated' | 'needs_review' | 'unavailable';
+  guardNotes: string[];
+}
+
 export interface Report {
   claimId: string;
   retailerId: string;
   generatedAt: string;
   formulaVersion: string;
-  video: { durationS: number; resolution: string; audio: boolean; sha256: string; proofReelUrl: string };
+  video: {
+    durationS: number; resolution: string; audio: boolean; sha256: string; proofReelUrl: string; sourceUrl?: string; audioUrl?: string;
+    /** With an extra clip: where each clip sits on the joined timeline. */
+    clips?: { n: number; tStart: number; tEnd: number; audio: boolean }[];
+  };
+  /** What was ordered (the store's description is taken as true) and what is asked back. */
+  order?: { item: string; description: string; priceCents: number; requestedCents: number };
+  transcript?: { status: 'done' | 'no_audio' | 'no_speech' | 'failed'; note: string; language?: string; segments: { start: number; end: number; text: string }[] };
+  factoryAssessment?: FactoryAssessment;
   /** claimsFrom 'written' means nothing was transcribed: the claims are the written reason split up, and tSaid is only where to look. */
   claimSummary: { reasonCode: string; reasonText: string; claimsFrom: 'transcript' | 'written'; spokenClaims: SpokenClaim[] };
   findings: ReportFinding[];

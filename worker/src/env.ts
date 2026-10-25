@@ -32,9 +32,14 @@ export const config = {
     enabled: str('REVIEW_ENABLED', '1') !== '0',
     maxDroidSessionsPerHour: Number(str('MAX_DROID_SESSIONS_PER_HOUR', '20')),
     whisperModel: str('WHISPER_MODEL', 'small'),
+    python: str('REVIEW_PYTHON', existsSync(resolve(REPO_ROOT, '.venv-review/bin/python3')) ? resolve(REPO_ROOT, '.venv-review/bin/python3') : 'python3'),
+    droidClaims: str('REVIEW_DROID_CLAIMS', '0') === '1',
     sessionLimitMs: Number(str('REVIEW_SESSION_LIMIT_MS', String(6 * 60_000))),
     // The Proof Builder runs as a third Droid session only when asked; by default the worker cuts the clips itself (same output, no credits).
     droidProof: str('REVIEW_DROID_PROOF', '0') === '1',
+    // The Report Auditor as a second Droid session took 55–90 s of a 2–3 minute review. The worker's own
+    // audit (audit.ts: files, hashes, time windows, wording, one finding per claim) always runs; this adds Droid's.
+    droidAuditor: str('REVIEW_DROID_AUDITOR', '0') === '1',
     model: str('REVIEW_DROID_MODEL'),
   },
   anthropicKey: str('ANTHROPIC_API_KEY'),

@@ -31,28 +31,35 @@ async function timed(log: IngestLogLine[], bin: string, args: string[], cwd: str
 
 // ---------------------------------------------------------------- transcript
 
-export interface TranscriptLane { transcript: TranscriptDoc | null; limit: string | null; artifacts: NewArtifact[]; log: IngestLogLine[] }
+export interface TranscriptLane { status: 'done' | 'no_audio' | 'no_speech' | 'failed'; transcript: TranscriptDoc | null; limit: string | null; artifacts: NewArtifact[]; log: IngestLogLine[] }
 
 export async function transcribeLane(dir: string, hasAudio: boolean): Promise<TranscriptLane> {
   const log: IngestLogLine[] = [];
-  if (!hasAudio || !existsSync(resolve(dir, 'audio.wav'))) return { transcript: null, limit: 'No audio track, so there is no transcript; claims come from the written reason.', artifacts: [], log };
+  if (!hasAudio) return { status: 'no_audio', transcript: null, limit: 'No audio track in the upload. Record with microphone access, or upload a video with sound.', artifacts: [], log };
+  if (!existsSync(resolve(dir, 'audio.wav'))) return { status: 'failed', transcript: null, limit: 'Audio exists, but extraction failed. This is a processing problem, not missing customer evidence.', artifacts: [], log };
   const script = resolve(config.toolsDir, 'transcribe.py');
-  const r = await timed(log, 'python3', [script, 'audio.wav', 'transcript.json', '--model', config.review.whisperModel, '--txt', 'transcript.txt'], dir, 'transcript (faster-whisper)');
-  if (r.code === 3) return { transcript: null, limit: 'No transcript: faster-whisper is not installed on the worker (pip install faster-whisper). Claims come from the written reason.', artifacts: [], log };
-  if (!r.ok) return { transcript: null, limit: `No transcript: the transcriber failed (${r.stderr.trim().split('\n').pop()?.slice(0, 160) ?? 'unknown error'}).`, artifacts: [], log };
-  const doc = JSON.parse(readFileSync(resolve(dir, 'transcript.json'), 'utf8')) as TranscriptDoc;
-  if (!doc.segments?.length) return { transcript: doc, limit: 'The audio track has no recognisable speech.', artifacts: [], log };
+  const r = await timed(log, config.review.python, [script, 'audio.wav', 'transcript.json', '--model', config.review.whisperModel, '--txt', 'transcript.txt'], dir, 'transcript (faster-whisper)');
+  if (r.code === 3) return { status: 'failed', transcript: null, limit: 'Transcriber unavailable. Run bash scripts/setup-review-audio.sh and restart the worker. This is a server setup problem, not missing customer evidence.', artifacts: [], log };
+  if (!r.ok) return { status: 'failed', transcript: null, limit: 'Transcription failed or timed out on the worker. Listen to the original audio; do not treat this as evidence against the claim.', artifacts: [], log };
+  let doc: TranscriptDoc;
+  try {
+    doc = JSON.parse(readFileSync(resolve(dir, 'transcript.json'), 'utf8')) as TranscriptDoc;
+    if (!Array.isArray(doc.segments) || !Array.isArray(doc.words) || doc.segments.some((s) => !Number.isFinite(s.start) || !Number.isFinite(s.end) || s.start < 0 || s.end < s.start || typeof s.text !== 'string')) throw new Error('invalid transcript');
+  } catch {
+    return { status: 'failed', transcript: null, limit: 'The transcriber returned invalid data. Listen to the original audio.', artifacts: [], log };
+  }
+  if (!doc.segments.length) return { status: 'no_speech', transcript: doc, limit: 'Audio is available, but no speech was recognised. Item sounds can still be relevant.', artifacts: [], log };
   const dur = Math.max(...doc.segments.map((s) => s.end));
   const artifacts: NewArtifact[] = [
     { kind: 'transcript', path: 'transcript.json', tStart: 0, tEnd: dur, label: `transcript, ${doc.words.length} words (${doc.model ?? 'whisper'})`, sha256: sha256File(resolve(dir, 'transcript.json')) },
     { kind: 'transcript', path: 'transcript.txt', tStart: 0, tEnd: dur, label: 'transcript, readable', sha256: sha256File(resolve(dir, 'transcript.txt')) },
   ];
-  return { transcript: doc, limit: null, artifacts, log };
+  return { status: 'done', transcript: doc, limit: null, artifacts, log };
 }
 
 // ---------------------------------------------------------------- integrity
 
-export interface UploadChecks { frame_reuse?: ReuseMatch[]; still_image?: boolean; blank_frames?: number; frame_motion?: number | null; fresh?: boolean; uploaded_after_s?: number }
+export interface UploadChecks { frame_reuse?: ReuseMatch[]; still_image?: boolean; blank_frames?: number; frame_motion?: number | null; fresh?: boolean; uploaded_after_s?: number; clips?: 1 | 2; has_audio?: boolean; extra_requested_at?: string; first?: UploadChecks }
 
 export interface IntegrityDoc {
   flags: IntegrityFlag[];
@@ -62,6 +69,7 @@ export interface IntegrityDoc {
   metadata: { creationTime: string | null; encoder: string | null; make: string | null; model: string | null; codec: string; container: string; claimOpenedAt: string; note: string };
   reuse: ReuseMatch[];
   challenge: { expectedFingers: number; lastFrame: string; checkedBy: 'droid' | 'nobody' };
+  clips: { n: number; tStart: number; tEnd: number }[];
   notes: string[];
 }
 
@@ -76,17 +84,18 @@ const spans = (stderr: string, startKey: string, endKey: string, durKey: string)
   return out;
 };
 
-export async function integrityLane(dir: string, ing: IngestResult, checks: UploadChecks, fingerCount: number, claimOpenedAt: Date): Promise<IntegrityLane> {
+export async function integrityLane(dir: string, ing: IngestResult, checks: UploadChecks, fingerCount: number, claimOpenedAt: Date, extraRequestedAt?: Date): Promise<IntegrityLane> {
   const log: IngestLogLine[] = [];
   const limits: string[] = [];
   const notes: string[] = [];
   const flags: IntegrityFlag[] = [];
   const dur = ing.meta.durationS;
 
-  const bd = await timed(log, 'ffmpeg', ['-hide_banner', '-nostats', '-i', 'video.mp4', '-vf', 'blackdetect=d=0.5:pix_th=0.10', '-an', '-f', 'null', '-'], dir, 'black frames');
+  // Both detectors can share one decode; neither depends on the other's result.
+  const bd = await timed(log, 'ffmpeg', ['-hide_banner', '-nostats', '-i', 'video.mp4', '-vf', 'blackdetect=d=0.5:pix_th=0.10,freezedetect=n=0.003:d=2', '-an', '-f', 'null', '-'], dir, 'black and frozen frames');
   const black = bd.ok ? spans(bd.stderr, 'black_start', 'black_end', 'black_duration') : [];
   if (!bd.ok) limits.push('The black-frame detector did not run.');
-  const fz = await timed(log, 'ffmpeg', ['-hide_banner', '-nostats', '-i', 'video.mp4', '-vf', 'freezedetect=n=0.003:d=2', '-an', '-f', 'null', '-'], dir, 'frozen frames');
+  const fz = bd;
   const frozen = fz.ok ? spans(fz.stderr, 'lavfi.freezedetect.freeze_start', 'lavfi.freezedetect.freeze_end', 'lavfi.freezedetect.freeze_duration') : [];
   if (!fz.ok) limits.push('The frozen-frame detector did not run.');
 
@@ -96,24 +105,37 @@ export async function integrityLane(dir: string, ing: IngestResult, checks: Uplo
   if (frozenS >= 2) { flags.push({ kind: 'frozen', confidence: 0.8, tStart: frozen[0]!.start, tEnd: frozen[0]!.end, note: `${frozenS.toFixed(1)} s of frozen frames` }); notes.push(`${frozenS.toFixed(1)} s of the video does not change at all (a still image or a paused recording).`); }
   if (checks.still_image) { flags.push({ kind: 'still_image', confidence: 0.7, note: `frame motion ${checks.frame_motion ?? '?'}` }); notes.push('The sampled frames barely change, as a photo or a slideshow would.'); }
 
-  const cutsPerSecond = dur > 0 ? Math.round((ing.scenes.length / dur) * 100) / 100 : 0;
-  if (cutsPerSecond > 0.5) { flags.push({ kind: 'splice', confidence: 0.5, note: `${ing.scenes.length} hard cuts in ${dur.toFixed(1)} s` }); notes.push(`${ing.scenes.length} hard cuts in ${dur.toFixed(1)} s: the video may be edited together from pieces.`); }
-  else if (cutsPerSecond > 0.25) { flags.push({ kind: 'splice', confidence: 0.25, note: `${ing.scenes.length} hard cuts in ${dur.toFixed(1)} s` }); notes.push(`${ing.scenes.length} scene changes in ${dur.toFixed(1)} s; some may be cuts.`); }
+  // Joining the extra clip to the claim video adds one cut that is ours, not an edit.
+  const cuts = Math.max(0, ing.scenes.length - (ing.clips.length - 1));
+  const cutsPerSecond = dur > 0 ? Math.round((cuts / dur) * 100) / 100 : 0;
+  if (cutsPerSecond > 0.5) { flags.push({ kind: 'splice', confidence: 0.5, note: `${cuts} hard cuts in ${dur.toFixed(1)} s` }); notes.push(`${cuts} hard cuts in ${dur.toFixed(1)} s: the video may be edited together from pieces.`); }
+  else if (cutsPerSecond > 0.25) { flags.push({ kind: 'splice', confidence: 0.25, note: `${cuts} hard cuts in ${dur.toFixed(1)} s` }); notes.push(`${cuts} scene changes in ${dur.toFixed(1)} s; some may be cuts.`); }
 
+  // Each clip's own file is checked against the moment it was asked for: the claim for clip 1, the request for the extra clip.
   const m = ing.meta;
-  let metaNote = 'No creation time in the file (phones recording through the browser rarely write one).';
-  if (m.creationTime) {
-    const created = new Date(m.creationTime);
-    if (!Number.isNaN(created.getTime())) {
-      const minutes = (claimOpenedAt.getTime() - created.getTime()) / 60_000;
-      if (minutes > 15) { flags.push({ kind: 'metadata_inconsistent', confidence: 0.6, note: `file created ${Math.round(minutes)} min before the claim was opened` }); metaNote = `The file's creation time is ${Math.round(minutes)} minutes before the claim was opened, so it may not have been recorded for this claim.`; }
-      else metaNote = `The file's creation time is within ${Math.max(0, Math.round(minutes))} minutes of the claim.`;
+  const metaNotes: string[] = [];
+  for (const clip of ing.clips) {
+    const cm = clip.meta;
+    const name = ing.clips.length > 1 ? `Clip ${clip.n}: the` : 'The';
+    const ref = clip.n === 2 && extraRequestedAt ? extraRequestedAt : claimOpenedAt;
+    const what = clip.n === 2 && extraRequestedAt ? 'the extra clip was requested' : 'the claim was opened';
+    let note = `${name} file has no creation time (phones recording through the browser rarely write one).`;
+    if (cm.creationTime) {
+      const created = new Date(cm.creationTime);
+      if (!Number.isNaN(created.getTime())) {
+        const minutes = (ref.getTime() - created.getTime()) / 60_000;
+        if (minutes > 15) { flags.push({ kind: 'metadata_inconsistent', confidence: 0.6, tStart: clip.tStart, tEnd: clip.tEnd, note: `clip ${clip.n} file created ${Math.round(minutes)} min before ${what}` }); note = `${name} file's creation time is ${Math.round(minutes)} minutes before ${what}, so it may not have been recorded for this claim.`; }
+        else note = `${name} file's creation time is within ${Math.max(0, Math.round(minutes))} minutes of when ${what}.`;
+      }
     }
+    metaNotes.push(note);
+    if (cm.encoder && /lavf|handbrake|ffmpeg|premiere|final cut|davinci/i.test(cm.encoder)) { flags.push({ kind: 'reencoded', confidence: 0.5, tStart: clip.tStart, tEnd: clip.tEnd, note: `clip ${clip.n} encoder tag ${cm.encoder}` }); notes.push(`${name} file was written by ${cm.encoder}, not directly by a phone camera.`); }
   }
-  if (m.encoder && /lavf|handbrake|ffmpeg|premiere|final cut|davinci/i.test(m.encoder)) { flags.push({ kind: 'reencoded', confidence: 0.5, note: `encoder tag ${m.encoder}` }); notes.push(`The file was written by ${m.encoder}, not directly by a phone camera.`); }
-  if (checks.fresh === false) { flags.push({ kind: 'metadata_inconsistent', confidence: 0.5, note: `uploaded ${checks.uploaded_after_s ?? '?'} s after the challenge was issued` }); notes.push('The upload arrived after the challenge window.'); }
+  const metaNote = metaNotes.join(' ');
+  if (checks.fresh === false) { flags.push({ kind: 'metadata_inconsistent', confidence: 0.5, note: `uploaded ${checks.uploaded_after_s ?? '?'} s after the ${checks.clips === 2 ? 'extra clip was requested' : 'challenge was issued'}` }); notes.push(checks.clips === 2 ? 'The extra clip arrived after its 30-minute window.' : 'The upload arrived after the challenge window.'); }
 
-  const reuse = checks.frame_reuse ?? [];
+  // Reuse found when the claim video was uploaded still counts once the extra clip arrives.
+  const reuse = [...(checks.first?.frame_reuse ?? []), ...(checks.frame_reuse ?? [])];
   if (reuse.length) { flags.push({ kind: 'frame_reuse', confidence: 0.9, note: `matches ${reuse.map((r) => r.matches_claim).join(', ')}` }); notes.push(`Frames match frames from ${reuse.map((r) => r.matches_claim).join(', ')} (difference-hash distance ≤ 6).`); }
 
   const doc: IntegrityDoc = {
@@ -121,6 +143,7 @@ export async function integrityLane(dir: string, ing: IngestResult, checks: Uplo
     metadata: { creationTime: m.creationTime, encoder: m.encoder, make: m.make, model: m.model, codec: m.codec, container: m.container, claimOpenedAt: claimOpenedAt.toISOString(), note: metaNote },
     reuse,
     challenge: { expectedFingers: fingerCount, lastFrame: 'frames/last.jpg', checkedBy: 'nobody' },
+    clips: ing.clips.map((c) => ({ n: c.n, tStart: c.tStart, tEnd: c.tEnd })),
     notes,
   };
   writeFileSync(resolve(dir, 'integrity.json'), JSON.stringify(doc, null, 2));
