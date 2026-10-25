@@ -1,0 +1,6 @@
+{
+  "P01": { "email": "<from the CRS Postman collection>", "firstName": "MARGARET", "lastName": "OKAFOR", "phoneNumber": "<phone>", "ipAddress": "<ip>", "ssn": "<ssn>", "dob": "<yyyy-mm-dd>", "street1": "<street>", "city": "<city>", "state": "<ST>", "zip": "<zip>" },
+  "P12": { "email": "<email>", "firstName": "VICTOR", "lastName": "ANAND", "phoneNumber": "<phone>", "ipAddress": "<ip>", "ssn": "<ssn>", "dob": "<yyyy-mm-dd>", "street1": "<street>", "city": "<city>", "state": "<ST>", "zip": "<zip>" },
+  "P13": { "email": "<email>", "firstName": "KAYLA", "lastName": "BRENNAN", "phoneNumber": "<phone>", "ipAddress": "<ip>", "ssn": "<ssn>", "dob": "<yyyy-mm-dd>", "street1": "<street>", "city": "<city>", "state": "<ST>", "zip": "<zip>" },
+  "P16": { "email": "<email>", "firstName": "SAMUEL", "lastName": "OYELARAN", "phoneNumber": "<phone>", "ipAddress": "<ip>", "ssn": "<ssn>", "dob": "<yyyy-mm-dd>", "street1": "<street>", "city": "<city>", "state": "<ST>", "zip": "<zip>" }
+}

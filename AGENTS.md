@@ -1,6 +1,6 @@
 # AGENTS.md: Vouch World (Cal Hacks 13.0, deadline Sun 9:00 AM PT)
 
-The full build spec is "Vouch World: Agent Build Spec" (Oct 24). This file is the short version an agent needs every session. It replaces the earlier "Vouch Refunds" brief: Threadline, the refund ladder, CRS and Nessie are gone; Factory Droid and `/lab` are in.
+The full build spec is "Vouch World: Agent Build Spec" (Oct 24). This file is the short version an agent needs every session. It replaces the earlier "Vouch Refunds" brief: Threadline, the refund ladder, CRS and Nessie are gone (CRS has since returned as a backend-only identity check, see below); Factory Droid and `/lab` are in.
 
 ## One sentence
 Vouch is trust infrastructure for shopping when consumers and AI agents buy on people's behalf: CREAO agents investigate refunds, a SpacetimeDB economy of 10,000 simulated shoppers shows the effect live on a globe, and Factory Droid improves the fraud detectors inside the running product.
@@ -19,7 +19,8 @@ An agent buys something → asks for a refund with a video → CREAO agents anal
 - `worker/` Node 22: CREAO adapter and orchestrator, ffmpeg frames, detectors, Droid Lab, credential signing, ledger poster. Two identities: `worker` and `poster`.
 - `web/` Next.js 16 App Router + Tailwind 4 + motion + react-globe.gl + Recharts. Routes: `/ /world /shop /claim/[id] /business /lab /system`.
 - `detectors/` live detectors, `candidates/` (the only folder Droid may write), `eval.ts` (fixed evaluator).
-- Not in the stack: Convex, Fetch, Coinbase/x402, Bright Data, CRS, Nessie, any second database.
+- Not in the stack: Convex, Fetch, Coinbase/x402, Bright Data, Nessie, any second database.
+- CRS (identity and contact-risk screening) is backend-only and not yet in the claim flow: the worker can call the CRS sandbox (`worker/src/crs.ts`). Read [docs/CRS.md](docs/CRS.md) before using or extending it.
 
 ## Hard rules
 - Honest labels: every number carries a badge: **Live** (from SpacetimeDB rows now), **Simulated** (from the agent simulation), **Fixture** (recorded test data), or **Replay of real run**. Never show a hard-coded number as Live.

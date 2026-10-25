@@ -18,6 +18,7 @@ import { LabRunner } from './lab';
 import { Showcase } from './showcase';
 import { mirrorOf } from './mirror';
 import { ReviewRunner } from './review/runner';
+import { isPersonaId, sandboxReady, screen, type PersonaId } from './crs';
 
 const WORKER_QUERIES = [
   'SELECT * FROM sim_run', 'SELECT * FROM metrics', 'SELECT * FROM control', 'SELECT * FROM agent', 'SELECT * FROM business',
@@ -131,6 +132,31 @@ async function main() {
     if (req.body?.code !== config.demoControllerCode) return reply.code(403).send({ error: 'controller code required' });
     const started = showcase.runNow({ live: true });
     return { ok: started, message: started ? 'Showcase run started' : 'A showcase run is already in progress' };
+  });
+  // CRS identity screening of one sandbox persona (docs/CRS.md). Callers send only the persona id;
+  // credentials and persona details stay here, and only the normalised result goes back.
+  app.get('/identity/status', async () => ({ mode: config.crs.mode, notReady: config.crs.mode === 'sandbox' ? sandboxReady() : null }));
+  app.post<{ Body: { personaId?: string } }>('/identity/check', async (req, reply) => {
+    const id = req.body?.personaId;
+    if (!isPersonaId(id)) return reply.code(400).send({ error: 'personaId must be one of the CRS sandbox personas' });
+    const notReady = config.crs.mode === 'sandbox' ? sandboxReady() : null;
+    if (notReady) return reply.code(503).send({ error: `CRS sandbox is not configured: ${notReady}` });
+    try { return await screen(id); } catch (e) { return reply.code(502).send({ error: (e as Error).message }); }
+  });
+  // Scale view: route N returns whose shoppers map onto the sandbox personas in a chosen mix.
+  // Each persona is checked once (results are cached), so 1,000 returns cost at most 4 CRS calls.
+  app.post<{ Body: { mix?: Record<string, number> } }>('/identity/batch', async (req, reply) => {
+    const mix = Object.entries(req.body?.mix ?? {}).filter(([id, n]) => isPersonaId(id) && Number.isInteger(n) && n > 0) as [PersonaId, number][];
+    const total = mix.reduce((s, [, n]) => s + n, 0);
+    if (total === 0 || total > 100_000) return reply.code(400).send({ error: 'mix must name sandbox personas with 1 to 100,000 returns in total' });
+    const notReady = config.crs.mode === 'sandbox' ? sandboxReady() : null;
+    if (notReady) return reply.code(503).send({ error: `CRS sandbox is not configured: ${notReady}` });
+    try {
+      const rows = await Promise.all(mix.map(async ([id, n]) => ({ personaId: id, returns: n, result: await screen(id) })));
+      const routes: Record<string, number> = { refund_investigator: 0, merchant_identity_review: 0, additional_verification: 0 };
+      for (const r of rows) routes[r.result.route]! += r.returns;
+      return { total, crsCalls: rows.length, routes, rows };
+    } catch (e) { return reply.code(502).send({ error: (e as Error).message }); }
   });
   app.post('/bench', async () => ({ message: 'Run `npx tsx scripts/bench.ts` on the worker machine: it publishes throwaway databases and writes results to bench_result.' }));
 
